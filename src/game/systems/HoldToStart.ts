@@ -11,10 +11,13 @@ export class HoldToStart {
   private ring: Phaser.GameObjects.Graphics;
   private dot: Phaser.GameObjects.Arc;
   private fired = false;
+  /** The current press began somewhere ignored; it doesn't count until released. */
+  private ignoring = false;
 
   constructor(
     scene: Phaser.Scene,
     private ms: number,
+    private ignoreAt: ((x: number, y: number) => boolean) | null,
     private onDone: () => void,
   ) {
     this.ring = scene.add.graphics().setDepth(1000);
@@ -23,8 +26,13 @@ export class HoldToStart {
       if (e.type !== "cursor") return;
       this.pos = { x: e.p.x, y: e.p.y };
       this.dot.setPosition(e.p.x, e.p.y).setRadius(e.inking ? 10 : 14);
-      if (e.inking) this.heldSince ??= performance.now();
-      else this.heldSince = null;
+      if (!e.inking) {
+        this.heldSince = null;
+        this.ignoring = false;
+      } else if (this.heldSince === null && !this.ignoring) {
+        if (this.ignoreAt?.(e.p.x, e.p.y)) this.ignoring = true;
+        else this.heldSince = performance.now();
+      }
     });
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
     const kb = scene.input.keyboard;

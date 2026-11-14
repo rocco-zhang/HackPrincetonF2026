@@ -2,9 +2,10 @@
 // The two connect directly (WebRTC data channel) after finding each other through PeerJS's free
 // public broker, using a four-letter room code. There is no game server and no cheat protection.
 import Peer, { type DataConnection } from "peerjs";
+import { DIFFICULTY, type Difficulty } from "../config";
 
 export type PvpMessage =
-  | { t: "hello"; asl: boolean } // host → guest: which mode we're playing
+  | { t: "hello"; asl: boolean; difficulty?: Difficulty } // host → guest: which mode and difficulty we're playing
   | { t: "ready"; v: boolean }
   | { t: "start" } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
@@ -107,9 +108,9 @@ export const pvp = {
     maybeStart();
   },
 
-  /** Tell the guest which mode the host picked. */
-  sendMode(asl: boolean) {
-    if (this.isHost) this.send({ t: "hello", asl });
+  /** Tell the guest which mode and difficulty the host picked. */
+  sendMode() {
+    if (this.isHost) this.send({ t: "hello", ...currentMode() });
   },
 
   leave() {
@@ -127,9 +128,10 @@ export const pvp = {
   },
 };
 
-/** Set by the lobby so a new connection can announce the host's mode. */
-export let currentMode: () => boolean = () => false;
-export const setModeSource = (fn: () => boolean) => (currentMode = fn);
+type ModeChoice = { asl: boolean; difficulty: Difficulty };
+/** Set by the lobby so a new connection can announce the host's mode and difficulty. */
+export let currentMode: () => ModeChoice = () => ({ asl: false, difficulty: "medium" });
+export const setModeSource = (fn: () => ModeChoice) => (currentMode = fn);
 
 function emit(e: PvpEvent) {
   for (const fn of [...listeners]) fn(e);
@@ -161,7 +163,7 @@ function adopt(c: DataConnection) {
     pvp.graceLeft = 0;
     pvp.error = "";
     setStatus("connected");
-    if (pvp.isHost) pvp.send({ t: "hello", asl: currentMode() });
+    if (pvp.isHost) pvp.sendMode();
     pvp.send({ t: "ready", v: pvp.myReady }); // after a reconnect, say where we stand
     if (!timer) timer = window.setInterval(tick, 250);
   });
@@ -191,7 +193,7 @@ function maybeStart() {
 
 function begin() {
   pvp.myReady = pvp.theirReady = false;
-  pvp.them = { hearts: 3, score: 0, wave: 1 };
+  pvp.them = { hearts: DIFFICULTY[currentMode().difficulty].hearts, score: 0, wave: 1 };
   emit({ type: "start" });
 }
 

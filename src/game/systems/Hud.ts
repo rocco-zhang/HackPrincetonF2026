@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { ARENA, GAME } from "../../config";
+import { ARENA, DIFFICULTY, type Difficulty } from "../../config";
 import { state } from "../../state";
 import { FONT, INK_CSS, MUTED_CSS, ORANGE_CSS } from "../palette";
 
@@ -12,9 +12,13 @@ export class Hud {
   private warn: Phaser.GameObjects.Text;
   private shownScore = 0;
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(
+    private scene: Phaser.Scene,
+    maxHearts: number,
+    private difficulty: Difficulty = "medium",
+  ) {
     const depth = 1000;
-    for (let i = 0; i < GAME.hearts; i++) {
+    for (let i = 0; i < maxHearts; i++) {
       this.hearts.push(scene.add.image(36 + i * 44, 36, "heart").setDepth(depth));
     }
     this.scoreText = scene.add
@@ -59,7 +63,7 @@ export class Hud {
   }
 
   setWave(n: number) {
-    this.waveText.setText(`Wave ${n}`);
+    this.waveText.setText(this.difficulty === "medium" ? `Wave ${n}` : `Wave ${n}  ·  ${DIFFICULTY[this.difficulty].label}`);
   }
 
   setMultiplier(m: number) {

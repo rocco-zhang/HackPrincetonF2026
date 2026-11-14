@@ -1,12 +1,14 @@
 import Phaser from "phaser";
-import { ARENA } from "../../config";
+import { ARENA, DIFFICULTIES, DIFFICULTY, type Difficulty } from "../../config";
 import { ASL_LETTERS } from "../../asl/hand";
-import { SYMBOLS, type SymbolName } from "../../input/events";
+import { onInput, SYMBOLS, type SymbolName } from "../../input/events";
 import { pvp } from "../../net/pvp";
-import { state } from "../../state";
-import { FONT, HIGHLIGHTER, INK_CSS, MUTED_CSS, TITLE_FONT } from "../palette";
+import { saveDifficulty, state } from "../../state";
+import { FONT, HIGHLIGHTER, INK, INK_CSS, MUTED_CSS, PAPER, TITLE_FONT } from "../palette";
 import { sfx } from "../sfx";
 import { HoldToStart } from "../systems/HoldToStart";
+
+const BTN = { w: 160, h: 48 };
 
 const LABELS: Record<SymbolName, string> = {
   hline: "dash",
@@ -24,6 +26,10 @@ export class Title extends Phaser.Scene {
   private modeLine!: Phaser.GameObjects.Text;
   private drawRow!: Phaser.GameObjects.Container;
   private aslRow!: Phaser.GameObjects.Container;
+  private diffButtons = new Map<Difficulty, { c: Phaser.GameObjects.Container; box: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
+  private hovered: Difficulty | null = null;
+  private pressing = false;
+  private diffBlurb!: Phaser.GameObjects.Text;
 
   constructor() {
     super("Title");
@@ -69,7 +75,7 @@ export class Title extends Phaser.Scene {
     this.aslRow = this.add.container(0, 0);
     ASL_LETTERS.forEach((l, i) => {
       const x = W / 2 + ((i % 12) - 5.5) * 86;
-      this.aslRow.add(this.add.image(x, i < 12 ? 322 : 424, `aslcard_${l}`).setScale(0.56).setAngle(i % 2 ? 2 : -2));
+      this.aslRow.add(this.add.image(x, i < 12 ? 300 : 394, `aslcard_${l}`).setScale(0.56).setAngle(i % 2 ? 2 : -2));
     });
     this.input.keyboard?.on("keydown-R", () => {
       if (state.aslSelected) this.scene.start("AslTrainer");
@@ -81,14 +87,16 @@ export class Title extends Phaser.Scene {
     this.input.keyboard?.on("keydown-A", () => {
       if (pvp.active && !pvp.isHost) return; // in a versus game the host picks the mode
       state.aslSelected = !state.aslSelected;
-      pvp.sendMode(state.aslSelected);
+      pvp.sendMode();
       this.showMode();
     });
+    this.makeDifficultyPicker();
     // versus: back on the title screen means not ready yet; the game starts when both are
     if (pvp.active) pvp.setReady(false);
     const offPvp = pvp.on((e) => {
       if (e.type === "message" && e.msg.t === "hello") {
         state.aslSelected = e.msg.asl;
+        if (e.msg.difficulty) state.difficulty = e.msg.difficulty; // the host's pick, not saved as ours
         this.showMode();
       } else if (e.type === "start") {
         sfx.start();
@@ -105,14 +113,15 @@ export class Title extends Phaser.Scene {
     this.tweens.add({ targets: this.prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
 
     this.add
-      .text(W / 2, H - 28, "A drawing/ASL · V versus · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
+      .text(W / 2, H - 28, "1/2/3 difficulty · A drawing/ASL · V versus · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
         fontFamily: FONT,
         fontSize: "15px",
         color: MUTED_CSS,
       })
       .setOrigin(0.5);
 
-    this.hold = new HoldToStart(this, 1000, () => {
+    // a press that lands on a difficulty button picks it rather than starting the game
+    this.hold = new HoldToStart(this, 1000, (x, y) => this.buttonAt(x, y) !== null, () => {
       if (state.aslSelected && state.mode !== "hand") {
         // handshapes need the camera; say so in the prompt and wait
         this.hold.rearm();
@@ -131,7 +140,85 @@ export class Title extends Phaser.Scene {
     });
   }
 
+  /** Easy / Medium / Hard buttons: pinch or click one, or press 1–3. In versus the host picks for both players. */
+  private makeDifficultyPicker() {
+    const W = ARENA.width, y = 466;
+    this.diffButtons = new Map();
+    DIFFICULTIES.forEach((d, i) => {
+      const x = W / 2 + (i - 1) * (BTN.w + 26);
+      const box = this.add.graphics();
+      const label = this.add
+        .text(0, 0, DIFFICULTY[d].label, { fontFamily: FONT, fontSize: "24px", fontStyle: "bold", color: INK_CSS })
+        .setOrigin(0.5);
+      const key = this.add
+        .text(-BTN.w / 2 + 12, -BTN.h / 2 + 6, String(i + 1), { fontFamily: FONT, fontSize: "13px", color: MUTED_CSS })
+        .setOrigin(0, 0);
+      const c = this.add.container(x, y, [box, label, key]).setAngle(i === 1 ? 0.8 : -1.2);
+      this.diffButtons.set(d, { c, box, label });
+    });
+    this.diffBlurb = this.add
+      .text(W / 2, y + 42, "", { fontFamily: FONT, fontSize: "18px", color: MUTED_CSS, stroke: "#f9f5ea", strokeThickness: 5 })
+      .setOrigin(0.5);
+    // hand and mouse both arrive as cursor events: hover highlights, pressing on a button picks it
+    const off = onInput((e) => {
+      if (e.type !== "cursor") return;
+      const d = this.buttonAt(e.p.x, e.p.y);
+      if (d !== this.hovered) {
+        this.hovered = d;
+        this.showDifficulty();
+      }
+      if (e.inking && !this.pressing && d) this.pickDifficulty(d);
+      this.pressing = e.inking;
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+    const keys = ["ONE", "TWO", "THREE"];
+    DIFFICULTIES.forEach((d, i) => {
+      this.input.keyboard?.on(`keydown-${keys[i]}`, () => this.pickDifficulty(d));
+      this.input.keyboard?.on(`keydown-NUMPAD_${keys[i]}`, () => this.pickDifficulty(d));
+    });
+  }
+
+  /** The difficulty button under a point, if any (a little generous, for a wobbly hand). */
+  private buttonAt(x: number, y: number): Difficulty | null {
+    for (const [d, b] of this.diffButtons) {
+      if (Math.abs(x - b.c.x) <= BTN.w / 2 + 6 && Math.abs(y - b.c.y) <= BTN.h / 2 + 6) return d;
+    }
+    return null;
+  }
+
+  private pickDifficulty(d: Difficulty) {
+    if (pvp.active && !pvp.isHost) return; // the host picks in versus
+    if (state.difficulty === d) return;
+    saveDifficulty(d);
+    pvp.sendMode();
+    sfx.hit();
+    const b = this.diffButtons.get(d)!;
+    this.tweens.add({ targets: b.c, scale: 1.12, duration: 90, yoyo: true });
+    this.showMode();
+  }
+
+  private showDifficulty() {
+    const cur = state.difficulty;
+    const locked = pvp.active && !pvp.isHost;
+    for (const [d, { box, label }] of this.diffButtons) {
+      const on = d === cur;
+      const hover = d === this.hovered && !on && !locked;
+      const { w, h } = BTN;
+      box.clear();
+      // offset ink shadow, then the paper card on top
+      box.fillStyle(INK, on ? 0.9 : 0.35);
+      box.fillRoundedRect(-w / 2 + 4, -h / 2 + 5, w, h, 10);
+      box.fillStyle(on ? HIGHLIGHTER : hover ? 0xfff6c2 : PAPER, 1);
+      box.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+      box.lineStyle(on ? 4 : 2.5, INK, on ? 1 : 0.7);
+      box.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+      label.setColor(on || hover ? INK_CSS : MUTED_CSS);
+    }
+    this.diffBlurb.setText(`${DIFFICULTY[cur].blurb}${locked ? "  ·  the host picks" : ""}`);
+  }
+
   private showMode() {
+    this.showDifficulty();
     const asl = state.aslSelected;
     this.drawRow.setVisible(!asl);
     this.aslRow.setVisible(asl);

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { ARENA } from "../../config";
+import { ARENA, DIFFICULTY, type Difficulty } from "../../config";
 import { ACCENT_CSS, FONT, INK_CSS, MUTED_CSS, ORANGE_CSS, TITLE_FONT } from "../palette";
 import { sfx } from "../sfx";
 import { HoldToStart } from "../systems/HoldToStart";
@@ -13,10 +13,12 @@ export class GameOver extends Phaser.Scene {
     super("GameOver");
   }
 
-  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean; versus?: { won: boolean; note?: string; theirScore: number } }) {
+  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean; difficulty?: Difficulty; versus?: { won: boolean; note?: string; theirScore: number } }) {
     const W = ARENA.width, H = ARENA.height;
     this.add.image(W / 2, H / 2, "floor");
-    const bestKey = data.asl ? `${BEST_KEY}.asl` : BEST_KEY;
+    // a best score per mode and difficulty; medium keeps the original keys so old bests carry over
+    const diff = data.difficulty ?? "medium";
+    const bestKey = (data.asl ? `${BEST_KEY}.asl` : BEST_KEY) + (diff === "medium" ? "" : `.${diff}`);
     const best = Number(localStorage.getItem(bestKey) ?? 0);
     const isBest = data.score > best;
     if (isBest) localStorage.setItem(bestKey, String(data.score));
@@ -42,7 +44,7 @@ export class GameOver extends Phaser.Scene {
       onUpdate: (tw) => scoreText.setText(Math.round(tw.getValue() ?? 0).toLocaleString()),
     });
     this.add
-      .text(W / 2, 360, data.versus ? `${data.versus.note ? `${data.versus.note}   ·   ` : ""}opponent's score ${data.versus.theirScore.toLocaleString()}` : `reached wave ${data.wave}   ·   best ${Math.max(best, data.score).toLocaleString()}`, { fontFamily: FONT, fontSize: "26px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+      .text(W / 2, 360, data.versus ? `${data.versus.note ? `${data.versus.note}   ·   ` : ""}opponent's score ${data.versus.theirScore.toLocaleString()}` : `${DIFFICULTY[diff].label}   ·   reached wave ${data.wave}   ·   best ${Math.max(best, data.score).toLocaleString()}`, { fontFamily: FONT, fontSize: "26px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5);
     if (isBest && data.score > 0 && !data.versus) {
       const nb = this.add.text(W / 2, 410, "New best!", { fontFamily: FONT, fontSize: "30px", fontStyle: "bold", color: ORANGE_CSS, stroke: "#f9f5ea", strokeThickness: 7 }).setOrigin(0.5);
@@ -57,7 +59,7 @@ export class GameOver extends Phaser.Scene {
 
     // short delay so a stroke that was in progress at game over doesn't restart instantly
     this.time.delayedCall(700, () => {
-      this.hold = new HoldToStart(this, 600, () => {
+      this.hold = new HoldToStart(this, 600, null, () => {
         sfx.start();
         // versus: back to the title screen, where both players ready up for a rematch
         if (data.versus) this.scene.start("Title");

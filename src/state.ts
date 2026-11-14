@@ -1,9 +1,31 @@
-import { INPUT } from "./config";
+import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
 import type { CastName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
 export type Landmark = { x: number; y: number; z: number };
+
+const DIFFICULTY_KEY = "spellcam.difficulty";
+
+function loadDifficulty(): Difficulty {
+  try {
+    const v = localStorage.getItem(DIFFICULTY_KEY) as Difficulty | null;
+    if (v && DIFFICULTIES.includes(v)) return v;
+  } catch {
+    // storage blocked: fall back to the default
+  }
+  return "medium";
+}
+
+/** Remember the title-screen difficulty choice for next time. */
+export function saveDifficulty(d: Difficulty) {
+  state.difficulty = d;
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, d);
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
 
 /** Shared app state read by the debug overlay, HUD and input adapters. */
 export const state = {
@@ -31,6 +53,8 @@ export const state = {
   wanted: [] as CastName[],
   /** Title-screen choice: play the ASL fingerspelling mode instead of drawing spells. */
   aslSelected: false,
+  /** Title-screen choice (in versus, the host's). */
+  difficulty: loadDifficulty(),
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
   /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */

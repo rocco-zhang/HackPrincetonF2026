@@ -1,4 +1,4 @@
-import { ARENA, GAME, waveSpec } from "../../config";
+import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
 import type { AslLetter } from "../../asl/hand";
 import { aslName, SYMBOLS, type CastName } from "../../input/events";
 
@@ -47,11 +47,17 @@ export class Spawner {
     private rand: () => number,
     private speedScale = 1,
     private poolFor: (wave: number) => CastName[] = symbolPool,
+    private difficulty: Difficulty = "medium",
   ) {}
+
+  /** The wave whose symbols this one draws from (easy unlocks shapes later, hard sooner). */
+  static poolWave(wave: number, difficulty: Difficulty) {
+    return Math.max(1, wave - DIFFICULTY[difficulty].poolWaveShift);
+  }
 
   startWave(n: number) {
     this.wave = n;
-    this.spec = waveSpec(n);
+    this.spec = waveSpec(n, this.difficulty);
     this.spawned = 0;
     this.timer = 0.4;
     this.elapsed = 0;
@@ -85,12 +91,12 @@ export class Spawner {
   }
 
   makeOrder(liveFronts: CastName[]): SpawnOrder {
-    const pool = this.poolFor(this.wave);
+    const pool = this.poolFor(Spawner.poolWave(this.wave, this.difficulty));
     const pick = () => pool[Math.floor(this.rand() * pool.length)];
     const len = 1 + Math.floor(this.rand() * this.spec.maxQueue);
     const symbols: CastName[] = [];
     // bias toward sharing a front symbol with someone already on screen → multi-hits
-    const first = liveFronts.length && this.rand() < 0.35 ? liveFronts[Math.floor(this.rand() * liveFronts.length)] : pick();
+    const first = liveFronts.length && this.rand() < DIFFICULTY[this.difficulty].shareChance ? liveFronts[Math.floor(this.rand() * liveFronts.length)] : pick();
     symbols.push(pool.includes(first) ? first : pick());
     while (symbols.length < len) {
       let s = pick();

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { ARENA, GAME } from "../../config";
+import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
 import { castLabel, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
 import { pvp } from "../../net/pvp";
@@ -13,6 +13,8 @@ import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
+const SHAPE_GLYPH: Partial<Record<CastName, string>> = { caret: "Λ", circle: "◯", zigzag: "zigzag" };
+
 const MULTI_NAMES = ["", "", "Double!", "Triple!", "Quad!", "Mega!"];
 
 export class Arena extends Phaser.Scene implements CastHost {
@@ -22,7 +24,8 @@ export class Arena extends Phaser.Scene implements CastHost {
   private hud!: Hud;
   private casting!: Casting;
   private spawner!: Spawner;
-  private hearts = GAME.hearts;
+  private difficulty: Difficulty = "medium";
+  private hearts = 3;
   private score = 0;
   private streak = 0;
   private wave = 0;
@@ -46,8 +49,10 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.versus = !!data?.pvp;
     this.charge = 0;
     this.demo = !!data?.demo && !this.asl && !this.versus;
+    // the demo run is scripted against the standard tuning
+    this.difficulty = this.demo ? "medium" : state.difficulty;
     this.monsters = [];
-    this.hearts = GAME.hearts;
+    this.hearts = DIFFICULTY[this.difficulty].hearts;
     this.score = 0;
     this.streak = 0;
     this.wave = 0;
@@ -60,10 +65,10 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.player = new Player(this, cx, cy);
     this.fx = new Fx(this);
     this.casting = new Casting(this, this);
-    this.hud = new Hud(this);
+    this.hud = new Hud(this, this.hearts, this.difficulty);
     this.hud.setHearts(this.hearts);
     // ASL rounds are slower: finding a handshape takes longer than drawing a line
-    this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.asl ? 0.7 : this.demo ? 0.85 : 1, this.asl ? aslPool : symbolPool);
+    this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.asl ? 0.7 : this.demo ? 0.85 : 1, this.asl ? aslPool : symbolPool, this.difficulty);
     state.aslActive = this.asl;
     this.themText = null;
     if (this.versus) this.setupVersus();
@@ -104,16 +109,38 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.wave = n;
     this.phase = "banner";
     this.hud.setWave(n);
-    const aslSub = n === 1 ? "make the handshape for a monster's letter, and hold it" : ASL_WAVES[n - 1] ? `new letters: ${ASL_WAVES[n - 1].join(" ")}` : undefined;
-    const sub = this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
-    this.fx.banner(`Wave ${n}`, INK_CSS, sub, 1200);
+    this.fx.banner(`Wave ${n}`, INK_CSS, this.waveSubtitle(n), 1200);
     sfx.wave();
-    this.time.delayedCall(GAME.breather * 1000, () => {
+    this.time.delayedCall(DIFFICULTY[this.difficulty].breather * 1000, () => {
       if (this.phase === "over") return;
       this.spawner.startWave(n);
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
     });
+  }
+
+  /** What's new this wave: shapes or letters unlocked, and monsters starting to carry longer queues. */
+  private waveSubtitle(n: number): string | undefined {
+    if (n === 1) {
+      if (this.asl) return "make the handshape for a monster's letter, and hold it";
+      return this.demo ? "demo run" : "draw the shape taped to a monster to tear it up";
+    }
+    const pw = Spawner.poolWave(n, this.difficulty);
+    const parts: string[] = [];
+    if (pw !== Spawner.poolWave(n - 1, this.difficulty)) {
+      if (this.asl) {
+        if (ASL_WAVES[pw - 1]) parts.push(`new letters: ${ASL_WAVES[pw - 1].join(" ")}`);
+      } else {
+        const before = new Set(symbolPool(pw - 1));
+        const added = symbolPool(pw).filter((s) => !before.has(s)).map((s) => SHAPE_GLYPH[s] ?? s);
+        if (added.length) parts.push(`new shape${added.length > 1 ? "s" : ""}: ${added.join(" and ")}`);
+      }
+    }
+    const q = waveSpec(n, this.difficulty).maxQueue;
+    if (q > waveSpec(n - 1, this.difficulty).maxQueue) parts.push(q === 2 ? "monsters now carry more than one" : "monsters now carry up to three");
+    if (!parts.length) return undefined;
+    const s = parts.join(". ");
+    return s[0].toUpperCase() + s.slice(1);
   }
 
   /** Show a reference card for each letter a monster needs right now, and what the camera thinks you're signing. */
@@ -193,7 +220,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     else sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1100, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, versus: { won, note, theirScore: pvp.them.score } }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, difficulty: this.difficulty, versus: { won, note, theirScore: pvp.them.score } }),
     );
   }
 
@@ -207,7 +234,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.themText?.setText(
       pvp.status === "reconnecting"
         ? `opponent lost connection: ${Math.ceil(pvp.graceLeft / 1000)} s to come back`
-        : `opponent  ${"♥".repeat(Math.max(0, t.hearts))}${"♡".repeat(Math.max(0, GAME.hearts - t.hearts))}  ${t.score.toLocaleString()}  wave ${t.wave}`,
+        : `opponent  ${"♥".repeat(Math.max(0, t.hearts))}${"♡".repeat(Math.max(0, DIFFICULTY[this.difficulty].hearts - t.hearts))}  ${t.score.toLocaleString()}  wave ${t.wave}`,
     );
   }
 
@@ -249,7 +276,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     if (this.phase === "play" && this.spawner.done && this.monsters.length === 0) {
-      const bonus = 500 * this.wave;
+      const bonus = Math.round(500 * this.wave * DIFFICULTY[this.difficulty].scoreMult);
       this.score += bonus;
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
       this.startWave(this.wave + 1);
@@ -282,7 +309,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (!m.active) return;
     const color = castColor(name);
     const mult = multi >= 3 ? 3 : multi >= 2 ? 2 : 1;
-    const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult);
+    const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult * DIFFICULTY[this.difficulty].scoreMult);
     this.score += pts;
     this.fx.floatText(m.x, m.y - 40, `+${pts}`, killed ? ORANGE_CSS : INK_CSS, killed ? 28 : 22);
     m.bubble.popFront();
@@ -340,7 +367,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1300, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl, difficulty: this.difficulty }),
     );
   }
 }
