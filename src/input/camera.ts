@@ -26,10 +26,10 @@ export async function startCamera(deviceId?: string) {
   } catch (err) {
     const name = (err as DOMException)?.name;
     if (name === "NotAllowedError" || name === "SecurityError")
-      throw new CameraError("Camera permission was denied. You can still play with the mouse.");
+      throw new CameraError("Camera permission was denied. The game is played with your hand, so allow the camera and try again.");
     if (name === "NotFoundError" || name === "OverconstrainedError")
-      throw new CameraError("No camera found. You can still play with the mouse.");
-    throw new CameraError(`Couldn't start the camera (${name ?? err}). You can still play with the mouse.`);
+      throw new CameraError("No camera found. The game is played with your hand, so it needs one.");
+    throw new CameraError(`Couldn't start the camera (${name ?? err}). Close other apps using it and try again.`);
   }
   currentDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
   const v = video();

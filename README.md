@@ -15,7 +15,7 @@ npm install        # also copies the MediaPipe wasm into public/ and fetches the
 npm run dev        # http://localhost:5173
 ```
 
-Click **Enable camera & sound** to play with your hand, or **Play with mouse only**. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
+Click **Enable camera & sound**. The game is played with your hand, so it needs a camera. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
 
 Everything runs in the browser. There is no backend (versus mode connects the two browsers directly). The hand model (`public/models/hand_landmarker.task`) is committed, and the wasm runtime is copied from `node_modules` on install, so the game never needs a CDN or venue Wi‑Fi. If the local files are missing, it falls back to the CDN automatically.
 
@@ -26,13 +26,13 @@ Everything runs in the browser. There is no backend (versus mode connects the tw
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and three icons in the top right: friends, achievements, settings. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
 - **Duel:** the same subject and difficulty pickers, a mode row (only **Friend** works; Ranked and Casual have no matchmaking yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
-- **Settings:** hand or mouse input, separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
+- **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
 
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release.
-- **Mouse:** drag to draw, release to cast.
+- **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
 - **Symbols:**
 
@@ -114,7 +114,6 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `C` / `V` | on the title screen: open Classic / Duel |
 | `1` `2` `3` | on the Classic and Duel screens: easy / medium / hard |
 | `Space` | Classic: start. Duel: ready |
-| `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |
 | `D` | debug overlay: camera preview with hand skeleton and drawing box, pinch ratio, FPS, last recognition + score, resampled stroke |
 | `K` | calibrate the drawing area: sweep your pinch over a comfortable area for 4 s |
 | `C` | next camera (laptop ↔ external webcam); on the title screen use Settings instead |
@@ -167,7 +166,7 @@ src/
     lobby.ts              the host / join panel
   input/
     events.ts             the input → game event bus (InputEvent)
-    mouseAdapter.ts       mouse/touch drag → same events
+    mouseAdapter.ts       the mouse as a menu pointer (and, with ?mouse, a full stand-in for the hand)
     camera.ts             getUserMedia, camera switching, mirroring
     handTracker.ts        MediaPipe loop (GPU → CPU fallback), pinch → cursor → strokes, calibration
     oneEuro.ts            One Euro filter

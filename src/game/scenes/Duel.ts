@@ -139,7 +139,7 @@ export class Duel extends Phaser.Scene {
       case "joining": return `Joining ${pvp.code}…`;
       case "reconnecting": return "Connection trouble: waiting for your friend…";
     }
-    if (cameraNeeded()) return "ASL needs the camera: turn on hand input in Settings (or press M).";
+    if (cameraNeeded()) return "ASL needs the camera, and this is the mouse-only test mode.";
     const who = pvp.isHost ? "You're the host: you pick the subjects and difficulty." : "The host picks the subjects and difficulty.";
     if (pvp.myReady) return "Ready! Waiting for your friend…";
     return pvp.theirReady ? "Your friend is ready. Press Ready to start." : `Connected. ${who} Press Ready when you are.`;

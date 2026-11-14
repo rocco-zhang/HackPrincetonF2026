@@ -24,7 +24,8 @@ export const isLang = (n: CastName): n is LangName => n.startsWith("lang_");
 export const castLabel = (n: CastName) => (isSymbol(n) ? n : isMath(n) ? String(mathAnswer(n)) : isLang(n) ? n.slice(5) : n.slice(4));
 
 export type InputEvent =
-  | { type: "cursor"; p: Pt; inking: boolean } // every frame: where the fingertip is, and whether it's drawing
+  // every frame: where the fingertip is, and whether it's drawing. `src` is "mouse" for the real pointer (menus), otherwise the hand.
+  | { type: "cursor"; p: Pt; inking: boolean; src?: "mouse" }
   | { type: "strokeStart"; p: Pt }
   | { type: "strokePoint"; p: Pt }
   | { type: "strokeEnd"; points: Pt[] }

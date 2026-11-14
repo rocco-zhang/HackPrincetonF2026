@@ -42,45 +42,57 @@ type Button = {
   shown: string;
 };
 
-// Whether a press is under way right now, across scenes: a pinch or click that opened a screen
-// must be let go before it can press anything on the next one.
-let inkingNow = false;
+type Src = "mouse" | "hand";
+const HAND_STALE_MS = 400; // no hand events for this long: the hand has left the picture
+
+// Whether each pointer is pressing right now, across scenes: a pinch or click that opened a
+// screen must be let go before it can press anything on the next one.
+const inkingNow: Record<Src, boolean> = { mouse: false, hand: false };
 onInput((e) => {
-  if (e.type === "cursor") inkingNow = e.inking;
+  if (e.type === "cursor") inkingNow[e.src ?? "hand"] = e.inking;
 });
 
 /**
- * Paper buttons that work the same with the mouse and with a pinch: both arrive as cursor
- * events, hovering highlights, and the moment a press starts on a button clicks it.
+ * Paper buttons that work with the mouse and with a pinch at the same time. Each is its own
+ * pointer: hovering highlights, and the moment a press starts on a button clicks it.
  */
 export class Menu {
   private buttons: Button[] = [];
-  private hovered: Button | null = null;
+  private hover: Record<Src, Button | null> = { mouse: null, hand: null };
+  private pressing: Record<Src, boolean> = { ...inkingNow };
   private sliders: Slider[] = [];
-  private dragging: Slider | null = null;
-  private pressing = inkingNow;
+  private dragging: { s: Slider; src: Src } | null = null;
+  private handSeen = 0;
   private dot: Phaser.GameObjects.Arc;
 
   constructor(private scene: Phaser.Scene) {
     this.buttons = [];
-    this.dot = scene.add.circle(-100, -100, 14, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9).setDepth(1000);
+    // the hand's cursor; the mouse already has the system pointer
+    this.dot = scene.add.circle(-100, -100, 14, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9).setDepth(1000).setVisible(false);
     const off = onInput((e) => {
       if (e.type !== "cursor") return;
-      this.dot.setPosition(e.p.x, e.p.y).setRadius(e.inking ? 10 : 14);
-      this.hovered = this.at(e.p.x, e.p.y);
-      if (e.inking && !this.pressing) {
-        if (this.hovered) this.click(this.hovered);
-        else this.dragging = this.sliders.find((s) => (s.o.enabled?.() ?? true) && Math.abs(e.p.y - s.o.y) <= 22 && e.p.x >= s.o.x - 14 && e.p.x <= s.o.x + s.o.w + 14) ?? null;
+      const src: Src = e.src ?? "hand";
+      if (src === "hand") {
+        this.handSeen = performance.now();
+        this.dot.setVisible(true).setPosition(e.p.x, e.p.y).setRadius(e.inking ? 10 : 14);
       }
-      if (this.dragging) {
-        const s = this.dragging;
+      const over = (this.hover[src] = this.at(e.p.x, e.p.y));
+      if (e.inking && !this.pressing[src] && !this.dragging) {
+        if (over) this.click(over);
+        else {
+          const s = this.sliders.find((s) => (s.o.enabled?.() ?? true) && Math.abs(e.p.y - s.o.y) <= 22 && e.p.x >= s.o.x - 14 && e.p.x <= s.o.x + s.o.w + 14);
+          if (s) this.dragging = { s, src };
+        }
+      }
+      if (this.dragging?.src === src) {
+        const { s } = this.dragging;
         if (e.inking) s.o.set(Math.min(1, Math.max(0, (e.p.x - s.o.x) / s.o.w)));
         else {
           this.dragging = null;
           s.o.onRelease?.();
         }
       }
-      this.pressing = e.inking;
+      this.pressing[src] = e.inking;
     });
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
   }
@@ -121,7 +133,8 @@ export class Menu {
     const { o, g } = s;
     const v = o.get();
     const enabled = o.enabled?.() ?? true;
-    const key = `${v.toFixed(3)}|${enabled}|${s === this.dragging}`;
+    const held = s === this.dragging?.s;
+    const key = `${v.toFixed(3)}|${enabled}|${held}`;
     if (key === s.shown) return;
     s.shown = key;
     const kx = o.x + o.w * v;
@@ -133,7 +146,7 @@ export class Menu {
     g.lineBetween(o.x, o.y, o.x + o.w, o.y);
     g.fillStyle(INK, 0.35);
     g.fillCircle(kx + 2, o.y + 3, 13);
-    g.fillStyle(s === this.dragging ? HIGHLIGHTER : PAPER, 1);
+    g.fillStyle(held ? HIGHLIGHTER : PAPER, 1);
     g.fillCircle(kx, o.y, 13);
     g.lineStyle(3, INK, 1);
     g.strokeCircle(kx, o.y, 13);
@@ -163,7 +176,7 @@ export class Menu {
     const visible = o.visible?.() ?? true;
     const enabled = o.enabled?.() ?? true;
     const on = o.selected?.() ?? false;
-    const hover = b === this.hovered && enabled;
+    const hover = (b === this.hover.mouse || b === this.hover.hand) && enabled;
     const label = o.label !== undefined ? val(o.label) : "";
     const sub = o.sub !== undefined ? val(o.sub) : "";
     const key = `${visible}|${enabled}|${on}|${hover}|${label}|${sub}`;
@@ -195,6 +208,13 @@ export class Menu {
 
   /** Call every frame: repaints whatever changed (hover, selection, labels). */
   update() {
+    if (this.dot.visible && performance.now() - this.handSeen > HAND_STALE_MS) {
+      // the hand left: drop its cursor, hover, and anything it was holding
+      this.dot.setVisible(false);
+      this.hover.hand = null;
+      this.pressing.hand = false;
+      if (this.dragging?.src === "hand") this.dragging = null;
+    }
     for (const b of this.buttons) this.paint(b);
     for (const s of this.sliders) this.paintSlider(s);
   }
