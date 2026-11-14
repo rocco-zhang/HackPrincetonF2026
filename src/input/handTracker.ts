@@ -101,6 +101,16 @@ function finishCalibration() {
   c.done?.(true);
 }
 
+function pinchRatioOf(lm: Landmark[], wl: Landmark[] | undefined, vw: number, vh: number): number | null {
+  const handSize = dist(lm[0], lm[9], vw, vh);
+  let ratio = handSize > 0 ? dist(lm[4], lm[8], vw, vh) / handSize : null;
+  const size3 = wl ? dist3(wl[0], wl[9]) : 0;
+  const ratio3 = wl && size3 > 0 ? dist3(wl[4], wl[8]) / size3 : null;
+  state.pinchRatio3d = ratio3;
+  if (ratio !== null && ratio3 !== null && ratio3 > INPUT.pinch3dMax) ratio = Math.max(ratio, ratio3);
+  return ratio;
+}
+
 function dist(a: Landmark, b: Landmark, vw: number, vh: number) {
   return Math.hypot((a.x - b.x) * vw, (a.y - b.y) * vh);
 }
@@ -150,8 +160,10 @@ function loop() {
     fpsStart = now;
   }
 
-  const lm = res.landmarks?.[0] as Landmark[] | undefined;
+  const hands = (res.landmarks ?? []) as Landmark[][];
+  const worlds = (res.worldLandmarks ?? []) as Landmark[][];
   const handActive = state.mode === "hand";
+  const lm = hands[0];
 
   if (!lm) {
     state.landmarks = null;
@@ -170,14 +182,7 @@ function loop() {
   state.handVisible = true;
   state.lastHandSeen = now;
   const vw = v.videoWidth, vh = v.videoHeight;
-  const handSize = dist(lm[0], lm[9], vw, vh);
-  let ratio = handSize > 0 ? dist(lm[4], lm[8], vw, vh) / handSize : null;
-  // 3D check: tips that overlap in the image but are apart in depth are not a pinch
-  const wl = res.worldLandmarks?.[0] as Landmark[] | undefined;
-  const size3 = wl ? dist3(wl[0], wl[9]) : 0;
-  const ratio3 = wl && size3 > 0 ? dist3(wl[4], wl[8]) / size3 : null;
-  state.pinchRatio3d = ratio3;
-  if (ratio !== null && ratio3 !== null && ratio3 > INPUT.pinch3dMax) ratio = Math.max(ratio, ratio3);
+  const ratio = pinchRatioOf(lm, worlds[0], vw, vh);
   state.pinchRatio = ratio;
   const asl = handActive && (state.aslActive || state.aslTraining);
   if (asl) {

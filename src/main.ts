@@ -55,7 +55,7 @@ function startGame() {
 /** (Re)start the Arena from whatever scene is running. */
 function startArena(demo: boolean) {
   const cur = game?.scene.getScenes(true).find((s) => s.scene.key !== "Boot");
-  cur?.scene.start("Arena", { demo, asl: state.aslSelected, math: state.mathSelected });
+  cur?.scene.start("Arena", { demo, asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected });
 }
 
 const gate = document.getElementById("gate")!;
