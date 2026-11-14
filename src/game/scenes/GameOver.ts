@@ -51,7 +51,7 @@ export class GameOver extends Phaser.Scene {
       this.tweens.add({ targets: nb, scale: 1.15, duration: 400, yoyo: true, repeat: -1 });
     }
     const prompt = this.add
-      .text(W / 2, 530, data.versus ? "Pinch & hold (or hold mouse / Space) for a rematch" : "Pinch & hold (or hold mouse / Space) to play again", { fontFamily: FONT, fontSize: "30px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
+      .text(W / 2, 530, data.versus ? "Pinch & hold (or hold the mouse button / Space) for a rematch" : "Pinch & hold (or hold the mouse button / Space) to play again", { fontFamily: FONT, fontSize: "30px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
       .setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
     this.add.text(W / 2, H - 28, data.versus ? "Esc: back to Duel" : "Esc: change difficulty or subjects", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);

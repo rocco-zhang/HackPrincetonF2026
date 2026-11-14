@@ -10,7 +10,7 @@ import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
 import { bus, emit, SYMBOLS } from "./input/events";
 import { loadAslExamples } from "./asl/examples";
-import { aslClassifier, cancelHandStroke, initHandTracker, startCalibration } from "./input/handTracker";
+import { aslClassifier, initHandTracker, startCalibration } from "./input/handTracker";
 import { initMouseAdapter } from "./input/mouseAdapter";
 import { Arena } from "./game/scenes/Arena";
 import { Classic } from "./game/scenes/Classic";
@@ -37,7 +37,7 @@ try {
 initCastPipeline();
 // your recorded ASL examples (data/asl-examples.json, or this browser) override the trained model
 void loadAslExamples((e) => aslClassifier.setExamples(e));
-const mouse = initMouseAdapter();
+initMouseAdapter();
 initDebugOverlay(() => game);
 initLobby(() => game);
 
@@ -65,7 +65,6 @@ function startArena(demo: boolean) {
 const gate = document.getElementById("gate")!;
 const gateMsg = document.getElementById("gateMsg")!;
 const enableBtn = document.getElementById("enable") as HTMLButtonElement;
-const mouseBtn = document.getElementById("mouseOnly") as HTMLButtonElement;
 const camPick = document.getElementById("camPick") as HTMLLabelElement;
 const camSelect = document.getElementById("camSelect") as HTMLSelectElement;
 
@@ -120,14 +119,14 @@ async function enableHands() {
       await initHandTracker();
     } catch (err) {
       console.error(err);
-      throw new Error("Hand tracking failed to load. You can still play with the mouse.");
+      throw new Error("Hand tracking failed to load. Check the connection and try again.");
     }
   }
 }
 
 enableBtn.addEventListener("click", async () => {
   unlockAudio();
-  enableBtn.disabled = mouseBtn.disabled = true;
+  enableBtn.disabled = true;
   gateMsg.textContent = "Starting camera…";
   try {
     await enableHands();
@@ -137,16 +136,11 @@ enableBtn.addEventListener("click", async () => {
   } catch (err) {
     gateMsg.textContent = (err as Error).message;
     enableBtn.textContent = "Try camera again";
-    enableBtn.disabled = mouseBtn.disabled = false;
+    enableBtn.disabled = false;
   }
 });
 
-mouseBtn.addEventListener("click", () => {
-  unlockAudio();
-  state.mode = "mouse";
-  closeGate();
-});
-
+// Testing without a camera: with ?mouse in the URL the mouse plays the whole game.
 if (new URLSearchParams(location.search).has("mouse")) {
   state.mode = "mouse";
   closeGate();
@@ -160,24 +154,6 @@ if (new URLSearchParams(location.search).has("mouse")) {
   window.addEventListener("keydown", unlock);
 }
 
-async function setMode(mode: "mouse" | "hand") {
-  if (mode === state.mode) return;
-  mouse.cancel();
-  cancelHandStroke();
-  if (mode === "hand") {
-    try {
-      toast("Starting hand tracking…");
-      await enableHands();
-    } catch (err) {
-      toast((err as Error).message);
-      return;
-    }
-  }
-  state.mode = mode;
-  toast(mode === "hand" ? "✋ Hand input" : "🖱 Mouse input");
-}
-
-actions.toggleInput = () => setMode(state.mode === "hand" ? "mouse" : "hand");
 actions.toggleSound = () => toast(toggleMute() ? "Sound off" : "Sound on");
 actions.toggleDebug = () => void (state.debug = !state.debug);
 actions.toggleMirror = () => {
@@ -193,7 +169,7 @@ actions.nextCamera = async () => {
   }
 };
 actions.calibrate = async () => {
-  if (!state.trackerReady || !state.cameraOn) return toast("Turn on hand input first (M)");
+  if (!state.trackerReady || !state.cameraOn) return toast("This needs the camera");
   if (state.calibrating) return;
   toast("Calibrating: sweep your pinch over the area you want to draw in (4 s)");
   const ok = await startCalibration();
@@ -205,7 +181,6 @@ window.addEventListener("keydown", (ev) => {
   if (lobbyOpen()) return; // typing a room code
   const k = ev.key.toLowerCase();
   if (k === "d") actions.toggleDebug();
-  else if (k === "m") void actions.toggleInput();
   else if (k === "n") actions.toggleSound();
   else if (k === "t") {
     state.recorder.active = !state.recorder.active;

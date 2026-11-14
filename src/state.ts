@@ -50,7 +50,10 @@ export function saveSubjects(list: Subject[]) {
 
 /** Shared app state read by the debug overlay, HUD and input adapters. */
 export const state = {
+  /** "hand" in normal play. "mouse" only with the ?mouse URL (testing without a camera): the mouse then draws too. */
   mode: "mouse" as "mouse" | "hand",
+  /** A round is running. The mouse works in menus but not here (unless ?mouse). */
+  inRound: false,
   cameraOn: false,
   trackerReady: false,
   delegate: "" as "" | "GPU" | "CPU",

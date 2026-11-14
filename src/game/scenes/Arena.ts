@@ -147,6 +147,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       off();
       state.wanted = [];
+      state.inRound = false;
       state.aslActive = false;
       state.mathActive = false;
       state.langActive = false;
@@ -192,6 +193,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   /** Point the input and the on-screen prompts at the current wave's subject. */
   private applySubject() {
+    state.inRound = true;
     state.aslActive = this.asl;
     state.mathActive = this.math;
     state.langActive = this.lang;
@@ -280,7 +282,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
     const letter = state.aslLetter;
     const lost = state.mode !== "hand";
-    this.aslText?.setText(lost ? "ASL mode needs the camera: press M" : letter ? `you're signing ${letter}${state.aslSource === "yours" ? " (your example)" : ""}` : "no letter recognised");
+    this.aslText?.setText(lost ? "ASL needs the camera" : letter ? `you're signing ${letter}${state.aslSource === "yours" ? " (your example)" : ""}` : "no letter recognised");
     const g = this.aslBar!;
     g.clear();
     if (on && letter && !lost) {

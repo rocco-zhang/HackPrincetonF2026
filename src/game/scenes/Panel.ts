@@ -58,7 +58,6 @@ export class Panel extends Phaser.Scene {
     const onOff = (v: boolean) => (v ? "On" : "Off");
     type Row = { name: string; note: string; label: string | (() => string); run: () => void; volume?: { get: () => number; set: (v: number) => void; on: () => boolean; test?: () => void } };
     const rows: Row[] = [
-      { name: "Input", note: "M", label: () => (state.mode === "hand" ? "Hand (camera)" : "Mouse"), run: () => void actions.toggleInput() },
       {
         name: "Sound effects",
         note: "N mutes all",

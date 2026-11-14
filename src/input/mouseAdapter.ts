@@ -1,4 +1,5 @@
-// Mouse / touch drag → the same events the hand tracker emits.
+// The mouse (or a touch) as a pointer for the menus. It does not draw: rounds are played with the hand.
+// The exception is the ?mouse URL (state.mode === "mouse"), where it emits the same strokes the hand tracker does.
 import { ARENA } from "../config";
 import { state } from "../state";
 import { emit, type Pt } from "./events";
@@ -19,12 +20,13 @@ export function initMouseAdapter() {
   let down = false;
 
   const handle = (ev: PointerEvent, inking: boolean) => {
-    if (state.mode !== "mouse") return;
+    const draws = state.mode === "mouse";
+    if (!draws && state.inRound) return;
     const g = toGameCoords(ev.clientX, ev.clientY);
     if (!g) return;
     const p: Pt = { x: g.x, y: g.y, t: performance.now() };
-    emit({ type: "cursor", p, inking });
-    strokes.update(p, inking);
+    emit({ type: "cursor", p, inking, src: "mouse" });
+    if (draws) strokes.update(p, inking);
   };
 
   const stage = document.getElementById("stage")!;

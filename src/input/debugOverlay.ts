@@ -107,7 +107,7 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
         ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${RECOG.acceptScore}, ≥ ${RECOG.acceptScoreWanted} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
         : "last: -",
       `templates: ${SYMBOLS.filter((n) => n !== "hline" && n !== "vline").map((n) => `${n} ${recognizer?.count(n) ?? 0}`).join("  ")}  (lines: angle rule)`,
-      `keys: D debug · T record · M mouse/hand · K calibrate · C camera · F mirror · G demo`,
+      `keys: D debug · T record · K calibrate · C camera · F mirror · G demo`,
     ];
     ctx.font = "12px ui-monospace, Menlo, monospace";
     const tw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;

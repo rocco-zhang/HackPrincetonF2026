@@ -39,7 +39,7 @@ export class Classic extends Phaser.Scene {
       this.add.text(x, capY, text, { fontFamily: FONT, fontSize: "19px", color: INK_CSS, align: "center", wordWrap: { width: 300 } }).setOrigin(0.5, 0);
     // 1: pinch to draw
     pinchIcon(this.add.graphics({ x: xs[0] + 12, y: stepY }));
-    cap(xs[0], state.mode === "hand" ? "1. Pinch thumb and index finger to draw in the air" : "1. Hold the mouse button and drag to draw");
+    cap(xs[0], "1. Pinch thumb and index finger to draw in the air");
     // 2: match what a monster carries
     this.add.image(xs[1] - 44, stepY + 4, "monster1").setScale(0.8);
     this.add.image(xs[1] + 6, stepY - 34, "sym_v").setScale(0.8).setAngle(-6);
@@ -74,6 +74,6 @@ export class Classic extends Phaser.Scene {
     set(this.subjectNote, many ? `each wave switches to the next: ${state.subjects.map((s) => SUBJECT_INFO[s].label).join(" → ")}` : "pick one or more");
     const hows = [...new Set(state.subjects.map((s) => SUBJECT_INFO[s].how))];
     set(this.matchText, `2. A monster carries a card: ${hows.join(", or ")} to tear it up`);
-    set(this.warn, cameraNeeded() ? "ASL needs the camera: turn on hand input in Settings (or press M)" : "");
+    set(this.warn, cameraNeeded() ? "ASL needs the camera, and this is the mouse-only test mode" : "");
   }
 }
