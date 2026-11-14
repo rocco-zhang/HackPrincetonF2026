@@ -13,10 +13,10 @@ export class GameOver extends Phaser.Scene {
     super("GameOver");
   }
 
-  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean; math?: boolean; versus?: { won: boolean; note?: string; theirScore: number } }) {
+  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean; math?: boolean; lang?: boolean; versus?: { won: boolean; note?: string; theirScore: number } }) {
     const W = ARENA.width, H = ARENA.height;
     this.add.image(W / 2, H / 2, "floor");
-    const bestKey = data.math ? `${BEST_KEY}.math` : data.asl ? `${BEST_KEY}.asl` : BEST_KEY;
+    const bestKey = data.lang ? `${BEST_KEY}.lang` : data.math ? `${BEST_KEY}.math` : data.asl ? `${BEST_KEY}.asl` : BEST_KEY;
     const best = Number(localStorage.getItem(bestKey) ?? 0);
     const isBest = data.score > best;
     if (isBest) localStorage.setItem(bestKey, String(data.score));
@@ -61,7 +61,7 @@ export class GameOver extends Phaser.Scene {
         sfx.start();
         // versus: back to the title screen, where both players ready up for a rematch
         if (data.versus) this.scene.start("Title");
-        else this.scene.start("Arena", { demo: data.demo, asl: data.asl, math: data.math });
+        else this.scene.start("Arena", { demo: data.demo, asl: data.asl, math: data.math, lang: data.lang });
       });
     });
   }

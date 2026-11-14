@@ -1,6 +1,6 @@
 // Procedural sound effects (Web Audio). The AudioContext is created on the
 // "Enable camera & sound" click, which browsers require before playing audio.
-import { ASL_NAMES, isMath, isSymbol, SYMBOLS, type CastName, type SymbolName } from "../input/events";
+import { ASL_NAMES, isLang, isMath, isSymbol, SYMBOLS, type CastName, type SymbolName } from "../input/events";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -102,7 +102,7 @@ const SYMBOL_SFX: Record<SymbolName, () => void> = {
 export const sfx = {
   // ASL letters reuse the six symbol sounds, in order
   symbol: (name: CastName) => {
-    const key = isSymbol(name) ? name : isMath(name) ? "circle" : SYMBOLS[Math.max(0, ASL_NAMES.indexOf(name)) % SYMBOLS.length];
+    const key = isSymbol(name) ? name : isMath(name) || isLang(name) ? "circle" : SYMBOLS[Math.max(0, ASL_NAMES.indexOf(name)) % SYMBOLS.length];
     SYMBOL_SFX[key]();
   },
   hit: () => tone({ freq: 1400, to: 700, dur: 0.08, type: "triangle", gain: 0.15 }),

@@ -31,12 +31,16 @@ export const state = {
   wanted: [] as CastName[],
   /** Title-screen choice: play the ASL fingerspelling mode instead of drawing spells. */
   aslSelected: false,
-  /** Title-screen choice: monsters carry arithmetic, answered from the keyboard. */
+  /** Title-screen choice: monsters carry arithmetic, answered by drawn digits. */
   mathSelected: false,
+  /** Title-screen choice: Korean, Japanese, and a few short words, drawn as easy marks. */
+  langSelected: false,
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
-  /** An arithmetic round is running: drawing is ignored and answers are typed. */
+  /** An arithmetic round is running. */
   mathActive: false,
+  /** A languages round is running. Each mark is drawn and casts on its own. */
+  langActive: false,
   /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */
   aslLetter: null as AslLetter | null,
   aslProgress: 0,

@@ -12,6 +12,7 @@ import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
+import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, pickLang, type Mark } from "../languages";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
@@ -33,6 +34,8 @@ export class Arena extends Phaser.Scene implements CastHost {
   private demo = false;
   private asl = false;
   private math = false;
+  private lang = false;
+  private marks: Mark[] = [];
   private buffer = "";
   private answerHold = 0;
   private answerText: Phaser.GameObjects.Text | null = null;
@@ -49,13 +52,15 @@ export class Arena extends Phaser.Scene implements CastHost {
     super("Arena");
   }
 
-  init(data: { demo?: boolean; asl?: boolean; math?: boolean; pvp?: boolean }) {
-    this.math = !!data?.math;
-    this.asl = !!data?.asl && !this.math;
+  init(data: { demo?: boolean; asl?: boolean; math?: boolean; lang?: boolean; pvp?: boolean }) {
+    this.lang = !!data?.lang;
+    this.math = !!data?.math && !this.lang;
+    this.asl = !!data?.asl && !this.math && !this.lang;
     this.versus = !!data?.pvp;
     this.charge = 0;
     this.buffer = "";
-    this.demo = !!data?.demo && !this.asl && !this.math && !this.versus;
+    this.marks = [];
+    this.demo = !!data?.demo && !this.asl && !this.math && !this.lang && !this.versus;
     this.monsters = [];
     this.hearts = GAME.hearts;
     this.score = 0;
@@ -76,9 +81,18 @@ export class Arena extends Phaser.Scene implements CastHost {
     const roll = this.demo ? mulberry32(DEMO_SEED) : Math.random;
     this.spawner = new Spawner(
       roll,
-      this.math ? 0.58 : this.asl ? 0.7 : this.demo ? 0.85 : 1,
+      this.lang ? 0.55 : this.math ? 0.58 : this.asl ? 0.7 : this.demo ? 0.85 : 1,
       this.asl ? aslPool : symbolPool,
-      this.math
+      this.lang
+        ? {
+            make: (wave) => {
+              const item = pickLang(wave, roll);
+              return { name: langCast(item.strokes), label: item.label };
+            },
+            queue: () => 1,
+            interval: 1.45,
+          }
+        : this.math
         ? {
             make: (wave, prefer) => {
               const problem = makeProblem(wave, roll, prefer);
@@ -91,6 +105,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     );
     state.aslActive = this.asl;
     state.mathActive = this.math;
+    state.langActive = this.lang;
     this.themText = null;
     if (this.versus) this.setupVersus();
     this.aslCards = new Map();
@@ -110,6 +125,12 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.answerBar = this.add.graphics().setDepth(1000);
       this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => this.onAnswerKey(ev));
     }
+    if (this.lang) {
+      this.answerText = this.add
+        .text(cx, ARENA.height - 78, "draw the mark", { fontFamily: FONT, fontSize: "28px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
+        .setOrigin(0.5)
+        .setDepth(1000);
+    }
 
     const off = onInput((e) => {
       switch (e.type) {
@@ -120,8 +141,17 @@ export class Arena extends Phaser.Scene implements CastHost {
           this.casting.onStrokeEnd();
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points);
           return;
-        case "symbol": if (!this.math && this.phase !== "over") this.casting.cast(e.name); return;
-        case "fizzle": if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points); return;
+        case "symbol":
+          if (this.lang && this.phase === "play") { this.onLangMark(e.name); return; }
+          if (!this.math && this.phase !== "over") this.casting.cast(e.name);
+          return;
+        case "fizzle":
+          if (this.lang && this.phase === "play") {
+            this.fx.floatText(this.player.x, this.player.y - 80, "line, stick, V, peak, or circle", "#8a857a", 18);
+            return;
+          }
+          if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points);
+          return;
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -129,6 +159,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.wanted = [];
       state.aslActive = false;
       state.mathActive = false;
+      state.langActive = false;
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
@@ -143,7 +174,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.phase = "banner";
     this.hud.setWave(n);
     const aslSub = n === 1 ? "make the handshape for a monster's letter, and hold it" : ASL_WAVES[n - 1] ? `new letters: ${ASL_WAVES[n - 1].join(" ")}` : undefined;
-    const sub = this.math ? mathWaveBlurb(n) : this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
+    const sub = this.lang ? langWaveBlurb(n) : this.math ? mathWaveBlurb(n) : this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
     this.fx.banner(`Wave ${n}`, INK_CSS, sub, 1200);
     sfx.wave();
     this.time.delayedCall(GAME.breather * 1000, () => {
@@ -231,7 +262,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     else sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1100, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, math: this.math, versus: { won, note, theirScore: pvp.them.score } }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, math: this.math, lang: this.lang, versus: { won, note, theirScore: pvp.them.score } }),
     );
   }
 
@@ -350,6 +381,52 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
   }
 
+  /** A finished stroke casts immediately. A short word keeps the marks until the sequence matches. */
+  private onLangMark(name: CastName) {
+    if (!isMark(name)) {
+      this.fx.floatText(this.player.x, this.player.y - 80, "line, stick, V, peak, or circle", "#8a857a", 18);
+      return;
+    }
+    const next = [...this.marks, name];
+    const cast = langCast(next);
+    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!);
+    if (fronts.includes(cast)) {
+      this.marks = [];
+      this.refreshLang();
+      this.casting.cast(cast);
+      return;
+    }
+    if (next.length < 3 && fronts.some((front) => front.startsWith(`${cast}-`))) {
+      this.marks = next;
+      this.refreshLang();
+      return;
+    }
+    const alone = langCast([name]);
+    if (fronts.includes(alone)) {
+      this.marks = [];
+      this.refreshLang();
+      this.casting.cast(alone);
+      return;
+    }
+    if (fronts.some((front) => front.startsWith(`${alone}-`))) {
+      this.marks = [name];
+      this.refreshLang();
+      return;
+    }
+    this.marks = [];
+    this.refreshLang();
+    this.casting.cast(alone);
+  }
+
+  private refreshLang() {
+    if (!this.answerText) return;
+    const drawn = this.marks.map((mark) => MARK_GLYPH[mark]).join(" ");
+    const hint = this.monsters.find((m) => !m.dying && m.prompts[0])?.prompts[0];
+    const help = hint ? hintFor(hint) : "";
+    if (drawn) this.answerText.setText(`${drawn}  ·  ${help || "draw the next mark"}`);
+    else this.answerText.setText(help || "draw the mark");
+  }
+
   private onDrawnDigit(points: { x: number; y: number }[]) {
     const hit = recognizeDigit(points);
     if (!hit) {
@@ -440,7 +517,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   private miss() {
     this.buffer = "";
     this.answerHold = 0;
-    this.refreshAnswer();
+    this.marks = [];
+    if (this.lang) this.refreshLang();
+    else this.refreshAnswer();
     this.paintHold();
     this.streak = 0;
     this.hud.setMultiplier(1);
@@ -479,7 +558,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1300, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl, math: this.math }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl, math: this.math, lang: this.lang }),
     );
   }
 }

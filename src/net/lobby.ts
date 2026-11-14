@@ -42,7 +42,7 @@ function render() {
 
 export function initLobby(game: () => Phaser.Game | null) {
   getGame = game;
-  setModeSource(() => ({ asl: state.aslSelected, math: state.mathSelected }));
+  setModeSource(() => ({ asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected }));
   const code = $<HTMLInputElement>("lobbyCode");
 
   $("lobbyHost").addEventListener("click", () => void pvp.host().catch(() => {}));
