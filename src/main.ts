@@ -20,7 +20,41 @@ import { toggleMute, unlockAudio } from "./game/sfx";
 import { initLobby, lobbyOpen, openLobby } from "./net/lobby";
 import { pvp } from "./net/pvp";
 import { state } from "./state";
+import { experiment, type Variant } from "./input/pinchExperiment";
 
+if (import.meta.env.DEV) {
+  Object.assign(experiment, __PINCH_LOCAL_CONFIG__);
+  const params = new URLSearchParams(location.search);
+  if (params.get("drawbox") === "wide") state.drawBox={x0:.14,y0:.125,x1:.86,y1:.665};
+  const variant = params.get("pinch");
+  if (variant && /^[A-F]$/.test(variant)) experiment.variant = variant as Variant;
+  const anchor = params.get("anchor");
+  if (anchor === "knuckle" || anchor === "tip" || anchor === "thumb" || anchor === "pinch") experiment.anchor = anchor;
+  const release = Number(params.get("release"));
+  if ([50,80,120,180].includes(release)) experiment.releaseMs = release;
+  if (params.get("timing") === "frames" || params.get("timing") === "time") {
+    experiment.timing=params.get("timing") as typeof experiment.timing;
+    for(const key of ["begin","end"]){
+      const value=Number(params.get(key)),frames=experiment.timing==="frames";
+      if(params.has(key)&&Number.isInteger(value)&&value>=(frames?1:0)&&value<=(frames?30:1000)){
+        if(frames){if(key==="begin")experiment.startFrames=value;else experiment.endFrames=value;}
+        else {if(key==="begin")experiment.startMs=value;else experiment.releaseMs=value;}
+      }
+    }
+  }
+  // Only explicit lab calibration is carried into gameplay; never infer thresholds from a match.
+  if (params.has("speedAssist")) experiment.speedAssist=params.get("speedAssist")==="true";
+  const speedRange=Number(params.get("speedRange"));
+  if(params.has("speedRange")&&Number.isFinite(speedRange)&&speedRange>=0&&speedRange<=.3)experiment.speedAssistRange=speedRange;
+  if (params.has("depthVeto")) experiment.depthVeto=params.get("depthVeto")!=="false";
+  if (params.has("use3d")) experiment.use3d=params.get("use3d")==="true";
+  const on = Number(params.get("on")), off = Number(params.get("off"));
+  if (on >= .05 && on <= .7 && off >= on + .1 && off <= .85) {experiment.on=on;experiment.off=off;experiment.calibrated=params.get("calibrated")==="true";}
+}
+if (import.meta.env.DEV && location.pathname.replace(/\/$/, "") === "/dev/pinch") {
+  initCastPipeline();
+  void import("./input/pinchLab").then(({initPinchLab}) => initPinchLab());
+} else {
 let game: Phaser.Game | null = null;
 
 // Left over from a removed pinch-calibration feature; nothing reads it any more.
@@ -207,3 +241,5 @@ window.addEventListener("keydown", async (ev) => {
     startArena(true);
   }
 });
+
+}

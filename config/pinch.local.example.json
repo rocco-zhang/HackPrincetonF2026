@@ -1,0 +1,13 @@
+{
+  "variant": "C",
+  "on": 0.15,
+  "off": 0.25,
+  "use3d": false,
+  "depthVeto": false,
+  "speedAssist": true,
+  "speedAssistRange": 0.1,
+  "timing": "frames",
+  "startFrames": 1,
+  "endFrames": 1,
+  "anchor": "thumb"
+}

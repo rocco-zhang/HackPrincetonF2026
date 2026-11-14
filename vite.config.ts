@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+import { parsePinchSettings } from "./src/input/pinchSettings.ts";
 
 const EXAMPLES_FILE = join(dirname(fileURLToPath(import.meta.url)), "data/asl-examples.json");
 const readExamples = () => (existsSync(EXAMPLES_FILE) ? readFileSync(EXAMPLES_FILE, "utf8") : "{}");
@@ -54,11 +55,17 @@ function aslExamples(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  const configFile = join(dirname(fileURLToPath(import.meta.url)), "config/pinch.local.json");
+  const pinchConfig = command === "serve" && existsSync(configFile)
+    ? parsePinchSettings(JSON.parse(readFileSync(configFile, "utf8"))) : {};
+  return {
+  define: { __PINCH_LOCAL_CONFIG__: JSON.stringify(pinchConfig) },
   base: "./",
   plugins: [aslExamples()],
   // saving examples must not make the dev server reload the page mid-recording
   server: { watch: { ignored: ["**/data/**"] } },
   build: { chunkSizeWarningLimit: 2000 },
   test: { include: ["tests/**/*.test.ts"] },
+};
 });

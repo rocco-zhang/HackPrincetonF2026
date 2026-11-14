@@ -5,3 +5,4 @@ dist
 .vite
 public/mediapipe/wasm
 package-lock.json
+config/pinch.local.json

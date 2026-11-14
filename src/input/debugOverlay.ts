@@ -4,6 +4,7 @@ import { state } from "../state";
 import { video } from "./camera";
 import { SYMBOLS } from "./events";
 import { localTemplateCount, recognizer } from "./castPipeline";
+import { experiment } from "./pinchExperiment";
 
 const BONES = [
   [0, 1], [1, 2], [2, 3], [3, 4],
@@ -99,6 +100,7 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
     const game = getGame();
     const r = state.lastRecog;
     const lines = [
+      `pinch experiment: ${experiment.version} / ${experiment.variant} / ${experiment.anchor} / release ${experiment.variant === "A" ? INPUT.releaseMs : experiment.releaseMs}ms`,
       `mode: ${state.mode}   camera: ${state.cameraOn ? "on" : "off"}   tracker: ${state.trackerReady ? `${state.delegate} / model ${state.modelSource}` : "not loaded"}`,
       `tracker fps: ${state.trackerFps.toFixed(0)}   game fps: ${game ? game.loop.actualFps.toFixed(0) : "-"}`,
       `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   3D: ${state.pinchRatio3d?.toFixed(2) ?? "-"} (veto > ${INPUT.pinch3dMax})   inking: ${state.inking}`,

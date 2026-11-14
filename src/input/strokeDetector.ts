@@ -11,6 +11,9 @@ export class PinchGate {
   releasedAt: number | null = null;
   private streak = 0;
   private since: number | null = null;
+  /** Experiments may distinguish observed opening from missing-hand evidence. Control stays unchanged. */
+  isolateLossEvidence = false;
+  private lastEvidence: "lost" | "observed" | null = null;
 
   constructor(
     public onRatio = INPUT.pinchOn,
@@ -22,6 +25,12 @@ export class PinchGate {
   ) {}
 
   update(ratio: number | null, now?: number): boolean {
+    const evidence = ratio === null ? "lost" : "observed";
+    if (this.isolateLossEvidence && this.inking && evidence !== this.lastEvidence) {
+      this.streak = 0;
+      this.since = null;
+    }
+    this.lastEvidence = evidence;
     const wantsChange = this.inking
       ? ratio === null || ratio > this.offRatio
       : ratio !== null && ratio < this.onRatio;
@@ -54,6 +63,7 @@ export class PinchGate {
     this.releasedAt = null;
     this.streak = 0;
     this.since = null;
+    this.lastEvidence = null;
   }
 }
 
