@@ -3,9 +3,10 @@
 // public broker, using a four-letter room code. There is no game server and no cheat protection.
 import Peer, { type DataConnection } from "peerjs";
 import { DIFFICULTY, type Difficulty } from "../config";
+import { cleanSubjects, type Subject } from "../game/subjects";
 
 export type PvpMessage =
-  | { t: "hello"; asl: boolean; math?: boolean; lang?: boolean; difficulty?: Difficulty } // host → guest: which mode and difficulty we're playing
+  | { t: "hello"; subjects: Subject[]; difficulty: Difficulty } // host → guest: which subjects and difficulty we're playing
   | { t: "ready"; v: boolean }
   | { t: "start" } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
@@ -47,6 +48,8 @@ export const pvp = {
   theirReady: false,
   /** Latest hearts / score / wave the opponent reported. */
   them: { hearts: 3, score: 0, wave: 1 },
+  /** Guest: the subjects and difficulty the host last announced. */
+  hostMode: null as ModeChoice | null,
   /** Milliseconds left for a dropped opponent to come back (0 when connected). */
   graceLeft: 0,
 
@@ -124,13 +127,14 @@ export const pvp = {
     this.myReady = this.theirReady = false;
     this.error = "";
     this.graceLeft = 0;
+    this.hostMode = null;
     setStatus("off");
   },
 };
 
-type ModeChoice = { asl: boolean; math: boolean; lang: boolean; difficulty: Difficulty };
+export type ModeChoice = { subjects: Subject[]; difficulty: Difficulty };
 /** Set by the lobby so a new connection can announce the host's mode and difficulty. */
-export let currentMode: () => ModeChoice = () => ({ asl: false, math: false, lang: false, difficulty: "medium" });
+export let currentMode: () => ModeChoice = () => ({ subjects: ["shapes"], difficulty: "medium" });
 export const setModeSource = (fn: () => ModeChoice) => (currentMode = fn);
 
 function emit(e: PvpEvent) {
@@ -179,6 +183,7 @@ function adopt(c: DataConnection) {
       return;
     }
     if (msg.t === "start") return begin();
+    if (msg.t === "hello") pvp.hostMode = { subjects: cleanSubjects(msg.subjects), difficulty: DIFFICULTY[msg.difficulty] ? msg.difficulty : "medium" };
     if (msg.t === "status") pvp.them = { hearts: msg.hearts, score: msg.score, wave: msg.wave };
     emit({ type: "message", msg });
   });

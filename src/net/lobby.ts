@@ -29,9 +29,9 @@ function render() {
   const status = $("lobbyStatus");
   status.textContent =
     pvp.error ? pvp.error
-    : s === "hosting" ? `Your code is ${pvp.code}. Your friend presses V, types it in and joins.`
+    : s === "hosting" ? `Your code is ${pvp.code}. Your friend opens Duel on their computer and joins with it.`
     : s === "joining" ? `Joining ${pvp.code}…`
-    : s === "connected" ? `Connected${pvp.isHost ? "" : ` to ${pvp.code}`}. Close this, then both hold to get ready.`
+    : s === "connected" ? `Connected${pvp.isHost ? "" : ` to ${pvp.code}`}. Now both press Ready.`
     : s === "reconnecting" ? "Connection trouble…"
     : "One of you hosts and reads out the code; the other joins with it.";
   status.classList.toggle("error", !!pvp.error);
@@ -42,7 +42,7 @@ function render() {
 
 export function initLobby(game: () => Phaser.Game | null) {
   getGame = game;
-  setModeSource(() => ({ asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected, difficulty: state.difficulty }));
+  setModeSource(() => ({ subjects: state.subjects, difficulty: state.difficulty }));
   const code = $<HTMLInputElement>("lobbyCode");
 
   $("lobbyHost").addEventListener("click", () => void pvp.host().catch(() => {}));

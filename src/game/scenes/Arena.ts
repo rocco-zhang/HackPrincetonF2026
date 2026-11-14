@@ -13,6 +13,7 @@ import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
 import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, pickLang, type Mark } from "../languages";
+import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
@@ -35,9 +36,11 @@ export class Arena extends Phaser.Scene implements CastHost {
   private wave = 0;
   private phase: "banner" | "play" | "over" = "banner";
   private demo = false;
-  private asl = false;
-  private math = false;
-  private lang = false;
+  /** What was picked for this round, and the one the current wave uses. */
+  private subjects: Subject[] = ["shapes"];
+  private subject: Subject = "shapes";
+  private level = 1;
+  private roll: () => number = Math.random;
   private marks: Mark[] = [];
   private buffer = "";
   private answerHold = 0;
@@ -55,15 +58,26 @@ export class Arena extends Phaser.Scene implements CastHost {
     super("Arena");
   }
 
-  init(data: { demo?: boolean; asl?: boolean; math?: boolean; lang?: boolean; pvp?: boolean }) {
-    this.lang = !!data?.lang;
-    this.math = !!data?.math && !this.lang;
-    this.asl = !!data?.asl && !this.math && !this.lang;
+  private get asl() {
+    return this.subject === "asl";
+  }
+  private get math() {
+    return this.subject === "math";
+  }
+  private get lang() {
+    return isScript(this.subject);
+  }
+
+  init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
     this.versus = !!data?.pvp;
+    this.demo = !!data?.demo && !this.versus;
+    // the demo run is scripted for drawn shapes
+    this.subjects = this.demo ? ["shapes"] : cleanSubjects(data?.subjects ?? state.subjects);
+    this.subject = this.subjects[0];
+    this.level = 1;
     this.charge = 0;
     this.buffer = "";
     this.marks = [];
-    this.demo = !!data?.demo && !this.asl && !this.math && !this.lang && !this.versus;
     // the demo run is scripted against the standard tuning
     this.difficulty = this.demo ? "medium" : state.difficulty;
     this.monsters = [];
@@ -82,60 +96,30 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.casting = new Casting(this, this);
     this.hud = new Hud(this, this.hearts, this.difficulty);
     this.hud.setHearts(this.hearts);
-    // ASL rounds are slower: finding a handshape takes longer than drawing a line
-    const roll = this.demo ? mulberry32(DEMO_SEED) : Math.random;
-    this.spawner = new Spawner(
-      roll,
-      this.lang ? 0.55 : this.math ? 0.58 : this.asl ? 0.7 : this.demo ? 0.85 : 1,
-      this.asl ? aslPool : symbolPool,
-      this.lang
-        ? {
-            make: (wave) => {
-              const item = pickLang(wave, roll);
-              return { name: langCast(item.strokes), label: item.label };
-            },
-            queue: () => 1,
-            interval: 1.45,
-          }
-        : this.math
-        ? {
-            make: (wave, prefer) => {
-              const problem = makeProblem(wave, roll, prefer);
-              return { name: problem.name, label: problem.prompt };
-            },
-            queue: mathQueue,
-            interval: 1.35,
-          }
-        : undefined,
-      this.difficulty,
-    );
-    state.aslActive = this.asl;
-    state.mathActive = this.math;
-    state.langActive = this.lang;
+    this.roll = this.demo ? mulberry32(DEMO_SEED) : Math.random;
+    this.spawner = this.makeSpawner();
     this.themText = null;
     if (this.versus) this.setupVersus();
     this.aslCards = new Map();
     this.aslText = this.aslBar = null;
-    if (this.asl) {
+    const has = (s: Subject) => this.subjects.includes(s);
+    this.answerText = this.answerBar = null;
+    if (has("asl")) {
       this.aslText = this.add
         .text(cx, 52, "", { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
         .setOrigin(0.5, 0)
         .setDepth(1000);
       this.aslBar = this.add.graphics().setDepth(1000);
     }
-    if (this.math) {
+    if (has("math") || this.subjects.some(isScript)) {
       this.answerText = this.add
-        .text(cx, ARENA.height - 78, "draw the answer", { fontFamily: FONT, fontSize: "36px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
+        .text(cx, ARENA.height - 78, "", { fontFamily: FONT, fontSize: "36px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
         .setOrigin(0.5)
         .setDepth(1000);
+    }
+    if (has("math")) {
       this.answerBar = this.add.graphics().setDepth(1000);
       this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => this.onAnswerKey(ev));
-    }
-    if (this.lang) {
-      this.answerText = this.add
-        .text(cx, ARENA.height - 78, "draw the mark", { fontFamily: FONT, fontSize: "28px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
-        .setOrigin(0.5)
-        .setDepth(1000);
     }
 
     const off = onInput((e) => {
@@ -169,38 +153,95 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
-      this.scene.start("Title");
+      this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
     });
 
     this.startWave(1);
   }
 
+  /** A spawner for the current wave's subject. */
+  private makeSpawner() {
+    const s = this.subject, roll = this.roll;
+    return new Spawner(
+      roll,
+      // slower when the answer takes longer than drawing a line: a handshape, a number, several marks
+      isScript(s) ? 0.55 : s === "math" ? 0.58 : s === "asl" ? 0.7 : this.demo ? 0.85 : 1,
+      s === "asl" ? aslPool : symbolPool,
+      isScript(s)
+        ? {
+            make: (level) => {
+              const item = pickLang(s, level, roll);
+              return { name: langCast(item.strokes), label: item.label };
+            },
+            queue: () => 1,
+            interval: 1.45,
+          }
+        : s === "math"
+          ? {
+              make: (level, prefer) => {
+                const problem = makeProblem(level, roll, prefer);
+                return { name: problem.name, label: problem.prompt };
+              },
+              queue: mathQueue,
+              interval: 1.35,
+            }
+          : undefined,
+      this.difficulty,
+    );
+  }
+
+  /** Point the input and the on-screen prompts at the current wave's subject. */
+  private applySubject() {
+    state.aslActive = this.asl;
+    state.mathActive = this.math;
+    state.langActive = this.lang;
+    this.buffer = "";
+    this.marks = [];
+    this.answerHold = 0;
+    this.answerBar?.clear();
+    this.answerText?.setVisible(this.math || this.lang).setFontSize(this.math ? 36 : 28);
+    if (this.lang) this.refreshLang();
+    else this.refreshAnswer();
+  }
+
   private startWave(n: number) {
     this.wave = n;
+    // with several subjects picked, each wave moves on to the next one
+    ({ subject: this.subject, level: this.level } = waveSubject(this.subjects, n));
+    this.spawner = this.makeSpawner();
+    this.spawner.startWave(n, this.level);
+    this.applySubject();
     this.phase = "banner";
     this.hud.setWave(n);
     this.fx.banner(`Wave ${n}`, INK_CSS, this.waveSubtitle(n), 1200);
     sfx.wave();
     this.time.delayedCall(DIFFICULTY[this.difficulty].breather * 1000, () => {
       if (this.phase === "over") return;
-      this.spawner.startWave(n);
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
     });
   }
 
-  /** What's new this wave: shapes or letters unlocked, and monsters starting to carry longer queues. */
+  /** What's new this wave: the subject, shapes or letters unlocked, and monsters starting to carry longer queues. */
   private waveSubtitle(n: number): string | undefined {
+    const text = this.subjectBlurb(n);
+    if (this.subjects.length === 1 || isScript(this.subject)) return text; // language blurbs already name the language
+    const label = SUBJECT_INFO[this.subject].label;
+    return text ? `${label}: ${text[0].toLowerCase()}${text.slice(1)}` : label;
+  }
+
+  private subjectBlurb(n: number): string | undefined {
+    const level = this.level;
     // math and languages follow their own curriculum on every difficulty
-    if (this.lang) return langWaveBlurb(n);
-    if (this.math) return mathWaveBlurb(n);
-    if (n === 1) {
-      if (this.asl) return "make the handshape for a monster's letter, and hold it";
-      return this.demo ? "demo run" : "draw the shape taped to a monster to tear it up";
+    if (isScript(this.subject)) return langWaveBlurb(this.subject, level);
+    if (this.math) return mathWaveBlurb(level);
+    if (level === 1) {
+      if (this.asl) return "Make the handshape for a monster's letter, and hold it";
+      return this.demo ? "Demo run" : "Draw the shape taped to a monster to tear it up";
     }
-    const pw = Spawner.poolWave(n, this.difficulty);
+    const pw = Spawner.poolWave(level, this.difficulty);
     const parts: string[] = [];
-    if (pw !== Spawner.poolWave(n - 1, this.difficulty)) {
+    if (pw !== Spawner.poolWave(level - 1, this.difficulty)) {
       if (this.asl) {
         if (ASL_WAVES[pw - 1]) parts.push(`new letters: ${ASL_WAVES[pw - 1].join(" ")}`);
       } else {
@@ -218,7 +259,9 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   /** Show a reference card for each letter a monster needs right now, and what the camera thinks you're signing. */
   private updateAsl() {
-    const needed = [...new Set(state.wanted)].sort();
+    const on = this.asl;
+    this.aslText?.setVisible(on);
+    const needed = on ? [...new Set(state.wanted)].sort() : [];
     for (const [name, card] of this.aslCards) {
       if (needed.includes(name)) continue;
       this.aslCards.delete(name);
@@ -240,7 +283,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.aslText?.setText(lost ? "ASL mode needs the camera: press M" : letter ? `you're signing ${letter}${state.aslSource === "yours" ? " (your example)" : ""}` : "no letter recognised");
     const g = this.aslBar!;
     g.clear();
-    if (letter && !lost) {
+    if (on && letter && !lost) {
       const w = 160, x = ARENA.width / 2 - w / 2, y = 88;
       g.fillStyle(castColor(`asl_${letter}`), 1);
       g.fillRect(x, y, w * state.aslProgress, 10);
@@ -293,7 +336,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     else sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1100, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, math: this.math, lang: this.lang, difficulty: this.difficulty, versus: { won, note, theirScore: pvp.them.score } }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, subjects: this.subjects, difficulty: this.difficulty, versus: { won, note, theirScore: pvp.them.score } }),
     );
   }
 
@@ -333,7 +376,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
-    if (this.asl) this.updateAsl();
+    if (this.aslText) this.updateAsl();
     if (this.math) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
     if (this.phase === "over") return;
@@ -450,7 +493,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private refreshLang() {
-    if (!this.answerText) return;
+    if (!this.answerText || !this.lang) return;
     const drawn = this.marks.map((mark) => MARK_GLYPH[mark]).join(" ");
     const hint = this.monsters.find((m) => !m.dying && m.prompts[0])?.prompts[0];
     const help = hint ? hintFor(hint) : "";
@@ -473,7 +516,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private onAnswerKey(ev: KeyboardEvent) {
-    if (this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (!this.math || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key >= "0" && ev.key <= "9") {
       ev.preventDefault();
       if (this.buffer.length >= 4) return;
@@ -496,7 +539,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private refreshAnswer() {
-    this.answerText?.setText(this.buffer || "draw the answer");
+    if (this.math) this.answerText?.setText(this.buffer || "draw the answer");
   }
 
   /** Digits accumulate. Holding still, with the hand open, casts the whole number. */
@@ -589,7 +632,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1300, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl, math: this.math, lang: this.lang, difficulty: this.difficulty }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, subjects: this.subjects, difficulty: this.difficulty }),
     );
   }
 }

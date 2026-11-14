@@ -93,7 +93,7 @@ export class AslTrainer extends Phaser.Scene {
       if (ev.shiftKey) void clearAllAslExamples().then(() => (this.note = "Forgot all your examples. Every letter uses the built-in model again."));
       else void setAslExamples(this.cls, []).then(() => (this.note = `Forgot your ${this.label}. It uses the built-in model again.`));
     });
-    kb.on("keydown-ESC", () => this.scene.start("Title"));
+    kb.on("keydown-ESC", () => this.scene.start("Panel", { kind: "settings" }));
   }
 
   private get cls(): AslClass {
