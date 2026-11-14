@@ -1,17 +1,63 @@
-// Procedural sound effects (Web Audio). The AudioContext is created on the
-// "Enable camera & sound" click, which browsers require before playing audio.
+// Procedural sound effects (Web Audio) and the background music (one looping file).
+// Both start on the "Enable camera & sound" click, which browsers require before playing audio.
 import { ASL_NAMES, isLang, isMath, isSymbol, SYMBOLS, type CastName, type SymbolName } from "../input/events";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
-export let muted = false;
+let music: HTMLAudioElement | null = null;
+
+const AUDIO_KEY = "spellcam.audio";
+const MUSIC_URL = "./audio/bg_music.mp3";
+// what a slider at full means: effects are short and loud, music sits underneath them
+const SFX_GAIN = 0.7;
+const MUSIC_GAIN = 0.6;
+
+export type AudioSettings = { sfxOn: boolean; sfxVol: number; musicOn: boolean; musicVol: number };
+
+function loadAudio(): AudioSettings {
+  const d: AudioSettings = { sfxOn: true, sfxVol: 0.7, musicOn: true, musicVol: 0.5 };
+  try {
+    const s = JSON.parse(localStorage.getItem(AUDIO_KEY) ?? "null") as Partial<AudioSettings> | null;
+    if (!s || typeof s !== "object") return d;
+    const vol = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback);
+    return { sfxOn: s.sfxOn !== false, sfxVol: vol(s.sfxVol, d.sfxVol), musicOn: s.musicOn !== false, musicVol: vol(s.musicVol, d.musicVol) };
+  } catch {
+    return d;
+  }
+}
+
+/** Sound-effect and music switches and volumes (0–1), remembered between visits. */
+export const audio: AudioSettings = loadAudio();
+
+function applyAudio() {
+  if (master) master.gain.value = audio.sfxOn ? audio.sfxVol * SFX_GAIN : 0;
+  if (!music) return;
+  music.volume = audio.musicVol * MUSIC_GAIN;
+  const play = audio.musicOn && audio.musicVol > 0;
+  if (play && music.paused) void music.play().catch(() => {}); // refused until the first click or key press
+  else if (!play && !music.paused) music.pause();
+}
+
+export function setAudio(patch: Partial<AudioSettings>) {
+  Object.assign(audio, patch);
+  try {
+    localStorage.setItem(AUDIO_KEY, JSON.stringify(audio));
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+  applyAudio();
+}
 
 export function unlockAudio() {
+  if (!music) {
+    music = new Audio(MUSIC_URL);
+    music.loop = true;
+    music.preload = "auto";
+  }
   if (!ctx) {
     ctx = new AudioContext();
     master = ctx.createGain();
-    master.gain.value = 0.5;
     const comp = ctx.createDynamicsCompressor();
     master.connect(comp).connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -19,12 +65,14 @@ export function unlockAudio() {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   void ctx.resume();
+  applyAudio();
 }
 
+/** Everything off, or (if everything already is) everything back on. Returns true when now silent. */
 export function toggleMute() {
-  muted = !muted;
-  if (master) master.gain.value = muted ? 0 : 0.5;
-  return muted;
+  const on = audio.sfxOn || audio.musicOn;
+  setAudio({ sfxOn: !on, musicOn: !on });
+  return on;
 }
 
 type ToneOpts = {

@@ -30,6 +30,9 @@ export type ButtonOpts = {
   onClick: () => void;
 };
 
+export type SliderOpts = { x: number; y: number; w: number; get: () => number; set: (v: number) => void; enabled?: () => boolean; onRelease?: () => void };
+type Slider = { o: SliderOpts; g: Phaser.GameObjects.Graphics; shown: string };
+
 type Button = {
   o: ButtonOpts;
   c: Phaser.GameObjects.Container;
@@ -53,6 +56,8 @@ onInput((e) => {
 export class Menu {
   private buttons: Button[] = [];
   private hovered: Button | null = null;
+  private sliders: Slider[] = [];
+  private dragging: Slider | null = null;
   private pressing = inkingNow;
   private dot: Phaser.GameObjects.Arc;
 
@@ -63,7 +68,18 @@ export class Menu {
       if (e.type !== "cursor") return;
       this.dot.setPosition(e.p.x, e.p.y).setRadius(e.inking ? 10 : 14);
       this.hovered = this.at(e.p.x, e.p.y);
-      if (e.inking && !this.pressing && this.hovered) this.click(this.hovered);
+      if (e.inking && !this.pressing) {
+        if (this.hovered) this.click(this.hovered);
+        else this.dragging = this.sliders.find((s) => (s.o.enabled?.() ?? true) && Math.abs(e.p.y - s.o.y) <= 22 && e.p.x >= s.o.x - 14 && e.p.x <= s.o.x + s.o.w + 14) ?? null;
+      }
+      if (this.dragging) {
+        const s = this.dragging;
+        if (e.inking) s.o.set(Math.min(1, Math.max(0, (e.p.x - s.o.x) / s.o.w)));
+        else {
+          this.dragging = null;
+          s.o.onRelease?.();
+        }
+      }
       this.pressing = e.inking;
     });
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
@@ -94,6 +110,33 @@ export class Menu {
     this.buttons.push(b);
     this.paint(b);
     return c;
+  }
+
+  /** A 0–1 slider, x at its left end: press on it and drag (or pinch and move). */
+  slider(o: SliderOpts) {
+    this.sliders.push({ o, g: this.scene.add.graphics(), shown: "" });
+  }
+
+  private paintSlider(s: Slider) {
+    const { o, g } = s;
+    const v = o.get();
+    const enabled = o.enabled?.() ?? true;
+    const key = `${v.toFixed(3)}|${enabled}|${s === this.dragging}`;
+    if (key === s.shown) return;
+    s.shown = key;
+    const kx = o.x + o.w * v;
+    g.clear().setAlpha(enabled ? 1 : 0.4);
+    // the track: a pencil line, highlighted up to the knob
+    g.lineStyle(10, HIGHLIGHTER, 1);
+    g.lineBetween(o.x, o.y, kx, o.y);
+    g.lineStyle(3, INK, 0.8);
+    g.lineBetween(o.x, o.y, o.x + o.w, o.y);
+    g.fillStyle(INK, 0.35);
+    g.fillCircle(kx + 2, o.y + 3, 13);
+    g.fillStyle(s === this.dragging ? HIGHLIGHTER : PAPER, 1);
+    g.fillCircle(kx, o.y, 13);
+    g.lineStyle(3, INK, 1);
+    g.strokeCircle(kx, o.y, 13);
   }
 
   private usable(b: Button) {
@@ -153,6 +196,7 @@ export class Menu {
   /** Call every frame: repaints whatever changed (hover, selection, labels). */
   update() {
     for (const b of this.buttons) this.paint(b);
+    for (const s of this.sliders) this.paintSlider(s);
   }
 }
 

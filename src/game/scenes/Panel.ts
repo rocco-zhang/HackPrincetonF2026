@@ -3,7 +3,7 @@ import { actions } from "../../actions";
 import { ARENA, DIFFICULTIES, DIFFICULTY } from "../../config";
 import { state } from "../../state";
 import { FONT, INK_CSS, MUTED_CSS } from "../palette";
-import { muted } from "../sfx";
+import { audio, setAudio, sfx } from "../sfx";
 import { bestScore, SUBJECT_INFO, SUBJECTS } from "../subjects";
 import { Menu, screenFrame } from "../systems/Menu";
 
@@ -56,9 +56,24 @@ export class Panel extends Phaser.Scene {
 
   private settings() {
     const onOff = (v: boolean) => (v ? "On" : "Off");
-    const rows: { name: string; note: string; label: string | (() => string); run: () => void }[] = [
+    type Row = { name: string; note: string; label: string | (() => string); run: () => void; volume?: { get: () => number; set: (v: number) => void; on: () => boolean; test?: () => void } };
+    const rows: Row[] = [
       { name: "Input", note: "M", label: () => (state.mode === "hand" ? "Hand (camera)" : "Mouse"), run: () => void actions.toggleInput() },
-      { name: "Sound", note: "N", label: () => onOff(!muted), run: actions.toggleSound },
+      {
+        name: "Sound effects",
+        note: "N mutes all",
+        label: () => onOff(audio.sfxOn),
+        run: () => setAudio({ sfxOn: !audio.sfxOn }),
+        // let go of the slider to hear how loud that is
+        volume: { get: () => audio.sfxVol, set: (v) => setAudio({ sfxVol: v }), on: () => audio.sfxOn, test: () => sfx.hit() },
+      },
+      {
+        name: "Music",
+        note: "",
+        label: () => onOff(audio.musicOn),
+        run: () => setAudio({ musicOn: !audio.musicOn }),
+        volume: { get: () => audio.musicVol, set: (v) => setAudio({ musicVol: v }), on: () => audio.musicOn },
+      },
       { name: "Mirror the camera", note: "F", label: () => onOff(state.mirror), run: actions.toggleMirror },
       { name: "Camera", note: "C", label: "Use the next camera", run: () => void actions.nextCamera() },
       { name: "Drawing area", note: "K", label: "Calibrate (4 seconds)", run: () => void actions.calibrate() },
@@ -66,10 +81,14 @@ export class Panel extends Phaser.Scene {
       { name: "Debug overlay", note: "D", label: () => onOff(state.debug), run: actions.toggleDebug },
     ];
     rows.forEach((r, i) => {
-      const y = 152 + i * 70;
-      this.add.text(330, y, r.name, { fontFamily: FONT, fontSize: "26px", fontStyle: "bold", color: INK_CSS }).setOrigin(0, 0.5);
-      if (r.note) this.add.text(600, y + 2, `key ${r.note}`, { fontFamily: FONT, fontSize: "16px", color: MUTED_CSS }).setOrigin(0, 0.5);
-      this.menu.add({ x: 830, y, w: 300, h: 52, label: r.label, fontSize: 22, angle: i % 2 ? 0.6 : -0.6, onClick: r.run });
+      const y = 140 + i * 62;
+      this.add.text(300, y, r.name, { fontFamily: FONT, fontSize: "26px", fontStyle: "bold", color: INK_CSS }).setOrigin(0, 0.5);
+      if (r.note) this.add.text(560, y + 2, `key ${r.note}`, { fontFamily: FONT, fontSize: "16px", color: MUTED_CSS }).setOrigin(0, 0.5);
+      if (r.volume) {
+        // an on/off switch, then the volume
+        this.menu.add({ x: 730, y, w: 100, h: 48, label: r.label, fontSize: 22, angle: i % 2 ? 0.6 : -0.6, selected: r.volume.on, onClick: r.run });
+        this.menu.slider({ x: 816, y, w: 164, get: r.volume.get, set: r.volume.set, enabled: r.volume.on, onRelease: r.volume.test });
+      } else this.menu.add({ x: 830, y, w: 300, h: 48, label: r.label, fontSize: 22, angle: i % 2 ? 0.6 : -0.6, onClick: r.run });
     });
   }
 
