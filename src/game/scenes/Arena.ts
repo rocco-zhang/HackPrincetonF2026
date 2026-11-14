@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ARENA, GAME } from "../../config";
-import { castLabel, onInput, type CastName } from "../../input/events";
+import { recognizeDigit } from "../../input/digits";
+import { castLabel, mathName, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
@@ -11,9 +12,11 @@ import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
+import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
 const MULTI_NAMES = ["", "", "Double!", "Triple!", "Quad!", "Mega!"];
+const ANSWER_HOLD = 0.7;
 
 export class Arena extends Phaser.Scene implements CastHost {
   player!: Player;
@@ -29,6 +32,11 @@ export class Arena extends Phaser.Scene implements CastHost {
   private phase: "banner" | "play" | "over" = "banner";
   private demo = false;
   private asl = false;
+  private math = false;
+  private buffer = "";
+  private answerHold = 0;
+  private answerText: Phaser.GameObjects.Text | null = null;
+  private answerBar: Phaser.GameObjects.Graphics | null = null;
   private versus = false;
   private charge = 0; // versus: builds up with kills; each whole point sends a monster
   private lastStatus = 0;
@@ -41,11 +49,13 @@ export class Arena extends Phaser.Scene implements CastHost {
     super("Arena");
   }
 
-  init(data: { demo?: boolean; asl?: boolean; pvp?: boolean }) {
-    this.asl = !!data?.asl;
+  init(data: { demo?: boolean; asl?: boolean; math?: boolean; pvp?: boolean }) {
+    this.math = !!data?.math;
+    this.asl = !!data?.asl && !this.math;
     this.versus = !!data?.pvp;
     this.charge = 0;
-    this.demo = !!data?.demo && !this.asl && !this.versus;
+    this.buffer = "";
+    this.demo = !!data?.demo && !this.asl && !this.math && !this.versus;
     this.monsters = [];
     this.hearts = GAME.hearts;
     this.score = 0;
@@ -63,8 +73,24 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud = new Hud(this);
     this.hud.setHearts(this.hearts);
     // ASL rounds are slower: finding a handshape takes longer than drawing a line
-    this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.asl ? 0.7 : this.demo ? 0.85 : 1, this.asl ? aslPool : symbolPool);
+    const roll = this.demo ? mulberry32(DEMO_SEED) : Math.random;
+    this.spawner = new Spawner(
+      roll,
+      this.math ? 0.58 : this.asl ? 0.7 : this.demo ? 0.85 : 1,
+      this.asl ? aslPool : symbolPool,
+      this.math
+        ? {
+            make: (wave, prefer) => {
+              const problem = makeProblem(wave, roll, prefer);
+              return { name: problem.name, label: problem.prompt };
+            },
+            queue: mathQueue,
+            interval: 1.35,
+          }
+        : undefined,
+    );
     state.aslActive = this.asl;
+    state.mathActive = this.math;
     this.themText = null;
     if (this.versus) this.setupVersus();
     this.aslCards = new Map();
@@ -76,21 +102,33 @@ export class Arena extends Phaser.Scene implements CastHost {
         .setDepth(1000);
       this.aslBar = this.add.graphics().setDepth(1000);
     }
+    if (this.math) {
+      this.answerText = this.add
+        .text(cx, ARENA.height - 78, "draw the answer", { fontFamily: FONT, fontSize: "36px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
+        .setOrigin(0.5)
+        .setDepth(1000);
+      this.answerBar = this.add.graphics().setDepth(1000);
+      this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => this.onAnswerKey(ev));
+    }
 
     const off = onInput((e) => {
       switch (e.type) {
         case "cursor": return this.casting.onCursor(e.p, e.inking);
         case "strokeStart": return this.casting.onStrokeStart(e.p);
         case "strokePoint": return this.casting.onStrokePoint(e.p);
-        case "strokeEnd": return this.casting.onStrokeEnd();
-        case "symbol": if (this.phase !== "over") this.casting.cast(e.name); return;
-        case "fizzle": if (this.phase !== "over") this.casting.onFizzle(e.points); return;
+        case "strokeEnd":
+          this.casting.onStrokeEnd();
+          if (this.math && this.phase === "play") this.onDrawnDigit(e.points);
+          return;
+        case "symbol": if (!this.math && this.phase !== "over") this.casting.cast(e.name); return;
+        case "fizzle": if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points); return;
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       off();
       state.wanted = [];
       state.aslActive = false;
+      state.mathActive = false;
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
@@ -105,7 +143,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.phase = "banner";
     this.hud.setWave(n);
     const aslSub = n === 1 ? "make the handshape for a monster's letter, and hold it" : ASL_WAVES[n - 1] ? `new letters: ${ASL_WAVES[n - 1].join(" ")}` : undefined;
-    const sub = this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
+    const sub = this.math ? mathWaveBlurb(n) : this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
     this.fx.banner(`Wave ${n}`, INK_CSS, sub, 1200);
     sfx.wave();
     this.time.delayedCall(GAME.breather * 1000, () => {
@@ -193,7 +231,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     else sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1100, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, versus: { won, note, theirScore: pvp.them.score } }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, math: this.math, versus: { won, note, theirScore: pvp.them.score } }),
     );
   }
 
@@ -224,7 +262,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private spawn(o: SpawnOrder) {
     const p = edgePoint(o.angle);
-    this.monsters.push(new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette));
+    this.monsters.push(new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels));
   }
 
   update(_t: number, deltaMs: number) {
@@ -234,6 +272,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
     if (this.asl) this.updateAsl();
+    if (this.math) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
     if (this.phase === "over") return;
 
@@ -285,6 +324,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult);
     this.score += pts;
     this.fx.floatText(m.x, m.y - 40, `+${pts}`, killed ? ORANGE_CSS : INK_CSS, killed ? 28 : 22);
+    m.prompts.shift();
     m.bubble.popFront();
     m.flashHit();
     this.fx.burst(m.x, m.y - 10, color, 12);
@@ -308,6 +348,105 @@ export class Arena extends Phaser.Scene implements CastHost {
       ease: "Quad.easeOut",
       onComplete: () => m.destroy(),
     });
+  }
+
+  private onDrawnDigit(points: { x: number; y: number }[]) {
+    const hit = recognizeDigit(points);
+    if (!hit) {
+      this.fx.floatText(this.player.x, this.player.y - 80, "draw a digit", "#8a857a", 22);
+      sfx.fizzle();
+      return;
+    }
+    if (this.buffer.length >= 4) return;
+    if (!this.buffer && hit.digit === "0") return;
+    this.buffer += hit.digit;
+    this.answerHold = 0;
+    this.refreshAnswer();
+  }
+
+  private onAnswerKey(ev: KeyboardEvent) {
+    if (this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (ev.key >= "0" && ev.key <= "9") {
+      ev.preventDefault();
+      if (this.buffer.length >= 4) return;
+      if (!this.buffer && ev.key === "0") return;
+      this.buffer += ev.key;
+      this.answerHold = 0;
+      this.refreshAnswer();
+      return;
+    }
+    if (ev.key === "Backspace") {
+      ev.preventDefault();
+      this.buffer = this.buffer.slice(0, -1);
+      this.refreshAnswer();
+      return;
+    }
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      this.submit();
+    }
+  }
+
+  private refreshAnswer() {
+    this.answerText?.setText(this.buffer || "draw the answer");
+  }
+
+  /** Digits accumulate. Holding still, with the hand open, casts the whole number. */
+  private tickAnswerHold(dt: number) {
+    const drawing = state.inking;
+    const handGone = state.mode === "hand" && performance.now() - state.lastHandSeen > 400;
+    if (this.phase !== "play" || !this.buffer || drawing || handGone) {
+      this.answerHold = 0;
+      this.paintHold();
+      return;
+    }
+    this.answerHold += dt;
+    this.paintHold();
+    if (this.answerHold >= ANSWER_HOLD) {
+      this.answerHold = 0;
+      this.submit();
+    }
+  }
+
+  private paintHold() {
+    const g = this.answerBar;
+    if (!g) return;
+    g.clear();
+    if (!this.buffer || this.answerHold <= 0) return;
+    const w = 180;
+    const x = ARENA.width / 2 - w / 2;
+    const y = ARENA.height - 46;
+    g.fillStyle(0x2b6fd0, 1);
+    g.fillRect(x, y, w * Math.min(1, this.answerHold / ANSWER_HOLD), 8);
+    g.lineStyle(2, INK, 0.9);
+    g.strokeRect(x, y, w, 8);
+  }
+
+  private submit() {
+    if (!this.buffer || this.phase === "over") return;
+    const name = mathName(Number(this.buffer));
+    const hit = this.monsters.some((m) => !m.dying && m.front === name);
+    this.buffer = "";
+    this.answerHold = 0;
+    this.refreshAnswer();
+    this.paintHold();
+    if (!hit) {
+      this.miss();
+      return;
+    }
+    this.casting.cast(name);
+  }
+
+  private miss() {
+    this.buffer = "";
+    this.answerHold = 0;
+    this.refreshAnswer();
+    this.paintHold();
+    this.streak = 0;
+    this.hud.setMultiplier(1);
+    this.fx.floatText(this.player.x, this.player.y - 80, "not that", "#8a857a", 22);
+    this.cameras.main.shake(90, 0.004);
+    sfx.fizzle();
   }
 
   private contact(m: Monster) {
@@ -340,7 +479,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1300, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl, math: this.math }),
     );
   }
 }

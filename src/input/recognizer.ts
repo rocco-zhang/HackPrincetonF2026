@@ -97,7 +97,7 @@ function pathDistance(a: XY[], b: XY[]) {
   return d / a.length;
 }
 
-function distanceAtBestAngle(pts: XY[], tmpl: XY[], tolDeg: number) {
+export function distanceAtBestAngle(pts: XY[], tmpl: XY[], tolDeg: number) {
   let a = (-tolDeg * Math.PI) / 180;
   let b = -a;
   const threshold = (2 * Math.PI) / 180;

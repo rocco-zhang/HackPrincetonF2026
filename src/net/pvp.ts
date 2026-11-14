@@ -4,7 +4,7 @@
 import Peer, { type DataConnection } from "peerjs";
 
 export type PvpMessage =
-  | { t: "hello"; asl: boolean } // host → guest: which mode we're playing
+  | { t: "hello"; asl: boolean; math?: boolean } // host → guest: which mode we're playing
   | { t: "ready"; v: boolean }
   | { t: "start" } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
@@ -108,8 +108,8 @@ export const pvp = {
   },
 
   /** Tell the guest which mode the host picked. */
-  sendMode(asl: boolean) {
-    if (this.isHost) this.send({ t: "hello", asl });
+  sendMode(asl: boolean, math = false) {
+    if (this.isHost) this.send({ t: "hello", asl, math });
   },
 
   leave() {
@@ -128,8 +128,8 @@ export const pvp = {
 };
 
 /** Set by the lobby so a new connection can announce the host's mode. */
-export let currentMode: () => boolean = () => false;
-export const setModeSource = (fn: () => boolean) => (currentMode = fn);
+export let currentMode: () => { asl: boolean; math: boolean } = () => ({ asl: false, math: false });
+export const setModeSource = (fn: () => { asl: boolean; math: boolean }) => (currentMode = fn);
 
 function emit(e: PvpEvent) {
   for (const fn of [...listeners]) fn(e);
@@ -161,7 +161,10 @@ function adopt(c: DataConnection) {
     pvp.graceLeft = 0;
     pvp.error = "";
     setStatus("connected");
-    if (pvp.isHost) pvp.send({ t: "hello", asl: currentMode() });
+    if (pvp.isHost) {
+      const mode = currentMode();
+      pvp.send({ t: "hello", asl: mode.asl, math: mode.math });
+    }
     pvp.send({ t: "ready", v: pvp.myReady }); // after a reconnect, say where we stand
     if (!timer) timer = window.setInterval(tick, 250);
   });

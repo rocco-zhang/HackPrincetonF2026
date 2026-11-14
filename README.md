@@ -41,7 +41,7 @@ Everything runs in the browser. There is no backend (versus mode connects the tw
 
 ### ASL fingerspelling mode
 
-Press `A` on the title screen to switch between drawing mode and ASL mode, then start as usual. It needs the camera.
+Press `A` on the title screen to switch modes: drawing, then ASL, then math, then drawing again. ASL needs the camera. Math does not.
 
 - Each monster carries a **letter**. Make that letter's ASL handshape and hold it for about half a second to cast it.
 - A reference card appears along the bottom for every letter a monster needs right now.
@@ -65,6 +65,14 @@ Backspace forgets the selected letter, and Shift+Backspace forgets everything.
 
 The reference cards are drawn from a real example of each letter in the training data, as the camera saw it. They are rough sketches, hard to read for the closed-fist letters (A, E, M, N, S, T), so keep a real ASL chart nearby.
 
+### Math mode
+
+Press `A` until the title says **Math mode**, then start as usual. The camera is optional.
+
+- Each monster carries a problem. Pinch and draw one digit at a time, then hold your hand still. A bar fills, and the whole number casts. Start another digit before the bar fills to add to the number.
+- The same answer hits every monster showing it.
+- Wave 1 is addition, wave 2 subtraction, wave 3 multiplication, wave 4 division. Later waves mix all four, use bigger numbers, put more than one problem on a monster, then add two-step questions.
+
 ### Versus mode (two computers)
 
 Both players open the game, and on the title screen press `V`.
@@ -75,7 +83,7 @@ Both players open the game, and on the title screen press `V`.
 
 - Each player has their own arena. Killing monsters sends extra monsters to your opponent: every two kills sends one, and multi-hits send more.
 - The opponent's hearts, score and wave are shown under your hearts. Whoever runs out of hearts first loses.
-- Both play the same mode. The host chooses drawing or ASL with `A`, and the guest's game follows.
+- Both play the same mode. The host chooses drawing, ASL, or math with `A`, and the guest's game follows.
 - Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
 - After a round, hold to return to the title screen and ready up again for a rematch.
 
@@ -85,7 +93,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 
 | Key | Action |
 |---|---|
-| `A` | on the title screen: switch between drawing mode and ASL fingerspelling mode |
+| `A` | on the title screen: cycle drawing, ASL, and math |
 | `V` | on the title screen: play versus a friend on another computer |
 | `R` | on the title screen in ASL mode: record your own examples of each letter |
 | `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |
