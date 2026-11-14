@@ -21,9 +21,19 @@ Everything runs in the browser. There is no backend (versus mode connects the tw
 
 ## How to play
 
+### Screens
+
+- **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and three icons in the top right: friends, achievements, settings. Every button works with a pinch or a click.
+- **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
+- **Duel:** the same subject and difficulty pickers, a mode row (**Casual** matches you with anyone, **Friend** uses a room code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
+- **Settings:** hand or mouse input, sound, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
+- **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
+
+### Playing
+
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release.
 - **Mouse:** drag to draw, release to cast.
-- **Start / restart:** pinch and hold (or hold the mouse button, or press Space).
+- **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
 - **Symbols:**
 
   | Name | Symbol |
@@ -41,7 +51,7 @@ Everything runs in the browser. There is no backend (versus mode connects the tw
 
 ### ASL fingerspelling mode
 
-Press `A` on the title screen to switch modes: drawing, then ASL, then math, then drawing again. ASL needs the camera. Math does not.
+Pick **ASL** as a subject on the Classic or Duel screen. ASL needs the camera, so Start stays disabled until hand input is on.
 
 - Each monster carries a **letter**. Make that letter's ASL handshape and hold it for about half a second to cast it.
 - A reference card appears along the bottom for every letter a monster needs right now.
@@ -54,7 +64,7 @@ Press `A` on the title screen to switch modes: drawing, then ASL, then math, the
 - On a second, independent image dataset (not trained on, not shipped) it gets 81% of handshapes right. The weak letters there are K, T, P and N (43–65%); A, B, C, F, I, V, Y are above 94%. That dataset's images are rotated at random, so this check ignores which way the hand points and counts K/P, G/Q and H/U as the same shape.
 - It has no "not a letter" answer, so a relaxed hand can read as some letter. Recording your relaxed hand (below) fixes that.
 
-**Teach it your own hand.** In ASL mode, press `R` on the title screen. Pick a letter with the arrow keys, press Space, and hold the letter for about 3 seconds while tilting it slightly. From then on that letter is recognised from your examples instead of the model. The last tile, "rest", records your relaxed hand so it reads as no letter.
+**Teach it your own hand.** Open Settings (the cog on the title screen) and choose **Teach it your own hand**. Pick a letter with the arrow keys, press Space, and hold the letter for about 3 seconds while tilting it slightly. From then on that letter is recognised from your examples instead of the model. The last tile, "rest", records your relaxed hand so it reads as no letter.
 
 Your examples are saved automatically and survive restarts:
 
@@ -67,31 +77,35 @@ The reference cards are drawn from a real example of each letter in the training
 
 ### Math mode
 
-Press `A` until the title says **Math mode**, then start as usual. The camera is optional.
+Pick **Math** on the Classic or Duel screen. The camera is optional.
 
 - Each monster carries a problem. Pinch and draw one digit at a time, then hold your hand still. A bar fills, and the whole number casts. Start another digit before the bar fills to add to the number.
 - The same answer hits every monster showing it.
 - Wave 1 is addition, wave 2 subtraction, wave 3 multiplication, wave 4 division. Later waves mix all four, use bigger numbers, put more than one problem on a monster, then add two-step questions.
 
-### Languages mode
+### Korean, Japanese and Chinese
 
-Press `A` until the title says **Languages mode**. Wave 1 is five Korean letters, wave 2 is five Japanese letters, then three short words. Every one of them is drawn with the same five marks: a flat line, a stick, a V, a peak, or a circle. A letter casts as soon as the stroke finishes. A short word is those marks drawn one after another.
+Pick any of the three as a subject. Everything is drawn with the same five marks: a flat line, a stick, a V, a peak, or a circle.
+
+- The first time a language comes up, monsters carry letters or characters that are one or two marks (Korean ㅡ ㅣ ㄴ ㄱ ㅇ, Japanese ー り し く の, Chinese 一 人 〇 二 十).
+- The second time, they carry longer ones drawn mark by mark (Korean syllables such as 이 and 기, Japanese words such as のり, Chinese 三 and 工). After that, both.
+- A hint at the bottom says which marks the nearest prompt takes, and for Chinese and the Japanese words, what it means.
 
 ### Versus mode (two computers)
 
-Both players open the game, and on the title screen press `V` to open the lobby. Set your name there, then find an opponent one of three ways:
+Both players open the game and choose **Duel** on the title screen. Under **Mode**, pick **Casual** (press **Quick match**, or **Browse games** for the lobby) or **Friend** (press **Host or join a game**). The lobby has all three ways to find an opponent, and your name:
 
-- **Quick match** joins an open public game, preferring one with your mode and difficulty. If nobody is waiting, it hosts one and keeps looking, so two people who press it at the same time still find each other.
-- **Open games** lists every public game with its host, mode and difficulty. Click **Join** on one, or click **Host a public game** to list your own.
+- **Quick match** joins an open public game, preferring one with your subjects and difficulty. If nobody is waiting, it hosts one and keeps looking, so two people who press it at the same time still find each other.
+- **Open games** lists every public game with its host, subjects and difficulty. Click **Join** on one, or click **Host a public game** to list your own.
 - **Host a private game** gives a four-letter code to read out; the other player types it and clicks **Join**.
 
-Once connected, both hold to start (pinch, mouse button or Space). The round begins when both are ready.
+Once connected, both press **Ready** (or Space). The round begins when both are ready.
 
 - Each player has their own arena. Killing monsters sends extra monsters to your opponent: every two kills sends one, and multi-hits send more.
 - The opponent's hearts, score and wave are shown under your hearts. Whoever runs out of hearts first loses.
-- Both play the same mode and difficulty. The host chooses drawing, ASL, math, or languages with `A` and the difficulty with `1`–`3`, and the guest's game follows.
+- Both play the same subjects and difficulty. The host picks them on the Duel screen, and the guest's screen follows.
 - Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
-- After a round, hold to return to the title screen and ready up again for a rematch.
+- After a round, hold to return to the Duel screen and ready up again for a rematch.
 
 The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results. Without a server, the lobby works by giving public games a fixed set of 12 broker ids: hosting claims a free one, and the lobby lists games by briefly connecting to each id and asking who's there. So at most 12 public games run at once; private games aren't limited.
 
@@ -99,18 +113,18 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 
 | Key | Action |
 |---|---|
-| `A` | on the title screen: cycle drawing, ASL, math, and languages |
-| `V` | on the title screen: play versus a friend on another computer |
-| `R` | on the title screen in ASL mode: record your own examples of each letter |
+| `C` / `V` | on the title screen: open Classic / Duel |
+| `1` `2` `3` | on the Classic and Duel screens: easy / medium / hard |
+| `Space` | Classic: start. Duel: ready |
 | `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |
 | `D` | debug overlay: camera preview with hand skeleton and drawing box, pinch ratio, FPS, last recognition + score, resampled stroke |
 | `K` | calibrate the drawing area: sweep your pinch over a comfortable area for 4 s |
-| `C` | next camera (laptop ↔ external webcam) |
+| `C` | next camera (laptop ↔ external webcam); on the title screen use Settings instead |
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
 | `N` | mute |
-| `Esc` | back to the title screen |
+| `Esc` | back one screen |
 
 ## Recording real templates (do this before the demo)
 
@@ -144,6 +158,7 @@ src/
   main.ts                 boot: start screen (camera + audio unlock) → Phaser; global hotkeys
   config.ts               every tunable: pinch thresholds, One Euro, drawing box, recognizer, waves, scoring
   state.ts                shared app state (mode, tracker status, last recognition…)
+  actions.ts              what the settings screen and the hotkeys both do
   asl/
     features.ts           landmarks → the 63 numbers the classifier reads (position, size and mirror removed)
     hand.ts               trained model + your recorded examples → letter; hold-to-cast
@@ -165,9 +180,11 @@ src/
     templates.json        recorded human templates (bundled)
     debugOverlay.ts       D overlay
   game/
-    scenes/               Boot (procedural art), Title, Arena, GameOver
+    scenes/               Boot (procedural art), Title, Classic, Duel, Panel (friends / achievements / settings), Arena, GameOver, AslTrainer
+    subjects.ts           the six subjects, combining them, which one a wave uses, best-score keys
+    icons.ts              pencil-drawn button icons
     entities/             Player, Monster, SymbolBubble
-    systems/              Spawner, Casting (trail + spells), Hud, Fx, HoldToStart
+    systems/              Spawner, Casting (trail + spells), Hud, Fx, HoldToStart, Menu (pinch-or-click buttons), pickers (difficulty + subjects)
     sfx.ts                procedural Web Audio sound effects
 ```
 

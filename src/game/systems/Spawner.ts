@@ -43,6 +43,8 @@ export type CardSource = {
 
 export class Spawner {
   wave = 0;
+  /** How far into the current subject's own lessons this wave is (same as the wave with one subject). */
+  level = 0;
   spawned = 0;
   private timer = 0;
   private spec = waveSpec(1);
@@ -62,8 +64,9 @@ export class Spawner {
     return Math.max(1, wave - DIFFICULTY[difficulty].poolWaveShift);
   }
 
-  startWave(n: number) {
+  startWave(n: number, level = n) {
     this.wave = n;
+    this.level = level;
     this.spec = waveSpec(n, this.difficulty);
     this.spawned = 0;
     this.timer = 0.4;
@@ -99,7 +102,7 @@ export class Spawner {
 
   makeOrder(liveFronts: CastName[]): SpawnOrder {
     if (this.cards) return this.makeCards(liveFronts);
-    const pool = this.poolFor(Spawner.poolWave(this.wave, this.difficulty));
+    const pool = this.poolFor(Spawner.poolWave(this.level, this.difficulty));
     const pick = () => pool[Math.floor(this.rand() * pool.length)];
     const len = 1 + Math.floor(this.rand() * this.spec.maxQueue);
     const symbols: CastName[] = [];
@@ -120,14 +123,14 @@ export class Spawner {
   }
 
   private makeCards(liveFronts: CastName[]): SpawnOrder {
-    const len = this.cards!.queue(this.wave);
+    const len = this.cards!.queue(this.level);
     const symbols: CastName[] = [];
     const labels: string[] = [];
     const shared = liveFronts.filter(isMath);
     const prefer = shared.length && this.rand() < (0.4 * DIFFICULTY[this.difficulty].shareChance) / DIFFICULTY.medium.shareChance ? mathAnswer(shared[Math.floor(this.rand() * shared.length)]) : undefined;
     for (let i = 0; i < len; i++) {
-      let card = this.cards!.make(this.wave, i === 0 ? prefer : undefined);
-      for (let k = 0; k < 6 && labels.includes(card.label); k++) card = this.cards!.make(this.wave);
+      let card = this.cards!.make(this.level, i === 0 ? prefer : undefined);
+      for (let k = 0; k < 6 && labels.includes(card.label); k++) card = this.cards!.make(this.level);
       symbols.push(card.name);
       labels.push(card.label);
     }

@@ -1,13 +1,13 @@
 // The versus panel: quick match, a list of open public games, or a private game with a room code.
 import type Phaser from "phaser";
 import { DIFFICULTY, type Difficulty } from "../config";
+import { subjectsLabel, type Subject } from "../game/subjects";
 import { state } from "../state";
-import { pvp, setModeSource, type GameMode, type RoomInfo } from "./pvp";
+import { pvp, setModeSource, type RoomInfo } from "./pvp";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const NAME_KEY = "spellcam.name";
-const MODE_LABEL: Record<GameMode, string> = { drawing: "Drawing", asl: "ASL", math: "Math", lang: "Languages" };
 const REFRESH_MS = 8000; // re-list open games this often while the panel is open
 
 let getGame: () => Phaser.Game | null = () => null;
@@ -73,8 +73,8 @@ function saveName(name: string) {
   }
 }
 
-function describe(r: { mode: GameMode; difficulty: Difficulty }) {
-  return `${MODE_LABEL[r.mode] ?? r.mode} · ${DIFFICULTY[r.difficulty]?.label ?? r.difficulty}`;
+function describe(r: { subjects: Subject[]; difficulty: Difficulty }) {
+  return `${subjectsLabel(r.subjects)} · ${DIFFICULTY[r.difficulty].label}`;
 }
 
 function render() {
@@ -86,10 +86,10 @@ function render() {
     : s === "searching" ? "Looking for an opponent…"
     : s === "hosting" && pvp.quick ? "No one was waiting, so you're hosting a public game. Waiting for an opponent…"
     : s === "hosting" && publicGame ? `Your game is listed as “${pvp.name}”. Waiting for someone to join…`
-    : s === "hosting" && pvp.code ? `Your code is ${pvp.code}. Your friend presses V, types it in and joins.`
+    : s === "hosting" && pvp.code ? `Your code is ${pvp.code}. Your friend opens Duel on their computer and joins with it.`
     : s === "hosting" ? "Opening a game…"
     : s === "joining" ? `Joining ${pvp.code}…`
-    : s === "connected" ? `Connected${pvp.isHost ? "" : ` to ${pvp.code}`}. Close this, then both hold to get ready.`
+    : s === "connected" ? `Connected${pvp.isHost ? "" : ` to ${pvp.code}`}. Now both press Ready.`
     : s === "reconnecting" ? "Connection trouble…"
     : "Quick match finds you an opponent, or pick an open game below.";
   status.classList.toggle("error", !!pvp.error);
@@ -118,7 +118,7 @@ function render() {
     const li = document.createElement("li");
     const name = document.createElement("span");
     name.className = "roomName";
-    name.textContent = String(r.name).slice(0, 16);
+    name.textContent = r.name;
     const mode = document.createElement("span");
     mode.className = "roomMode";
     mode.textContent = describe(r);
@@ -141,7 +141,7 @@ function render() {
 
 export function initLobby(game: () => Phaser.Game | null) {
   getGame = game;
-  setModeSource(() => ({ asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected, difficulty: state.difficulty }));
+  setModeSource(() => ({ subjects: state.subjects, difficulty: state.difficulty }));
 
   const nameInput = $<HTMLInputElement>("lobbyName");
   pvp.name = loadName();

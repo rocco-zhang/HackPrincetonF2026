@@ -10,9 +10,10 @@
 // - Quick match joins an open public game, or hosts one and keeps looking while it waits.
 import Peer, { type DataConnection } from "peerjs";
 import { DIFFICULTY, type Difficulty } from "../config";
+import { cleanSubjects, type Subject } from "../game/subjects";
 
 export type PvpMessage =
-  | { t: "hello"; asl: boolean; math?: boolean; lang?: boolean; difficulty?: Difficulty } // host → guest: which mode and difficulty we're playing
+  | { t: "hello"; subjects: Subject[]; difficulty: Difficulty } // host → guest: which subjects and difficulty we're playing
   | { t: "ready"; v: boolean }
   | { t: "start" } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
@@ -21,10 +22,8 @@ export type PvpMessage =
   | { t: "full" } // host → would-be guest: someone already took this game
   | { t: "ping" };
 
-export type GameMode = "drawing" | "asl" | "math" | "lang";
-
 /** What a public host says about its game when the lobby asks. */
-export type RoomInfo = { id: string; slot: number; name: string; mode: GameMode; difficulty: Difficulty; open: boolean };
+export type RoomInfo = { id: string; slot: number; name: string; subjects: Subject[]; difficulty: Difficulty; open: boolean };
 
 export type PvpEvent =
   | { type: "state" } // status / ready flags changed
@@ -75,6 +74,8 @@ export const pvp = {
   theirReady: false,
   /** Latest hearts / score / wave the opponent reported. */
   them: { hearts: 3, score: 0, wave: 1 },
+  /** Guest: the subjects and difficulty the host last announced. */
+  hostMode: null as ModeChoice | null,
   /** Milliseconds left for a dropped opponent to come back (0 when connected). */
   graceLeft: 0,
 
@@ -202,13 +203,14 @@ export const pvp = {
     this.myReady = this.theirReady = false;
     this.error = "";
     this.graceLeft = 0;
+    this.hostMode = null;
     setStatus("off");
   },
 };
 
-type ModeChoice = { asl: boolean; math: boolean; lang: boolean; difficulty: Difficulty };
+export type ModeChoice = { subjects: Subject[]; difficulty: Difficulty };
 /** Set by the lobby so a new connection can announce the host's mode and difficulty. */
-export let currentMode: () => ModeChoice = () => ({ asl: false, math: false, lang: false, difficulty: "medium" });
+export let currentMode: () => ModeChoice = () => ({ subjects: ["shapes"], difficulty: "medium" });
 export const setModeSource = (fn: () => ModeChoice) => (currentMode = fn);
 
 function emit(e: PvpEvent) {
@@ -259,6 +261,7 @@ function adopt(c: DataConnection) {
       return;
     }
     if (msg.t === "start") return begin();
+    if (msg.t === "hello") pvp.hostMode = { subjects: cleanSubjects(msg.subjects), difficulty: DIFFICULTY[msg.difficulty] ? msg.difficulty : "medium" };
     if (msg.t === "full") {
       if (pvp.quick) return void pvp.quickMatch(); // beaten to it: look again
       return fail("Someone else just joined that game. Pick another, or try quick match.");
@@ -345,10 +348,6 @@ function claim(ids: string[]): Promise<string> {
   });
 }
 
-function modeOf(m: ModeChoice): GameMode {
-  return m.lang ? "lang" : m.math ? "math" : m.asl ? "asl" : "drawing";
-}
-
 /** A lobby is asking who's here: say, then hang up. */
 function answerProbe(c: DataConnection) {
   c.on("open", () => {
@@ -357,7 +356,7 @@ function answerProbe(c: DataConnection) {
       id: c.provider.id,
       slot: pvp.slot,
       name: pvp.name,
-      mode: modeOf(m),
+      subjects: m.subjects,
       difficulty: m.difficulty,
       open: pvp.status === "hosting",
     };
@@ -384,8 +383,18 @@ function scanRooms(): Promise<RoomInfo[]> {
         if (peer && !peer.destroyed && peer.id === id) continue; // that's us
         const c = scout.connect(id, { reliable: true, metadata: { probe: true } });
         c.on("data", (data) => {
-          const info = data as RoomInfo;
-          if (info && typeof info.name === "string") found.set(id, { ...info, id, slot: i });
+          // answers come from other players' browsers: keep only well-formed fields
+          const info = data as Partial<RoomInfo> | null;
+          if (info && typeof info.name === "string") {
+            found.set(id, {
+              id,
+              slot: i,
+              name: info.name.trim().slice(0, 16) || "Player",
+              subjects: cleanSubjects(info.subjects),
+              difficulty: info.difficulty && DIFFICULTY[info.difficulty] ? info.difficulty : "medium",
+              open: info.open === true,
+            });
+          }
           c.close();
           if (found.size >= ROOM_SLOTS) finish();
         });
@@ -400,11 +409,18 @@ function scanRooms(): Promise<RoomInfo[]> {
   });
 }
 
-/** Quick match prefers a game like the one you picked, then any open game. */
+/** Quick match prefers a game like the one you picked, then one sharing a subject, then any open game. */
 function pickRoom(rooms: RoomInfo[]): RoomInfo | null {
   const want = currentMode();
-  const mode = modeOf(want);
-  return rooms.find((r) => r.mode === mode && r.difficulty === want.difficulty) ?? rooms.find((r) => r.mode === mode) ?? rooms[0] ?? null;
+  const same = (r: RoomInfo) => r.subjects.join("+") === cleanSubjects(want.subjects).join("+");
+  const overlap = (r: RoomInfo) => r.subjects.some((s) => want.subjects.includes(s));
+  return (
+    rooms.find((r) => same(r) && r.difficulty === want.difficulty) ??
+    rooms.find(same) ??
+    rooms.find(overlap) ??
+    rooms[0] ??
+    null
+  );
 }
 
 let scanning = false;

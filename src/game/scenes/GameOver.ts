@@ -1,10 +1,9 @@
 import Phaser from "phaser";
 import { ARENA, DIFFICULTY, type Difficulty } from "../../config";
+import { bestKey, cleanSubjects, subjectsLabel, type Subject } from "../subjects";
 import { ACCENT_CSS, FONT, INK_CSS, MUTED_CSS, ORANGE_CSS, TITLE_FONT } from "../palette";
 import { sfx } from "../sfx";
 import { HoldToStart } from "../systems/HoldToStart";
-
-const BEST_KEY = "spellcam.best";
 
 export class GameOver extends Phaser.Scene {
   private hold!: HoldToStart;
@@ -13,16 +12,16 @@ export class GameOver extends Phaser.Scene {
     super("GameOver");
   }
 
-  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean; math?: boolean; lang?: boolean; difficulty?: Difficulty; versus?: { won: boolean; note?: string; theirScore: number } }) {
+  create(data: { score: number; wave: number; demo?: boolean; subjects?: Subject[]; difficulty?: Difficulty; versus?: { won: boolean; note?: string; theirScore: number } }) {
     const W = ARENA.width, H = ARENA.height;
     this.add.image(W / 2, H / 2, "floor");
-    // a best score per mode and difficulty; medium keeps the original keys so old bests carry over
+    // a best score per subject selection and difficulty
     const diff = data.difficulty ?? "medium";
-    const mode = data.lang ? `${BEST_KEY}.lang` : data.math ? `${BEST_KEY}.math` : data.asl ? `${BEST_KEY}.asl` : BEST_KEY;
-    const bestKey = mode + (diff === "medium" ? "" : `.${diff}`);
-    const best = Number(localStorage.getItem(bestKey) ?? 0);
-    const isBest = data.score > best;
-    if (isBest) localStorage.setItem(bestKey, String(data.score));
+    const subjects = cleanSubjects(data.subjects);
+    const key = bestKey(subjects, diff);
+    const best = Number(localStorage.getItem(key) ?? 0);
+    const isBest = data.score > best && !data.versus && !data.demo;
+    if (isBest) localStorage.setItem(key, String(data.score));
 
     this.add
       .text(W / 2, 140, data.versus ? (data.versus.won ? "You win!" : "Your opponent outlasted you") : "The paper monsters got you!", { fontFamily: TITLE_FONT, fontSize: "60px", color: ACCENT_CSS, stroke: "#f9f5ea", strokeThickness: 12 })
@@ -45,7 +44,7 @@ export class GameOver extends Phaser.Scene {
       onUpdate: (tw) => scoreText.setText(Math.round(tw.getValue() ?? 0).toLocaleString()),
     });
     this.add
-      .text(W / 2, 360, data.versus ? `${data.versus.note ? `${data.versus.note}   ·   ` : ""}opponent's score ${data.versus.theirScore.toLocaleString()}` : `${DIFFICULTY[diff].label}   ·   reached wave ${data.wave}   ·   best ${Math.max(best, data.score).toLocaleString()}`, { fontFamily: FONT, fontSize: "26px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+      .text(W / 2, 360, data.versus ? `${data.versus.note ? `${data.versus.note}   ·   ` : ""}opponent's score ${data.versus.theirScore.toLocaleString()}` : `${subjectsLabel(subjects)}   ·   ${DIFFICULTY[diff].label}   ·   reached wave ${data.wave}   ·   best ${Math.max(best, data.score).toLocaleString()}`, { fontFamily: FONT, fontSize: "26px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5);
     if (isBest && data.score > 0 && !data.versus) {
       const nb = this.add.text(W / 2, 410, "New best!", { fontFamily: FONT, fontSize: "30px", fontStyle: "bold", color: ORANGE_CSS, stroke: "#f9f5ea", strokeThickness: 7 }).setOrigin(0.5);
@@ -55,16 +54,16 @@ export class GameOver extends Phaser.Scene {
       .text(W / 2, 530, data.versus ? "Pinch & hold (or hold mouse / Space) for a rematch" : "Pinch & hold (or hold mouse / Space) to play again", { fontFamily: FONT, fontSize: "30px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
       .setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
-    this.add.text(W / 2, H - 28, "Esc: title screen", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
-    this.input.keyboard?.on("keydown-ESC", () => this.scene.start("Title"));
+    this.add.text(W / 2, H - 28, data.versus ? "Esc: back to Duel" : "Esc: change difficulty or subjects", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
+    this.input.keyboard?.on("keydown-ESC", () => this.scene.start(data.versus ? "Duel" : data.demo ? "Title" : "Classic"));
 
     // short delay so a stroke that was in progress at game over doesn't restart instantly
     this.time.delayedCall(700, () => {
       this.hold = new HoldToStart(this, 600, null, () => {
         sfx.start();
-        // versus: back to the title screen, where both players ready up for a rematch
-        if (data.versus) this.scene.start("Title");
-        else this.scene.start("Arena", { demo: data.demo, asl: data.asl, math: data.math, lang: data.lang });
+        // versus: back to the Duel screen, where both players ready up for a rematch
+        if (data.versus) this.scene.start("Duel");
+        else this.scene.start("Arena", { demo: data.demo, subjects });
       });
     });
   }

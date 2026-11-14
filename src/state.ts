@@ -1,5 +1,6 @@
 import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
+import { cleanSubjects, type Subject } from "./game/subjects";
 import type { CastName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
@@ -22,6 +23,26 @@ export function saveDifficulty(d: Difficulty) {
   state.difficulty = d;
   try {
     localStorage.setItem(DIFFICULTY_KEY, d);
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
+
+const SUBJECTS_KEY = "spellcam.subjects";
+
+function loadSubjects(): Subject[] {
+  try {
+    return cleanSubjects(JSON.parse(localStorage.getItem(SUBJECTS_KEY) ?? "null"));
+  } catch {
+    return ["shapes"];
+  }
+}
+
+/** Remember which subjects were picked for next time. */
+export function saveSubjects(list: Subject[]) {
+  state.subjects = cleanSubjects(list);
+  try {
+    localStorage.setItem(SUBJECTS_KEY, JSON.stringify(state.subjects));
   } catch {
     // storage blocked: the choice still lasts for this session
   }
@@ -51,14 +72,10 @@ export const state = {
   lastRecog: null as RecogResult | null,
   /** Symbols a monster currently needs; the recognizer favours these. Empty outside the arena. */
   wanted: [] as CastName[],
-  /** Title-screen choice: play the ASL fingerspelling mode instead of drawing spells. */
-  aslSelected: false,
-  /** Title-screen choice (in versus, the host's). */
+  /** Setup-screen choice (in a duel, the host's): what the monsters carry. Each wave uses the next one. */
+  subjects: loadSubjects(),
+  /** Setup-screen choice (in a duel, the host's). */
   difficulty: loadDifficulty(),
-  /** Title-screen choice: monsters carry arithmetic, answered by drawn digits. */
-  mathSelected: false,
-  /** Title-screen choice: Korean, Japanese, and a few short words, drawn as easy marks. */
-  langSelected: false,
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
   /** An arithmetic round is running. */
