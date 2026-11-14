@@ -1,0 +1,146 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #05040c;
+  color: #fff;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  max-height: 100vh;
+  background: #07060f;
+  touch-action: none;
+  overflow: hidden;
+}
+
+#cam {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.22;
+  filter: saturate(0.5) contrast(1.15);
+  pointer-events: none;
+}
+
+#cam.mirrored {
+  transform: scaleX(-1);
+}
+
+#game {
+  position: absolute;
+  inset: 0;
+}
+
+#debug {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#gate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: radial-gradient(ellipse at center, #2a1650 0%, #0b0618 60%, #05040c 100%);
+  z-index: 10;
+  text-align: center;
+  padding: 24px;
+}
+
+#gate.hidden {
+  display: none;
+}
+
+#gate h1 {
+  margin: 0;
+  font-size: clamp(56px, 10vw, 120px);
+  letter-spacing: 0.04em;
+  color: #fff6dc;
+  text-shadow: 0 0 30px #ffb43b, 0 0 60px #ff7a1a88;
+}
+
+#gate .tag {
+  margin: 0 0 12px;
+  font-size: 22px;
+  color: #d9ccff;
+}
+
+#gate button {
+  font: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  padding: 16px 36px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  color: #1a0f05;
+  background: linear-gradient(180deg, #ffe9a8, #ffb43b);
+  box-shadow: 0 0 30px #ffb43b88;
+  transition: transform 0.1s;
+}
+
+#gate button:hover {
+  transform: scale(1.04);
+}
+
+#gate button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#gate button.secondary {
+  font-size: 17px;
+  padding: 10px 24px;
+  color: #d9ccff;
+  background: transparent;
+  border: 1px solid #d9ccff66;
+  box-shadow: none;
+}
+
+#gateMsg {
+  min-height: 1.4em;
+  font-size: 18px;
+  color: #ffb3c6;
+  max-width: 640px;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 20px);
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #1b1233ee;
+  border: 1px solid #ffffff22;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
