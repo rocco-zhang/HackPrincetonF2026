@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { FONT } from "../palette";
+import { FONT, INK_CSS, TITLE_FONT } from "../palette";
 
 /** Particle bursts, floating text and banners. */
 export class Fx {
@@ -11,21 +11,23 @@ export class Fx {
     const key = `${kind}:${color}`;
     let e = this.emitters.get(key);
     if (!e) {
-      e = this.scene.add.particles(0, 0, "spark", kind === "burst"
+      e = this.scene.add.particles(0, 0, kind === "burst" ? "scrap" : "spark", kind === "burst"
         ? {
-            lifespan: { min: 350, max: 750 },
-            speed: { min: 90, max: 420 },
-            scale: { start: 0.9, end: 0 },
-            alpha: { start: 1, end: 0 },
+            // torn paper scraps
+            lifespan: { min: 400, max: 800 },
+            speed: { min: 90, max: 380 },
+            gravityY: 300,
+            rotate: { min: 0, max: 360 },
+            scale: { start: 1, end: 0.5 },
+            alpha: { start: 1, end: 0.6 },
             tint: color,
-            blendMode: Phaser.BlendModes.SCREEN,
             emitting: false,
           }
         : {
             lifespan: { min: 300, max: 600 },
             speed: { min: 20, max: 90 },
             scale: { start: 0.6, end: 1.4 },
-            alpha: { start: 0.5, end: 0 },
+            alpha: { start: 0.8, end: 0 },
             tint: color,
             emitting: false,
           });
@@ -39,13 +41,13 @@ export class Fx {
     this.emitter(color, "burst").explode(count, x, y);
   }
 
-  puff(x: number, y: number, color = 0x8a8399, count = 10) {
+  puff(x: number, y: number, color = 0xb5b0a5, count = 10) {
     this.emitter(color, "puff").explode(count, x, y);
   }
 
-  floatText(x: number, y: number, text: string, color = "#ffffff", size = 26) {
+  floatText(x: number, y: number, text: string, color = INK_CSS, size = 26) {
     const t = this.scene.add
-      .text(x, y, text, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: "bold", color, stroke: "#120a24", strokeThickness: 5 })
+      .text(x, y, text, { fontFamily: FONT, fontSize: `${size}px`, fontStyle: "bold", color, stroke: "#f9f5ea", strokeThickness: 7 })
       .setOrigin(0.5)
       .setDepth(950);
     this.scene.tweens.add({
@@ -59,19 +61,19 @@ export class Fx {
     });
   }
 
-  banner(text: string, color = "#ffffff", sub?: string, hold = 900) {
+  banner(text: string, color = INK_CSS, sub?: string, hold = 900) {
     const { width: W, height: H } = this.scene.scale;
     const t = this.scene.add
-      .text(W / 2, H / 2 - 120, text, { fontFamily: FONT, fontSize: "72px", fontStyle: "bold", color, stroke: "#120a24", strokeThickness: 8 })
+      .text(W / 2, H / 2 - 120, text, { fontFamily: TITLE_FONT, fontSize: "84px", color, stroke: "#f9f5ea", strokeThickness: 14 })
       .setOrigin(0.5)
       .setDepth(980)
       .setScale(0.4)
       .setAlpha(0);
-    t.setPadding(32).setShadow(0, 0, color, 18, true, true);
+    t.setPadding(32);
     const targets: Phaser.GameObjects.Text[] = [t];
     if (sub) {
       const s = this.scene.add
-        .text(W / 2, H / 2 - 64, sub, { fontFamily: FONT, fontSize: "24px", color: "#e6defc", stroke: "#120a24", strokeThickness: 5 })
+        .text(W / 2, H / 2 - 64, sub, { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 7 })
         .setOrigin(0.5)
         .setDepth(980)
         .setAlpha(0);

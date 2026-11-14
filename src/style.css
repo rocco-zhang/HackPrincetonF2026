@@ -6,9 +6,10 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #05040c;
-  color: #fff;
-  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  /* the desk the sheet of paper is lying on */
+  background: #6f8f86;
+  color: #33312e;
+  font-family: "Chalkboard SE", "Chalkboard", "Comic Sans MS", "Bradley Hand", cursive;
   overflow: hidden;
   user-select: none;
 }
@@ -20,7 +21,8 @@ body {
   width: min(100vw, calc(100vh * 16 / 9));
   aspect-ratio: 16 / 9;
   max-height: 100vh;
-  background: #07060f;
+  background: #f9f5ea;
+  box-shadow: 0 10px 36px rgba(20, 30, 25, 0.45);
   touch-action: none;
   overflow: hidden;
 }
@@ -31,8 +33,9 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.22;
-  filter: saturate(0.5) contrast(1.15);
+  /* shows through the paper like a faint pencil sketch */
+  opacity: 0.6;
+  filter: grayscale(1) contrast(1.25) brightness(1.1);
   pointer-events: none;
 }
 
@@ -61,7 +64,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  background: radial-gradient(ellipse at center, #2a1650 0%, #0b0618 60%, #05040c 100%);
+  background:
+    linear-gradient(90deg, transparent calc(33.33% - 7px), #78643c12 calc(33.33% - 1px), #ffffff47 calc(33.33% + 1px), transparent calc(33.33% + 7px)),
+    linear-gradient(90deg, transparent calc(66.66% - 7px), #78643c12 calc(66.66% - 1px), #ffffff47 calc(66.66% + 1px), transparent calc(66.66% + 7px)),
+    radial-gradient(ellipse at center, #f9f5ea 55%, #e9dfc8 100%);
   z-index: 10;
   text-align: center;
   padding: 24px;
@@ -75,14 +81,19 @@ body {
   margin: 0;
   font-size: clamp(56px, 10vw, 120px);
   letter-spacing: 0.04em;
-  color: #fff6dc;
-  text-shadow: 0 0 30px #ffb43b, 0 0 60px #ff7a1a88;
+  font-family: "Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive;
+  font-weight: 400;
+  color: #33312e;
+  padding: 0 0.25em;
+  transform: rotate(-1.6deg);
+  /* a swipe of highlighter */
+  background: linear-gradient(#ffe95cd9, #ffe95cd9) center 62% / 100% 52% no-repeat;
 }
 
 #gate .tag {
   margin: 0 0 12px;
-  font-size: 22px;
-  color: #d9ccff;
+  font-size: 24px;
+  color: #33312e;
 }
 
 #gate button {
@@ -90,17 +101,30 @@ body {
   font-size: 24px;
   font-weight: 700;
   padding: 16px 36px;
-  border-radius: 999px;
-  border: none;
+  /* uneven radii make the border look drawn by hand */
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  border: 3px solid #33312e;
   cursor: pointer;
-  color: #1a0f05;
-  background: linear-gradient(180deg, #ffe9a8, #ffb43b);
-  box-shadow: 0 0 30px #ffb43b88;
-  transition: transform 0.1s;
+  color: #33312e;
+  background: #ffe95c;
+  box-shadow: 3px 4px 0 #281e0a33;
+  transform: rotate(-1deg);
+  transition: transform 0.1s, box-shadow 0.1s;
 }
 
 #gate button:hover {
-  transform: scale(1.04);
+  transform: rotate(-1deg) translateY(-2px);
+  box-shadow: 4px 7px 0 #281e0a33;
+}
+
+#gate button:active {
+  transform: rotate(-1deg) translateY(2px);
+  box-shadow: 1px 1px 0 #281e0a33;
+}
+
+#gate button:focus-visible {
+  outline: 3px dashed #d7372f;
+  outline-offset: 5px;
 }
 
 #gate button:disabled {
@@ -111,16 +135,23 @@ body {
 #gate button.secondary {
   font-size: 17px;
   padding: 10px 24px;
-  color: #d9ccff;
-  background: transparent;
-  border: 1px solid #d9ccff66;
-  box-shadow: none;
+  background: #fffefa;
+  border-width: 2px;
+  transform: rotate(1deg);
+}
+
+#gate button.secondary:hover {
+  transform: rotate(1deg) translateY(-2px);
+}
+
+#gate button.secondary:active {
+  transform: rotate(1deg) translateY(2px);
 }
 
 #gateMsg {
   min-height: 1.4em;
   font-size: 18px;
-  color: #ffb3c6;
+  color: #d7372f;
   max-width: 640px;
 }
 
@@ -130,9 +161,11 @@ body {
   bottom: 28px;
   transform: translate(-50%, 20px);
   padding: 10px 18px;
-  border-radius: 10px;
-  background: #1b1233ee;
-  border: 1px solid #ffffff22;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  background: #fffefa;
+  border: 2px solid #33312e;
+  color: #33312e;
+  box-shadow: 3px 4px 0 #281e0a33;
   font-size: 16px;
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;

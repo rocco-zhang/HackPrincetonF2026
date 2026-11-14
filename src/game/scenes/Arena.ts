@@ -5,14 +5,14 @@ import { mulberry32 } from "../../input/shapes";
 import { state } from "../../state";
 import { Monster } from "../entities/Monster";
 import { Player } from "../entities/Player";
-import { MONSTER_PALETTES, SYMBOL_COLOR } from "../palette";
+import { INK_CSS, MONSTER_PALETTES, ORANGE_CSS, ACCENT_CSS, SYMBOL_COLOR } from "../palette";
 import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
 import { DEMO_SEED, edgePoint, Spawner, type SpawnOrder } from "../systems/Spawner";
 
-const MULTI_NAMES = ["", "", "DOUBLE!", "TRIPLE!", "QUAD!", "MEGA!"];
+const MULTI_NAMES = ["", "", "Double!", "Triple!", "Quad!", "Mega!"];
 
 export class Arena extends Phaser.Scene implements CastHost {
   player!: Player;
@@ -75,8 +75,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.wave = n;
     this.phase = "banner";
     this.hud.setWave(n);
-    const sub = n === 1 ? (this.demo ? "demo run" : "draw the glowing symbol over a Hollow") : n === 3 ? "new spell: ⚡ zigzag · Hollows carry more symbols" : n === 2 ? "new spells: Λ and ◯" : undefined;
-    this.fx.banner(`WAVE ${n}`, "#ffffff", sub, 1200);
+    const sub = n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
+    this.fx.banner(`Wave ${n}`, INK_CSS, sub, 1200);
     sfx.wave();
     this.time.delayedCall(GAME.breather * 1000, () => {
       if (this.phase === "over") return;
@@ -86,7 +86,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
   }
 
-  /** Three Hollows with the same symbol, so the demo shows a triple hit early. */
+  /** Three monsters with the same symbol, so the demo shows a triple hit early. */
   private scriptDemoOpening() {
     const speed = this.spawner.speed;
     const mk = (angle: number, palette: number): SpawnOrder => ({ angle, symbols: ["v"], speed, palette });
@@ -124,7 +124,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.phase === "play" && this.spawner.done && this.monsters.length === 0) {
       const bonus = 500 * this.wave;
       this.score += bonus;
-      this.fx.floatText(px, py - 90, `wave clear +${bonus}`, "#ffd36b", 28);
+      this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
       this.startWave(this.wave + 1);
     }
   }
@@ -135,7 +135,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   onCast(name: SymbolName, hits: Monster[]) {
     if (hits.length === 0) {
-      this.fx.floatText(this.player.x, this.player.y - 70, "no target", "#9c95b0", 16);
+      this.fx.floatText(this.player.x, this.player.y - 70, "no monster needs that", "#8a857a", 16);
       return;
     }
     this.streak++;
@@ -145,7 +145,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       const c = SYMBOL_COLOR[name];
       this.cameras.main.flash(160, (c >> 16) & 255, (c >> 8) & 255, c & 255);
       this.cameras.main.shake(220, 0.008);
-      this.fx.banner(label, "#ffd36b", `×${Math.min(3, hits.length)} score`, 350);
+      this.fx.banner(label, ACCENT_CSS, `×${Math.min(3, hits.length)} score`, 350);
       sfx.multi(hits.length);
     }
   }
@@ -156,7 +156,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const mult = multi >= 3 ? 3 : multi >= 2 ? 2 : 1;
     const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult);
     this.score += pts;
-    this.fx.floatText(m.x, m.y - 40, `+${pts}`, killed ? "#ffd36b" : "#ffffff", killed ? 28 : 22);
+    this.fx.floatText(m.x, m.y - 40, `+${pts}`, killed ? ORANGE_CSS : INK_CSS, killed ? 28 : 22);
     m.bubble.popFront();
     m.flashHit();
     this.fx.burst(m.x, m.y - 10, color, 12);
@@ -168,7 +168,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.removeMonster(m);
     const rim = Phaser.Display.Color.HexStringToColor(MONSTER_PALETTES[m.palette].rim).color;
     this.fx.burst(m.x, m.y, rim, 36);
-    this.fx.burst(m.x, m.y, 0xffffff, 10);
+    this.fx.burst(m.x, m.y, 0xffffff, 14);
     this.cameras.main.shake(120, 0.005);
     sfx.kill();
     this.tweens.add({
@@ -184,7 +184,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private contact(m: Monster) {
     this.removeMonster(m);
-    this.fx.puff(m.x, m.y, 0x3a2a5a, 20);
+    this.fx.puff(m.x, m.y, 0x8a857a, 20);
     this.fx.burst(this.player.x, this.player.y, 0xff4d6d, 30);
     m.destroy();
     this.hearts--;

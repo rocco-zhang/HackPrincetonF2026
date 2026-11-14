@@ -18,7 +18,7 @@ export class Monster extends Phaser.GameObjects.Container {
     this.queue = [...symbols];
     this.speed = speed;
     this.palette = palette;
-    this.shadow = scene.add.ellipse(0, 40, 54, 14, 0x000000, 0.45);
+    this.shadow = scene.add.ellipse(0, 44, 50, 10, 0x281e0a, 0.14);
     this.sprite = scene.add.image(0, 0, `monster${palette}`);
     this.bubble = new SymbolBubble(scene, -78, symbols);
     this.add([this.shadow, this.sprite, this.bubble]);

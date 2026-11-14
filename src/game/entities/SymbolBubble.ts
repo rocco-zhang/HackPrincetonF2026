@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GAME } from "../../config";
 import type { SymbolName } from "../../input/events";
+import { INK } from "../palette";
 
 const GAP = GAME.iconSize - 2;
 
@@ -8,16 +9,20 @@ const GAP = GAME.iconSize - 2;
 export class SymbolBubble extends Phaser.GameObjects.Container {
   private bg: Phaser.GameObjects.Graphics;
   private icons: Phaser.GameObjects.Image[] = [];
+  private tape: Phaser.GameObjects.Image;
 
   constructor(scene: Phaser.Scene, y: number, symbols: SymbolName[]) {
     super(scene, 0, y);
     this.bg = scene.add.graphics();
     this.add(this.bg);
+    this.tape = scene.add.image(0, -GAME.iconSize / 2 - 7, "tape").setAngle(Phaser.Math.Between(-9, 9));
+    this.setAngle(Phaser.Math.Between(-4, 4));
     for (const s of symbols) {
       const img = scene.add.image(0, 0, `sym_${s}`).setDisplaySize(GAME.iconSize, GAME.iconSize);
       this.icons.push(img);
       this.add(img);
     }
+    this.add(this.tape);
     this.layout(false);
   }
 
@@ -29,11 +34,15 @@ export class SymbolBubble extends Phaser.GameObjects.Container {
     const n = this.icons.length;
     const w = Math.max(1, n) * GAP + 14;
     this.bg.clear();
+    this.tape.setVisible(n > 0);
     if (n > 0) {
-      this.bg.fillStyle(0x0b0820, 0.82);
-      this.bg.fillRoundedRect(-w / 2, -GAME.iconSize / 2 - 6, w, GAME.iconSize + 12, 16);
-      this.bg.lineStyle(2, 0xffffff, 0.22);
-      this.bg.strokeRoundedRect(-w / 2, -GAME.iconSize / 2 - 6, w, GAME.iconSize + 12, 16);
+      const top = -GAME.iconSize / 2 - 6, h = GAME.iconSize + 12;
+      this.bg.fillStyle(0x281e0a, 0.18);
+      this.bg.fillRect(-w / 2 + 2, top + 3, w, h);
+      this.bg.fillStyle(0xfffefa, 1);
+      this.bg.fillRect(-w / 2, top, w, h);
+      this.bg.lineStyle(1.5, INK, 0.6);
+      this.bg.strokeRect(-w / 2, top, w, h);
     }
     this.icons.forEach((img, i) => {
       const x = -((n - 1) * GAP) / 2 + i * GAP;
@@ -42,7 +51,7 @@ export class SymbolBubble extends Phaser.GameObjects.Container {
       this.scene.tweens.killTweensOf(img);
       if (animate) this.scene.tweens.add({ targets: img, x, duration: 140, ease: "Quad.easeOut" });
       else img.x = x;
-      img.setAlpha(front ? 1 : 0.45);
+      img.setAlpha(front ? 1 : 0.4);
       img.setScale(base * (front ? 1.12 : 0.88));
       if (front) {
         this.scene.tweens.add({

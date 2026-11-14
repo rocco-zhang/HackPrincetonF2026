@@ -36,7 +36,7 @@ export const INPUT = {
 
 export const RECOG = {
   acceptScore: 0.76,
-  // lower bar when matching only against symbols a Hollow currently needs
+  // lower bar when matching only against symbols a monster currently needs
   acceptScoreWanted: 0.55,
   // ...but only if it scores within this much of the best match overall, so a clear ring stays a ring
   wantedMargin: 0.08,

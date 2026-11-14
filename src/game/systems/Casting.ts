@@ -3,7 +3,7 @@ import { ARENA } from "../../config";
 import type { Pt, SymbolName } from "../../input/events";
 import type { Monster } from "../entities/Monster";
 import type { Player } from "../entities/Player";
-import { SYMBOL_COLOR } from "../palette";
+import { ACCENT, INK, SYMBOL_COLOR } from "../palette";
 import { sfx } from "../sfx";
 import type { Fx } from "./Fx";
 
@@ -33,15 +33,15 @@ export class Casting {
     private scene: Phaser.Scene,
     private host: CastHost,
   ) {
-    this.gfx = scene.add.graphics().setDepth(700).setBlendMode(Phaser.BlendModes.SCREEN);
-    this.cursorRing = scene.add.circle(0, 0, 16).setStrokeStyle(3, 0xffffff, 0.9);
-    this.cursorDot = scene.add.image(0, 0, "spark").setScale(0.7).setBlendMode(Phaser.BlendModes.SCREEN).setVisible(false);
+    this.gfx = scene.add.graphics().setDepth(700);
+    this.cursorRing = scene.add.circle(0, 0, 16, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9);
+    this.cursorDot = scene.add.image(0, 0, "star").setScale(0.55).setTint(ACCENT).setVisible(false);
     this.cursor = scene.add.container(-100, -100, [this.cursorRing, this.cursorDot]).setDepth(960);
   }
 
   onCursor(p: Pt, inking: boolean) {
     this.cursor.setPosition(p.x, p.y);
-    this.cursorRing.setRadius(inking ? 10 : 16).setStrokeStyle(3, inking ? 0xffe9a8 : 0xffffff, inking ? 1 : 0.8);
+    this.cursorRing.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
     this.cursorDot.setVisible(inking);
   }
 
@@ -55,17 +55,17 @@ export class Casting {
 
   onStrokeEnd() {
     if (this.current.length > 1) {
-      this.lastEnded = { pts: this.current, color: 0xffffff, age: 0 };
+      this.lastEnded = { pts: this.current, color: INK, age: 0 };
       this.fading.push(this.lastEnded);
     }
     this.current = [];
   }
 
   onFizzle(points: Pt[]) {
-    if (this.lastEnded) this.lastEnded.color = 0x6f6880;
+    if (this.lastEnded) this.lastEnded.color = 0xb5b0a5;
     const end = points[points.length - 1] ?? { x: ARENA.width / 2, y: ARENA.height / 2 };
     this.host.fx.puff(end.x, end.y);
-    this.host.fx.floatText(end.x, end.y - 20, "fizzle", "#9c95b0", 18);
+    this.host.fx.floatText(end.x, end.y - 20, "oops", "#8a857a", 18);
     sfx.fizzle();
   }
 
@@ -91,15 +91,15 @@ export class Casting {
 
     targets.forEach((m, i) => {
       const killed = m.queue.length === 0;
-      const bolt = this.scene.add.image(player.x, player.y, "spark").setTint(color).setScale(1.4).setBlendMode(Phaser.BlendModes.SCREEN).setDepth(800);
-      const tail = this.scene.add.particles(0, 0, "spark", {
+      const bolt = this.scene.add.image(player.x, player.y, "star").setTint(color).setScale(1.3).setDepth(800);
+      this.scene.tweens.add({ targets: bolt, angle: 360, duration: 300, repeat: -1 });
+      const tail = this.scene.add.particles(0, 0, "star", {
         follow: bolt,
-        lifespan: 260,
-        scale: { start: 0.7, end: 0 },
-        alpha: { start: 0.8, end: 0 },
+        lifespan: 280,
+        scale: { start: 0.6, end: 0 },
+        rotate: { min: 0, max: 360 },
         tint: color,
-        frequency: 12,
-        blendMode: Phaser.BlendModes.SCREEN,
+        frequency: 14,
       }).setDepth(799);
       const d = Phaser.Math.Distance.Between(player.x, player.y, m.x, m.y);
       this.scene.tweens.add({
@@ -128,7 +128,7 @@ export class Casting {
       const a = 1 - Math.max(0, f.age) / 0.45;
       this.drawTrail(f.pts, f.color, a);
     }
-    if (this.current.length > 1) this.drawTrail(this.current, 0xffd36b, 1);
+    if (this.current.length > 1) this.drawTrail(this.current, INK, 1);
   }
 
   private drawTrail(pts: Pt[], color: number, alpha: number) {
@@ -140,8 +140,9 @@ export class Casting {
       for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
       g.strokePath();
     };
-    pass(22, color, 0.12 * alpha);
-    pass(12, color, 0.3 * alpha);
-    pass(5, 0xffffff, 0.9 * alpha);
+    // pencil line; dots round off the joins and ends
+    pass(5.5, color, 0.92 * alpha);
+    g.fillStyle(color, 0.92 * alpha);
+    for (const p of pts) g.fillCircle(p.x, p.y, 2.75);
   }
 }

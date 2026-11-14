@@ -18,7 +18,7 @@ export class HoldToStart {
     private onDone: () => void,
   ) {
     this.ring = scene.add.graphics().setDepth(1000);
-    this.dot = scene.add.circle(-100, -100, 14).setStrokeStyle(3, 0xffffff, 0.9).setDepth(1000);
+    this.dot = scene.add.circle(-100, -100, 14, 0xfffefa, 0.6).setStrokeStyle(3, 0x33312e, 0.9).setDepth(1000);
     const off = onInput((e) => {
       if (e.type !== "cursor") return;
       this.pos = { x: e.p.x, y: e.p.y };
@@ -42,7 +42,7 @@ export class HoldToStart {
     this.ring.clear();
     if (this.heldSince === null || this.fired) return;
     const p = Math.min(1, (performance.now() - this.heldSince) / this.ms);
-    this.ring.lineStyle(5, 0xffd36b, 1);
+    this.ring.lineStyle(5, 0xd7372f, 1);
     this.ring.beginPath();
     this.ring.arc(this.pos.x, this.pos.y, 26, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
     this.ring.strokePath();

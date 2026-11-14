@@ -1,8 +1,8 @@
 # SPELLCAM
 
-Draw spells in the air with your fingertip to banish the Hollows before they reach your lantern.
+You are a stick figure on a sheet of paper, and the paper monsters are closing in. Draw shapes in the air with your fingertip to tear them up before they reach you.
 
-Your webcam tracks your hand in the browser (MediaPipe). Pinch your thumb and index finger to start drawing, and release to cast. Each Hollow carries a queue of symbols. Drawing a symbol strips it from **every** Hollow whose next symbol matches, so one spell can hit several at once.
+Your webcam tracks your hand in the browser (MediaPipe). Pinch your thumb and index finger to start drawing, and release to cast. Each monster carries a queue of symbols on a scrap of paper taped above it. Drawing a symbol strips it from **every** monster whose next symbol matches, so one spell can hit several at once.
 
 Built at HackPrinceton Fall '26 (Entertainment & Media track). The design doc is [`init_plan.md`](init_plan.md).
 
@@ -36,8 +36,8 @@ Everything runs in the browser. There is no backend. The hand model (`public/mod
   | bolt | zigzag (M or W) |
 
   Any drawing direction works.
-- **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol Hollows.
-- **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 Hollows scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
+- **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
+- **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
 ### Hotkeys
 
@@ -48,7 +48,7 @@ Everything runs in the browser. There is no backend. The hand model (`public/mod
 | `K` | calibrate the drawing area: sweep your pinch over a comfortable area for 4 s |
 | `C` | next camera (laptop ↔ external webcam) |
 | `F` | toggle mirroring |
-| `G` | **demo run**: seeded RNG, slightly slower Hollows, and an opening that sets up a multi-hit |
+| `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
 | `N` | mute |
 | `Esc` | back to the title screen |
@@ -108,9 +108,9 @@ src/
 
 - **Not yet verified on a real hand.** The build machine had no webcam in the loop. The MediaPipe model loads locally on the GPU delegate in ~150 ms, and the whole game was play-tested with simulated mouse strokes. But pinch thresholds (`INPUT.pinchOn` 0.28 / `pinchOff` 0.5, a 3D veto at `pinch3dMax` 0.5, plus a 180 ms release grace period), One Euro parameters (`minCutoff` 1.0, `beta` 0.01) and the default drawing box all need tuning on a real webcam. Use `D` to see the live pinch ratio.
 - **The cursor follows the index-finger base knuckle** (`INPUT.cursorAnchor: "knuckle"`), which does not move when the fingers pinch or open. Set it to `"pinch"` for the thumb–index midpoint instead. A release has to last 180 ms (300 ms if the hand is lost) before a stroke ends, and the stroke is cut back to where the release began. The first and last 3 points of each hand stroke are also trimmed.
-- **Symbols a Hollow currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
+- **Symbols a monster currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
 - **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
-- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
-- **The webcam feed sits faintly behind the whole arena** (22% opacity), with a full preview in the debug overlay.
+- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts that ship with macOS. Colours live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
+- **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
 - **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
 - **Out of scope for now:** mana, pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).

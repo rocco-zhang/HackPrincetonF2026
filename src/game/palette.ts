@@ -1,21 +1,37 @@
 import type { SymbolName } from "../input/events";
 
+/** Pencil graphite: every line and all text. */
+export const INK = 0x33312e;
+export const INK_CSS = "#33312e";
+/** The sheet of paper everything is drawn on. */
+export const PAPER = 0xf9f5ea;
+export const PAPER_CSS = "#f9f5ea";
+/** Red pen, for the things that should jump out. */
+export const ACCENT = 0xd7372f;
+export const ACCENT_CSS = "#d7372f";
+export const ORANGE_CSS = "#d9661c";
+export const MUTED_CSS = "#8a857a";
+export const HIGHLIGHTER = 0xffe95c;
+
+// Felt-tip marker colours, dark enough to read on paper.
 export const SYMBOL_COLOR: Record<SymbolName, number> = {
-  hline: 0x4de8ff,
-  vline: 0x9dff5c,
-  v: 0xffb03b,
-  caret: 0xff5ca8,
-  circle: 0xffe14d,
-  zigzag: 0xb07cff,
+  hline: 0x2b6fd0,
+  vline: 0x2f9e58,
+  v: 0xe8762c,
+  caret: 0xd7372f,
+  circle: 0xd09a00,
+  zigzag: 0x7a4fc4,
 };
 
 export const css = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
+/** The three paper monsters. `rim` is the colour of the scraps when one is torn up. */
 export const MONSTER_PALETTES = [
-  { eye: "#7df9ff", rim: "#4de8ff", body: ["#2a1d4a", "#0a0716"] },
-  { eye: "#ff7ad9", rim: "#ff5ca8", body: ["#3a1838", "#0d0610"] },
-  { eye: "#c6ff7a", rim: "#9dff5c", body: ["#1b3328", "#060f0a"] },
+  { name: "crumpled ball", rim: "#ffffff" },
+  { name: "torn notebook page", rim: "#cfe0f7" },
+  { name: "sticky note", rim: "#ffe66b" },
 ];
 
-export const FONT = '"Avenir Next", "Segoe UI", system-ui, sans-serif';
-export const GOLD = 0xffd36b;
+// Handwriting fonts that ship with macOS; no web font, so the game still works offline.
+export const FONT = '"Chalkboard SE", "Chalkboard", "Comic Sans MS", "Bradley Hand", cursive';
+export const TITLE_FONT = '"Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive';

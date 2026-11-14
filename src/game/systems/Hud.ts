@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { ARENA, GAME } from "../../config";
 import { state } from "../../state";
-import { FONT } from "../palette";
+import { FONT, INK_CSS, MUTED_CSS, ORANGE_CSS } from "../palette";
 
 export class Hud {
   private hearts: Phaser.GameObjects.Image[] = [];
@@ -18,22 +18,21 @@ export class Hud {
       this.hearts.push(scene.add.image(36 + i * 44, 36, "heart").setDepth(depth));
     }
     this.scoreText = scene.add
-      .text(ARENA.width + 8, -16, "0", { fontFamily: FONT, fontSize: "40px", fontStyle: "bold", color: "#ffffff" })
+      .text(ARENA.width + 8, -16, "0", { fontFamily: FONT, fontSize: "40px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
       .setOrigin(1, 0)
-      .setPadding(32).setShadow(0, 0, "#ffd36b", 12, true, true)
+      .setPadding(32)
       .setDepth(depth);
     this.multText = scene.add
-      .text(ARENA.width - 24, 62, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: "#ffd36b" })
+      .text(ARENA.width - 24, 62, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: ORANGE_CSS, stroke: "#f9f5ea", strokeThickness: 5 })
       .setOrigin(1, 0)
       .setDepth(depth);
     this.waveText = scene.add
-      .text(ARENA.width / 2, 18, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: "#d9ccff" })
+      .text(ARENA.width / 2, 18, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5, 0)
       .setDepth(depth);
     this.hint = scene.add
-      .text(18, ARENA.height - 14, "", { fontFamily: FONT, fontSize: "16px", color: "#bfb6e0" })
+      .text(18, ARENA.height - 14, "", { fontFamily: FONT, fontSize: "16px", color: MUTED_CSS })
       .setOrigin(0, 1)
-      .setAlpha(0.8)
       .setDepth(depth);
     this.warn = scene.add
       .text(ARENA.width / 2, ARENA.height - 40, "✋ Raise your hand so the camera can see it", {
@@ -41,7 +40,7 @@ export class Hud {
         fontSize: "24px",
         fontStyle: "bold",
         color: "#ffffff",
-        backgroundColor: "#c2185bcc",
+        backgroundColor: "#d7372f",
         padding: { x: 14, y: 8 },
       })
       .setOrigin(0.5, 1)
@@ -60,7 +59,7 @@ export class Hud {
   }
 
   setWave(n: number) {
-    this.waveText.setText(`WAVE ${n}`);
+    this.waveText.setText(`Wave ${n}`);
   }
 
   setMultiplier(m: number) {
