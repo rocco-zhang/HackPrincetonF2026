@@ -26,7 +26,7 @@ Everything runs in the browser. There is no backend (versus mode connects the tw
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and three icons in the top right: friends, achievements, settings. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
 - **Duel:** the same subject and difficulty pickers, a mode row (only **Friend** works; Ranked and Casual have no matchmaking yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
-- **Settings:** hand or mouse input, sound, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
+- **Settings:** hand or mouse input, separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
@@ -121,7 +121,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
-| `N` | mute |
+| `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 
 ## Recording real templates (do this before the demo)
@@ -183,7 +183,7 @@ src/
     icons.ts              pencil-drawn button icons
     entities/             Player, Monster, SymbolBubble
     systems/              Spawner, Casting (trail + spells), Hud, Fx, HoldToStart, Menu (pinch-or-click buttons), pickers (difficulty + subjects)
-    sfx.ts                procedural Web Audio sound effects
+    sfx.ts                procedural Web Audio sound effects, the looping background music (public/audio/bg_music.mp3), and their volume settings
 ```
 
 ## Decisions and known gaps

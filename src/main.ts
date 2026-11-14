@@ -20,7 +20,7 @@ import { AslTrainer } from "./game/scenes/AslTrainer";
 import { Boot } from "./game/scenes/Boot";
 import { GameOver } from "./game/scenes/GameOver";
 import { Title } from "./game/scenes/Title";
-import { toggleMute, unlockAudio } from "./game/sfx";
+import { audio, toggleMute, unlockAudio } from "./game/sfx";
 import { initLobby, lobbyOpen } from "./net/lobby";
 import { pvp } from "./net/pvp";
 import { state } from "./state";
@@ -53,7 +53,7 @@ function startGame() {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [Boot, Title, Classic, Duel, Panel, Arena, GameOver, AslTrainer],
   });
-  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp };
+  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp, audio };
 }
 
 /** (Re)start the Arena from whatever scene is running. */
@@ -150,6 +150,14 @@ mouseBtn.addEventListener("click", () => {
 if (new URLSearchParams(location.search).has("mouse")) {
   state.mode = "mouse";
   closeGate();
+  // no button was clicked, so sound has to wait for the first click or key press
+  const unlock = () => {
+    unlockAudio();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock);
+  window.addEventListener("keydown", unlock);
 }
 
 async function setMode(mode: "mouse" | "hand") {
