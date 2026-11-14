@@ -31,6 +31,7 @@ export class Title extends Phaser.Scene {
   private pressing = false;
   private diffBlurb!: Phaser.GameObjects.Text;
   private mathRow!: Phaser.GameObjects.Container;
+  private langRow!: Phaser.GameObjects.Container;
 
   constructor() {
     super("Title");
@@ -86,6 +87,14 @@ export class Title extends Phaser.Scene {
       this.tweens.add({ targets: glyph, y: 328, duration: 900 + i * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       this.mathRow.add([glyph, label]);
     });
+    this.langRow = this.add.container(0, 0);
+    [["한", "Korean"], ["あ", "Japanese"], ["hi", "words"]].forEach(([glyphText, name], i) => {
+      const x = W / 2 + (i - 1) * 220;
+      const glyph = this.add.text(x, 330, glyphText, { fontFamily: TITLE_FONT, fontSize: "84px", color: INK_CSS }).setOrigin(0.5);
+      const label = this.add.text(x, 420, name, { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 }).setOrigin(0.5);
+      this.tweens.add({ targets: glyph, y: 318, duration: 900 + i * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.langRow.add([glyph, label]);
+    });
     this.input.keyboard?.on("keydown-R", () => {
       if (state.aslSelected) this.scene.start("AslTrainer");
     });
@@ -99,13 +108,14 @@ export class Title extends Phaser.Scene {
     if (pvp.active) pvp.setReady(false);
     const offPvp = pvp.on((e) => {
       if (e.type === "message" && e.msg.t === "hello") {
-        state.mathSelected = !!e.msg.math;
-        state.aslSelected = e.msg.asl && !state.mathSelected;
+        state.langSelected = !!e.msg.lang;
+        state.mathSelected = !!e.msg.math && !state.langSelected;
+        state.aslSelected = e.msg.asl && !state.mathSelected && !state.langSelected;
         if (e.msg.difficulty) state.difficulty = e.msg.difficulty; // the host's pick, not saved as ours
         this.showMode();
       } else if (e.type === "start") {
         sfx.start();
-        this.scene.start("Arena", { asl: state.aslSelected, math: state.mathSelected, pvp: true });
+        this.scene.start("Arena", { asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected, pvp: true });
       } else if (e.type === "state") this.showMode();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, offPvp);
@@ -118,7 +128,7 @@ export class Title extends Phaser.Scene {
     this.tweens.add({ targets: this.prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
 
     this.add
-      .text(W / 2, H - 28, "1/2/3 difficulty · A drawing/ASL/math · V versus · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
+      .text(W / 2, H - 28, "1/2/3 difficulty · A drawing/ASL/math/languages · V versus · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
         fontFamily: FONT,
         fontSize: "15px",
         color: MUTED_CSS,
@@ -141,7 +151,7 @@ export class Title extends Phaser.Scene {
       }
       sfx.start();
       this.cameras.main.flash(250, 255, 255, 255);
-      this.scene.start("Arena", { demo: false, asl: state.aslSelected, math: state.mathSelected });
+      this.scene.start("Arena", { demo: false, asl: state.aslSelected, math: state.mathSelected, lang: state.langSelected });
     });
   }
 
@@ -224,9 +234,13 @@ export class Title extends Phaser.Scene {
 
   private cycleMode() {
     if (pvp.active && !pvp.isHost) return;
-    if (state.mathSelected) {
+    if (state.langSelected) {
+      state.langSelected = false;
       state.mathSelected = false;
       state.aslSelected = false;
+    } else if (state.mathSelected) {
+      state.mathSelected = false;
+      state.langSelected = true;
     } else if (state.aslSelected) {
       state.aslSelected = false;
       state.mathSelected = true;
@@ -241,20 +255,25 @@ export class Title extends Phaser.Scene {
     this.showDifficulty();
     const asl = state.aslSelected;
     const math = state.mathSelected;
-    this.drawRow.setVisible(!asl && !math);
+    const lang = state.langSelected;
+    this.drawRow.setVisible(!asl && !math && !lang);
     this.aslRow.setVisible(asl);
     this.mathRow.setVisible(math);
+    this.langRow.setVisible(lang);
     this.tagline.setText(
-      math
-        ? "Math mode: draw each digit, then hold your hand still to cast the whole number."
-        : asl
-          ? "Learn ASL fingerspelling: make a monster's letter with your hand to tear it up."
-          : "You're a stick figure. The paper monsters want you. Draw them away.",
+      lang
+        ? "Languages: draw the mark. A line, a stick, a V, a peak, or a circle."
+        : math
+          ? "Math mode: draw each digit, then hold your hand still to cast the whole number."
+          : asl
+            ? "Learn ASL fingerspelling: make a monster's letter with your hand to tear it up."
+            : "You're a stick figure. The paper monsters want you. Draw them away.",
     );
-    const mode = math ? "Math" : asl ? "ASL" : "Drawing";
+    const mode = lang ? "Languages" : math ? "Math" : asl ? "ASL" : "Drawing";
     this.modeLine.setText(
       pvp.active ? `Versus  ·  ${mode} mode${pvp.isHost ? "  ·  A: change mode" : " (the host picks)"}  ·  V: connection`
-      : math ? "Math mode  ·  draw the digits  ·  addition, then − × ÷, then harder  ·  A: drawing mode"
+      : lang ? "Languages mode  ·  Korean, then Japanese, then short words  ·  A: drawing mode"
+      : math ? "Math mode  ·  draw the digits  ·  addition, then − × ÷, then harder  ·  A: languages"
       : asl ? "ASL mode  ·  R: teach it your own hand  ·  A: math mode  ·  V: versus a friend"
       : "Drawing mode  ·  A: ASL mode  ·  V: versus a friend",
     );

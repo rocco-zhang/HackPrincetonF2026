@@ -73,6 +73,10 @@ Press `A` until the title says **Math mode**, then start as usual. The camera is
 - The same answer hits every monster showing it.
 - Wave 1 is addition, wave 2 subtraction, wave 3 multiplication, wave 4 division. Later waves mix all four, use bigger numbers, put more than one problem on a monster, then add two-step questions.
 
+### Languages mode
+
+Press `A` until the title says **Languages mode**. Wave 1 is five Korean letters, wave 2 is five Japanese letters, then three short words. Every one of them is drawn with the same five marks: a flat line, a stick, a V, a peak, or a circle. A letter casts as soon as the stroke finishes. A short word is those marks drawn one after another.
+
 ### Versus mode (two computers)
 
 Both players open the game, and on the title screen press `V`.
@@ -83,7 +87,7 @@ Both players open the game, and on the title screen press `V`.
 
 - Each player has their own arena. Killing monsters sends extra monsters to your opponent: every two kills sends one, and multi-hits send more.
 - The opponent's hearts, score and wave are shown under your hearts. Whoever runs out of hearts first loses.
-- Both play the same mode. The host chooses drawing, ASL, or math with `A`, and the guest's game follows.
+- Both play the same mode. The host chooses drawing, ASL, math, or languages with `A`, and the guest's game follows.
 - Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
 - After a round, hold to return to the title screen and ready up again for a rematch.
 
@@ -93,7 +97,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 
 | Key | Action |
 |---|---|
-| `A` | on the title screen: cycle drawing, ASL, and math |
+| `A` | on the title screen: cycle drawing, ASL, math, and languages |
 | `V` | on the title screen: play versus a friend on another computer |
 | `R` | on the title screen in ASL mode: record your own examples of each letter |
 | `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |

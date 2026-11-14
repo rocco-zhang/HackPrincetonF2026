@@ -1,4 +1,4 @@
-import { ASL_NAMES, isMath, isSymbol, type CastName, type SymbolName } from "../input/events";
+import { ASL_NAMES, isLang, isMath, isSymbol, type CastName, type SymbolName } from "../input/events";
 
 /** Pencil graphite: every line and all text. */
 export const INK = 0x33312e;
@@ -27,7 +27,7 @@ const MARKERS = Object.values(SYMBOL_COLOR);
 /** Marker colour for anything castable; ASL letters cycle through the six markers. */
 export function castColor(name: CastName): number {
   if (isSymbol(name)) return SYMBOL_COLOR[name];
-  if (isMath(name)) return SYMBOL_COLOR.hline;
+  if (isMath(name) || isLang(name)) return SYMBOL_COLOR.hline;
   const i = ASL_NAMES.indexOf(name);
   return MARKERS[(i < 0 ? 0 : i) % MARKERS.length];
 }
