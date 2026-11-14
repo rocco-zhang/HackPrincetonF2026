@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GAME } from "../../config";
-import type { SymbolName } from "../../input/events";
+import type { CastName } from "../../input/events";
 import { INK } from "../palette";
 
 const GAP = GAME.iconSize - 2;
@@ -11,7 +11,7 @@ export class SymbolBubble extends Phaser.GameObjects.Container {
   private icons: Phaser.GameObjects.Image[] = [];
   private tape: Phaser.GameObjects.Image;
 
-  constructor(scene: Phaser.Scene, y: number, symbols: SymbolName[]) {
+  constructor(scene: Phaser.Scene, y: number, symbols: CastName[]) {
     super(scene, 0, y);
     this.bg = scene.add.graphics();
     this.add(this.bg);

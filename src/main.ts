@@ -8,9 +8,11 @@ import { applyMirror, listCameras, nextCamera, startCamera } from "./input/camer
 import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
 import { bus, emit, SYMBOLS } from "./input/events";
-import { cancelHandStroke, initHandTracker, startCalibration } from "./input/handTracker";
+import { loadAslExamples } from "./asl/examples";
+import { aslClassifier, cancelHandStroke, initHandTracker, startCalibration } from "./input/handTracker";
 import { initMouseAdapter } from "./input/mouseAdapter";
 import { Arena } from "./game/scenes/Arena";
+import { AslTrainer } from "./game/scenes/AslTrainer";
 import { Boot } from "./game/scenes/Boot";
 import { GameOver } from "./game/scenes/GameOver";
 import { Title } from "./game/scenes/Title";
@@ -27,6 +29,8 @@ try {
 }
 
 initCastPipeline();
+// your recorded ASL examples (data/asl-examples.json, or this browser) override the trained model
+void loadAslExamples((e) => aslClassifier.setExamples(e));
 const mouse = initMouseAdapter();
 initDebugOverlay(() => game);
 
@@ -40,7 +44,7 @@ function startGame() {
     transparent: true,
     audio: { noAudio: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [Boot, Title, Arena, GameOver],
+    scene: [Boot, Title, Arena, GameOver, AslTrainer],
   });
   (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker };
 }

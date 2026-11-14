@@ -1,16 +1,16 @@
 import Phaser from "phaser";
 import { ARENA, GAME } from "../../config";
-import { onInput, type SymbolName } from "../../input/events";
+import { castLabel, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
 import { state } from "../../state";
 import { Monster } from "../entities/Monster";
 import { Player } from "../entities/Player";
-import { INK_CSS, MONSTER_PALETTES, ORANGE_CSS, ACCENT_CSS, SYMBOL_COLOR } from "../palette";
+import { ACCENT_CSS, castColor, FONT, INK, INK_CSS, MONSTER_PALETTES, ORANGE_CSS } from "../palette";
 import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
-import { DEMO_SEED, edgePoint, Spawner, type SpawnOrder } from "../systems/Spawner";
+import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
 const MULTI_NAMES = ["", "", "Double!", "Triple!", "Quad!", "Mega!"];
 
@@ -27,13 +27,18 @@ export class Arena extends Phaser.Scene implements CastHost {
   private wave = 0;
   private phase: "banner" | "play" | "over" = "banner";
   private demo = false;
+  private asl = false;
+  private aslCards = new Map<CastName, Phaser.GameObjects.Image>();
+  private aslText: Phaser.GameObjects.Text | null = null;
+  private aslBar: Phaser.GameObjects.Graphics | null = null;
 
   constructor() {
     super("Arena");
   }
 
-  init(data: { demo?: boolean }) {
-    this.demo = !!data?.demo;
+  init(data: { demo?: boolean; asl?: boolean }) {
+    this.asl = !!data?.asl;
+    this.demo = !!data?.demo && !this.asl;
     this.monsters = [];
     this.hearts = GAME.hearts;
     this.score = 0;
@@ -50,7 +55,18 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.casting = new Casting(this, this);
     this.hud = new Hud(this);
     this.hud.setHearts(this.hearts);
-    this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.demo ? 0.85 : 1);
+    // ASL rounds are slower: finding a handshape takes longer than drawing a line
+    this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.asl ? 0.7 : this.demo ? 0.85 : 1, this.asl ? aslPool : symbolPool);
+    state.aslActive = this.asl;
+    this.aslCards = new Map();
+    this.aslText = this.aslBar = null;
+    if (this.asl) {
+      this.aslText = this.add
+        .text(cx, 52, "", { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+        .setOrigin(0.5, 0)
+        .setDepth(1000);
+      this.aslBar = this.add.graphics().setDepth(1000);
+    }
 
     const off = onInput((e) => {
       switch (e.type) {
@@ -65,6 +81,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       off();
       state.wanted = [];
+      state.aslActive = false;
     });
     this.input.keyboard?.on("keydown-ESC", () => this.scene.start("Title"));
 
@@ -75,7 +92,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.wave = n;
     this.phase = "banner";
     this.hud.setWave(n);
-    const sub = n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
+    const aslSub = n === 1 ? "make the handshape for a monster's letter, and hold it" : ASL_WAVES[n - 1] ? `new letters: ${ASL_WAVES[n - 1].join(" ")}` : undefined;
+    const sub = this.asl ? aslSub : n === 1 ? (this.demo ? "demo run" : "draw the shape taped to a monster to tear it up") : n === 3 ? "new shape: zigzag. Monsters now carry more than one" : n === 2 ? "new shapes: Λ and ◯" : undefined;
     this.fx.banner(`Wave ${n}`, INK_CSS, sub, 1200);
     sfx.wave();
     this.time.delayedCall(GAME.breather * 1000, () => {
@@ -84,6 +102,39 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
     });
+  }
+
+  /** Show a reference card for each letter a monster needs right now, and what the camera thinks you're signing. */
+  private updateAsl() {
+    const needed = [...new Set(state.wanted)].sort();
+    for (const [name, card] of this.aslCards) {
+      if (needed.includes(name)) continue;
+      this.aslCards.delete(name);
+      this.tweens.add({ targets: card, y: ARENA.height + 90, duration: 200, onComplete: () => card.destroy() });
+    }
+    needed.forEach((name, i) => {
+      const x = ARENA.width / 2 + (i - (needed.length - 1) / 2) * Math.min(108, (ARENA.width - 200) / needed.length);
+      let card = this.aslCards.get(name);
+      if (!card) {
+        // under the monsters, so none can hide behind a card
+        card = this.add.image(x, ARENA.height + 90, `aslcard_${castLabel(name)}`).setScale(0.82).setDepth(-5).setAngle(Phaser.Math.Between(-3, 3));
+        this.aslCards.set(name, card);
+      }
+      card.x += (x - card.x) * 0.2;
+      card.y += (ARENA.height - 78 - card.y) * 0.2;
+    });
+    const letter = state.aslLetter;
+    const lost = state.mode !== "hand";
+    this.aslText?.setText(lost ? "ASL mode needs the camera: press M" : letter ? `you're signing ${letter}${state.aslSource === "yours" ? " (your example)" : ""}` : "no letter recognised");
+    const g = this.aslBar!;
+    g.clear();
+    if (letter && !lost) {
+      const w = 160, x = ARENA.width / 2 - w / 2, y = 88;
+      g.fillStyle(castColor(`asl_${letter}`), 1);
+      g.fillRect(x, y, w * state.aslProgress, 10);
+      g.lineStyle(2, INK, 0.9);
+      g.strokeRect(x, y, w, 10);
+    }
   }
 
   /** Three monsters with the same symbol, so the demo shows a triple hit early. */
@@ -106,8 +157,9 @@ export class Arena extends Phaser.Scene implements CastHost {
     const dt = Math.min(0.05, deltaMs / 1000);
     this.casting.update(dt);
     this.hud.update(this.score);
-    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as SymbolName[];
+    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
+    if (this.asl) this.updateAsl();
     if (this.phase === "over") return;
 
     if (this.phase === "play") {
@@ -133,7 +185,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     return Math.min(GAME.streakMaxMult, 1 + Math.floor(this.streak / GAME.streakStep) * 0.5);
   }
 
-  onCast(name: SymbolName, hits: Monster[]) {
+  onCast(name: CastName, hits: Monster[]) {
     if (hits.length === 0) {
       this.fx.floatText(this.player.x, this.player.y - 70, "no monster needs that", "#8a857a", 16);
       return;
@@ -142,7 +194,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud.setMultiplier(this.streakMult);
     if (hits.length >= 2) {
       const label = MULTI_NAMES[Math.min(hits.length, MULTI_NAMES.length - 1)];
-      const c = SYMBOL_COLOR[name];
+      const c = castColor(name);
       this.cameras.main.flash(160, (c >> 16) & 255, (c >> 8) & 255, c & 255);
       this.cameras.main.shake(220, 0.008);
       this.fx.banner(label, ACCENT_CSS, `×${Math.min(3, hits.length)} score`, 350);
@@ -150,9 +202,9 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
   }
 
-  onSpellLanded(m: Monster, name: SymbolName, killed: boolean, multi: number) {
+  onSpellLanded(m: Monster, name: CastName, killed: boolean, multi: number) {
     if (!m.active) return;
-    const color = SYMBOL_COLOR[name];
+    const color = castColor(name);
     const mult = multi >= 3 ? 3 : multi >= 2 ? 2 : 1;
     const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult);
     this.score += pts;
@@ -208,7 +260,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
     this.time.delayedCall(1300, () =>
-      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo }),
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, demo: this.demo, asl: this.asl }),
     );
   }
 }

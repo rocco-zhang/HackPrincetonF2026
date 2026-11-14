@@ -3,7 +3,9 @@ import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import { ARENA, INPUT } from "../config";
 import { state, type Landmark } from "../state";
 import { video } from "./camera";
-import { emit, type Pt } from "./events";
+import { aslFeatures } from "../asl/features";
+import { AslCaster, AslClassifier } from "../asl/hand";
+import { aslName, emit, type Pt } from "./events";
 import { OneEuro2D } from "./oneEuro";
 import { PinchGate, StrokeDetector } from "./strokeDetector";
 
@@ -17,6 +19,9 @@ let landmarker: HandLandmarker | null = null;
 const gate = new PinchGate();
 const strokes = new StrokeDetector(INPUT.handTrimPoints);
 const euro = new OneEuro2D(INPUT.euroMinCutoff, INPUT.euroBeta, INPUT.euroDCutoff);
+const aslCaster = new AslCaster();
+/** Trained model + your recorded examples (main.ts loads those into it). */
+export const aslClassifier = new AslClassifier();
 let lastVideoTime = -1;
 let lastP: Pt | null = null;
 let frames = 0;
@@ -104,6 +109,24 @@ function dist3(a: Landmark, b: Landmark) {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
+/** ASL: read the handshape; during a round, cast its letter once it has been held long enough. */
+function stepAsl(image: Landmark[] | undefined, aspect: number, now: number) {
+  const f = image ? aslFeatures(image, aspect) : null;
+  const r = f ? aslClassifier.classify(f) : { letter: null, confidence: 0, source: null };
+  state.aslFeat = f;
+  state.aslLetter = r.letter;
+  state.aslSource = r.source;
+  state.aslConfidence = r.confidence;
+  if (!state.aslActive) {
+    aslCaster.reset();
+    state.aslProgress = 0;
+    return;
+  }
+  const cast = aslCaster.update(r.letter, now);
+  state.aslProgress = aslCaster.progress(now);
+  if (cast) emit({ type: "symbol", name: aslName(cast), score: 1, points: [] });
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const v = video();
@@ -135,6 +158,7 @@ function loop() {
     state.handVisible = false;
     state.pinchRatio = null;
     state.pinchRatio3d = null;
+    if (handActive && (state.aslActive || state.aslTraining)) stepAsl(undefined, 1, now);
     state.inking = gate.update(null, now);
     if (!state.inking) strokes.finish(gate.releasedAt);
     else if (handActive && lastP) strokes.update(lastP, true);
@@ -155,9 +179,22 @@ function loop() {
   state.pinchRatio3d = ratio3;
   if (ratio !== null && ratio3 !== null && ratio3 > INPUT.pinch3dMax) ratio = Math.max(ratio, ratio3);
   state.pinchRatio = ratio;
-  state.inking = gate.update(ratio, now);
-  // cut the stroke back to where the (debounced) release began
-  if (!state.inking) strokes.finish(gate.releasedAt);
+  const asl = handActive && (state.aslActive || state.aslTraining);
+  if (asl) {
+    // handshapes instead of strokes: nothing is drawn during an ASL round
+    stepAsl(lm, vw / vh, now);
+    gate.reset();
+    strokes.finish();
+    state.inking = false;
+  } else {
+    if (state.aslLetter) aslCaster.reset();
+    state.aslLetter = null;
+    state.aslFeat = null;
+    state.aslProgress = 0;
+    state.inking = gate.update(ratio, now);
+    // cut the stroke back to where the (debounced) release began
+    if (!state.inking) strokes.finish(gate.releasedAt);
+  }
 
   // Cursor anchor: see INPUT.cursorAnchor. The same point is used whether or not the
   // hand is pinched, so the cursor doesn't jump when inking starts.
@@ -180,7 +217,7 @@ function loop() {
   const p: Pt = { x: f.x, y: f.y, t: now };
   lastP = p;
   emit({ type: "cursor", p, inking: state.inking });
-  strokes.update(p, state.inking);
+  if (!asl) strokes.update(p, state.inking);
 }
 
 export function cancelHandStroke() {

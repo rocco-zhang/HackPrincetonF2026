@@ -74,9 +74,9 @@ export class Hud {
     }
     const hand = state.mode === "hand";
     this.hint.setText(
-      (hand ? "✋ pinch thumb + index to draw" : "🖱 drag to draw") + "   ·   M switch input   ·   D debug",
+      (state.aslActive ? "🤟 hold a letter's handshape" : hand ? "✋ pinch thumb + index to draw" : "🖱 drag to draw") + "   ·   M switch input   ·   D debug",
     );
     const lost = hand && performance.now() - state.lastHandSeen > 1000;
-    this.warn.setVisible(lost);
+    this.warn.setVisible(lost).setY(state.aslActive ? ARENA.height - 160 : ARENA.height - 40); // clear of the ASL cards
   }
 }

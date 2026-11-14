@@ -1,11 +1,11 @@
 import Phaser from "phaser";
 import { GAME } from "../../config";
-import type { SymbolName } from "../../input/events";
+import type { CastName } from "../../input/events";
 import { SymbolBubble } from "./SymbolBubble";
 
 export class Monster extends Phaser.GameObjects.Container {
   /** Logical symbol queue; the visual bubble catches up when spells land. */
-  queue: SymbolName[];
+  queue: CastName[];
   speed: number;
   dying = false;
   palette: number;
@@ -13,7 +13,7 @@ export class Monster extends Phaser.GameObjects.Container {
   bubble: SymbolBubble;
   private shadow: Phaser.GameObjects.Ellipse;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, symbols: SymbolName[], speed: number, palette: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, symbols: CastName[], speed: number, palette: number) {
     super(scene, x, y);
     this.queue = [...symbols];
     this.speed = speed;
@@ -39,7 +39,7 @@ export class Monster extends Phaser.GameObjects.Container {
     scene.tweens.add({ targets: this, scale: 1, alpha: 1, duration: 350, ease: "Back.easeOut" });
   }
 
-  get front(): SymbolName | undefined {
+  get front(): CastName | undefined {
     return this.queue[0];
   }
 

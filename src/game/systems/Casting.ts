@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
-import type { Pt, SymbolName } from "../../input/events";
+import type { CastName, Pt } from "../../input/events";
+import { state } from "../../state";
 import type { Monster } from "../entities/Monster";
 import type { Player } from "../entities/Player";
-import { ACCENT, INK, SYMBOL_COLOR } from "../palette";
+import { ACCENT, castColor, INK } from "../palette";
 import { sfx } from "../sfx";
 import type { Fx } from "./Fx";
 
@@ -14,9 +15,9 @@ export interface CastHost {
   monsters: Monster[];
   fx: Fx;
   /** Called when a spell reaches a monster (after the symbol was removed logically). */
-  onSpellLanded(m: Monster, name: SymbolName, killed: boolean, multi: number): void;
+  onSpellLanded(m: Monster, name: CastName, killed: boolean, multi: number): void;
   /** Called once per cast with the monsters it hit. */
-  onCast(name: SymbolName, hits: Monster[]): void;
+  onCast(name: CastName, hits: Monster[]): void;
 }
 
 /** Cursor, ink trail, and turning recognized symbols into spells. */
@@ -40,6 +41,7 @@ export class Casting {
   }
 
   onCursor(p: Pt, inking: boolean) {
+    this.cursor.setVisible(!state.aslActive); // nothing to aim in ASL mode
     this.cursor.setPosition(p.x, p.y);
     this.cursorRing.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
     this.cursorDot.setVisible(inking);
@@ -69,8 +71,8 @@ export class Casting {
     sfx.fizzle();
   }
 
-  cast(name: SymbolName) {
-    const color = SYMBOL_COLOR[name];
+  cast(name: CastName) {
+    const color = castColor(name);
     if (this.lastEnded) {
       this.lastEnded.color = color;
       this.lastEnded.age = -0.1; // linger a bit longer when it worked

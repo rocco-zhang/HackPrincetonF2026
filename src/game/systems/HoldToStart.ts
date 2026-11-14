@@ -38,6 +38,12 @@ export class HoldToStart {
     this.onDone();
   }
 
+  /** Allow it to fire again (when a start was refused). */
+  rearm() {
+    this.fired = false;
+    this.heldSince = null;
+  }
+
   update() {
     this.ring.clear();
     if (this.heldSince === null || this.fired) return;

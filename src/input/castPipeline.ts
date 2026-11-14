@@ -1,6 +1,6 @@
 // strokeEnd → recognizer → symbol / fizzle (or → template recorder when recording).
 import { state } from "../state";
-import { emit, onInput, type SymbolName } from "./events";
+import { emit, isSymbol, onInput, type SymbolName } from "./events";
 import { createDefaultRecognizer, type Recognizer } from "./recognizer";
 import type { XY } from "./shapes";
 import { isStrokeTooSmall } from "./strokeDetector";
@@ -26,7 +26,7 @@ export function initCastPipeline() {
   recognizer = createDefaultRecognizer([bundled as TemplateSet, local]);
 
   onInput((e) => {
-    if (e.type !== "strokeEnd") return;
+    if (e.type !== "strokeEnd" || state.aslActive) return;
     const pts = e.points;
     state.lastStroke = pts;
     if (isStrokeTooSmall(pts)) {
@@ -45,7 +45,7 @@ export function initCastPipeline() {
       return;
     }
 
-    const r = recognizer.recognize(pts, state.wanted);
+    const r = recognizer.recognize(pts, state.wanted.filter(isSymbol));
     state.lastRecog = r;
     // after every listener has seen this strokeEnd
     queueMicrotask(() => {

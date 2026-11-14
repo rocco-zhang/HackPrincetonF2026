@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
+import { ASL_LETTERS } from "../../asl/hand";
 import { SYMBOLS, type SymbolName } from "../../input/events";
 import { state } from "../../state";
 import { FONT, HIGHLIGHTER, INK_CSS, MUTED_CSS, TITLE_FONT } from "../palette";
@@ -18,6 +19,10 @@ const LABELS: Record<SymbolName, string> = {
 export class Title extends Phaser.Scene {
   private hold!: HoldToStart;
   private prompt!: Phaser.GameObjects.Text;
+  private tagline!: Phaser.GameObjects.Text;
+  private modeLine!: Phaser.GameObjects.Text;
+  private drawRow!: Phaser.GameObjects.Container;
+  private aslRow!: Phaser.GameObjects.Container;
 
   constructor() {
     super("Title");
@@ -46,26 +51,46 @@ export class Title extends Phaser.Scene {
       .setOrigin(0.5)
       .setPadding(32)
       .setAngle(-1.6);
-    this.add
-      .text(W / 2, 236, "You're a stick figure. The paper monsters want you. Draw them away.", { fontFamily: FONT, fontSize: "25px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+    this.tagline = this.add
+      .text(W / 2, 236, "", { fontFamily: FONT, fontSize: "25px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5);
 
+    // what you cast with: six drawn symbols, or (ASL mode) ten fingerspelled letters
     const gap = 150;
+    this.drawRow = this.add.container(0, 0);
     SYMBOLS.forEach((s, i) => {
       const x = W / 2 + (i - (SYMBOLS.length - 1) / 2) * gap;
       const icon = this.add.image(x, 360, `sym_${s}`).setScale(1.3);
       this.tweens.add({ targets: icon, y: 350, duration: 900 + i * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      this.add.text(x, 420, LABELS[s], { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 }).setOrigin(0.5);
+      const label = this.add.text(x, 420, LABELS[s], { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 }).setOrigin(0.5);
+      this.drawRow.add([icon, label]);
+    });
+    this.aslRow = this.add.container(0, 0);
+    ASL_LETTERS.forEach((l, i) => {
+      const x = W / 2 + ((i % 12) - 5.5) * 86;
+      this.aslRow.add(this.add.image(x, i < 12 ? 322 : 424, `aslcard_${l}`).setScale(0.56).setAngle(i % 2 ? 2 : -2));
+    });
+    this.input.keyboard?.on("keydown-R", () => {
+      if (state.aslSelected) this.scene.start("AslTrainer");
     });
 
+    this.modeLine = this.add
+      .text(W / 2, 606, "", { fontFamily: FONT, fontSize: "22px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+      .setOrigin(0.5);
+    this.input.keyboard?.on("keydown-A", () => {
+      state.aslSelected = !state.aslSelected;
+      this.showMode();
+    });
+    this.showMode();
+
     this.prompt = this.add
-      .text(W / 2, 540, "", { fontFamily: FONT, fontSize: "34px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
+      .text(W / 2, 546, "", { fontFamily: FONT, fontSize: "34px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
       .setOrigin(0.5)
       .setPadding(32);
     this.tweens.add({ targets: this.prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
 
     this.add
-      .text(W / 2, H - 28, "M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
+      .text(W / 2, H - 28, "A drawing/ASL · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
         fontFamily: FONT,
         fontSize: "15px",
         color: MUTED_CSS,
@@ -73,16 +98,33 @@ export class Title extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.hold = new HoldToStart(this, 1000, () => {
+      if (state.aslSelected && state.mode !== "hand") {
+        // handshapes need the camera; say so in the prompt and wait
+        this.hold.rearm();
+        return;
+      }
       sfx.start();
       this.cameras.main.flash(250, 255, 255, 255);
-      this.scene.start("Arena", { demo: false });
+      this.scene.start("Arena", { demo: false, asl: state.aslSelected });
     });
+  }
+
+  private showMode() {
+    const asl = state.aslSelected;
+    this.drawRow.setVisible(!asl);
+    this.aslRow.setVisible(asl);
+    this.tagline.setText(
+      asl ? "Learn ASL fingerspelling: make a monster's letter with your hand to tear it up." : "You're a stick figure. The paper monsters want you. Draw them away.",
+    );
+    this.modeLine.setText(asl ? "ASL fingerspelling mode  ·  R: teach it your own hand  ·  A: drawing mode" : "Drawing mode  ·  press A for ASL fingerspelling mode");
   }
 
   update() {
     this.hold.update();
     let msg: string;
-    if (state.mode === "hand") {
+    if (state.aslSelected && state.mode !== "hand") {
+      msg = "ASL mode needs the camera: press M to turn it on";
+    } else if (state.mode === "hand") {
       msg = state.handVisible || performance.now() - state.lastHandSeen < 600
         ? "Pinch thumb + index and hold to begin"
         : "Raise your hand in front of the camera";

@@ -13,12 +13,13 @@ export class GameOver extends Phaser.Scene {
     super("GameOver");
   }
 
-  create(data: { score: number; wave: number; demo?: boolean }) {
+  create(data: { score: number; wave: number; demo?: boolean; asl?: boolean }) {
     const W = ARENA.width, H = ARENA.height;
     this.add.image(W / 2, H / 2, "floor");
-    const best = Number(localStorage.getItem(BEST_KEY) ?? 0);
+    const bestKey = data.asl ? `${BEST_KEY}.asl` : BEST_KEY;
+    const best = Number(localStorage.getItem(bestKey) ?? 0);
     const isBest = data.score > best;
-    if (isBest) localStorage.setItem(BEST_KEY, String(data.score));
+    if (isBest) localStorage.setItem(bestKey, String(data.score));
 
     this.add
       .text(W / 2, 140, "The paper monsters got you!", { fontFamily: TITLE_FONT, fontSize: "60px", color: ACCENT_CSS, stroke: "#f9f5ea", strokeThickness: 12 })
@@ -58,7 +59,7 @@ export class GameOver extends Phaser.Scene {
     this.time.delayedCall(700, () => {
       this.hold = new HoldToStart(this, 600, () => {
         sfx.start();
-        this.scene.start("Arena", { demo: data.demo });
+        this.scene.start("Arena", { demo: data.demo, asl: data.asl });
       });
     });
   }

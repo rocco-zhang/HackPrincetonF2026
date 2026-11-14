@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
-import { SYMBOLS, type SymbolName } from "../../input/events";
+import { ASL_LETTERS, prototype, type AslLetter } from "../../asl/hand";
+import { aslName, SYMBOLS, type SymbolName } from "../../input/events";
 import { BASE_SHAPES, mulberry32 } from "../../input/shapes";
-import { css, INK_CSS, MONSTER_PALETTES, PAPER_CSS, SYMBOL_COLOR } from "../palette";
+import { castColor, css, INK_CSS, MONSTER_PALETTES, PAPER_CSS, SYMBOL_COLOR, TITLE_FONT } from "../palette";
 
 type Ctx = CanvasRenderingContext2D;
 type P = [number, number];
@@ -29,6 +30,10 @@ export class Boot extends Phaser.Scene {
     this.makePlayer();
     MONSTER_PALETTES.forEach((_, i) => this.makeMonster(i));
     for (const s of SYMBOLS) this.makeSymbol(s);
+    for (const l of ASL_LETTERS) {
+      this.makeAslLetter(l);
+      this.makeAslCard(l);
+    }
     this.makeHeart("heart", true);
     this.makeHeart("heart_empty", false);
 
@@ -386,6 +391,65 @@ export class Boot extends Phaser.Scene {
         ? [...this.ring(S / 2, S / 2, S / 2 - pad, S / 2 - pad, 22), [S / 2 + (S / 2 - pad), S / 2 + 3]]
         : BASE_SHAPES[name][0].map(([x, y]) => [pad + x * (S - 2 * pad), pad + y * (S - 2 * pad)] as P);
     this.sketch(ctx, pts, { width: 7.5, color: css(SYMBOL_COLOR[name]), amp: 0.7 });
+  }
+
+  /** ASL mode: the letter a monster carries, in marker. */
+  private makeAslLetter(letter: AslLetter) {
+    const S = 64;
+    const ctx = this.canvas(`sym_${aslName(letter)}`, S, S);
+    ctx.font = `54px ${TITLE_FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = css(castColor(aslName(letter)));
+    ctx.fillText(letter, S / 2 + this.j(1), S / 2 + 3);
+  }
+
+  /**
+   * ASL mode: a reference card showing the handshape for a letter. The hand is a real example
+   * from the training data (the one most typical of its letter), drawn as the camera saw it.
+   */
+  private makeAslCard(letter: AslLetter) {
+    const W = 120, H = 168;
+    const ctx = this.canvas(`aslcard_${letter}`, W, H);
+    this.cutout(ctx, [[6, 6], [W - 7, 5], [W - 6, H - 8], [7, H - 7]], "#fffefa");
+    const f = prototype(letter);
+    const pt = (i: number) => ({ x: f[i * 3], y: f[i * 3 + 1], z: f[i * 3 + 2] });
+    const all = Array.from({ length: 21 }, (_, i) => pt(i));
+    const x0 = Math.min(...all.map((p) => p.x)), x1 = Math.max(...all.map((p) => p.x));
+    const y0 = Math.min(...all.map((p) => p.y)), y1 = Math.max(...all.map((p) => p.y));
+    const k = Math.min(84 / (x1 - x0), 104 / (y1 - y0), 44);
+    const at = (i: number): P => [W / 2 + (all[i].x - (x0 + x1) / 2) * k, 100 + (all[i].y - (y0 + y1) / 2) * k];
+    const depth = (ids: number[]) => ids.reduce((s, i) => s + all[i].z, 0) / ids.length;
+    const parts: { ids: number[]; palm?: boolean }[] = [
+      { ids: [0, 1, 5, 9, 13, 17], palm: true },
+      { ids: [1, 2, 3, 4] },
+      { ids: [5, 6, 7, 8] },
+      { ids: [9, 10, 11, 12] },
+      { ids: [13, 14, 15, 16] },
+      { ids: [17, 18, 19, 20] },
+    ];
+    // farthest from the camera first, so nearer fingers are drawn over the palm
+    parts.sort((a, b) => depth(b.ids) - depth(a.ids));
+    const w = Math.max(7, k * 0.3);
+    for (const part of parts) {
+      const pts = part.ids.map(at);
+      if (part.palm) {
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.closePath();
+        ctx.fillStyle = "#fffefa";
+        ctx.fill();
+        this.sketch(ctx, pts, { closed: true, width: 2.4, amp: 0.4, passes: 1 });
+      } else {
+        this.sketch(ctx, pts, { width: w, amp: 0.2, passes: 1 });
+        this.sketch(ctx, pts, { width: w - 4, color: "#fffefa", amp: 0.2, passes: 1 });
+      }
+    }
+    ctx.font = `34px ${TITLE_FONT}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = css(castColor(aslName(letter)));
+    ctx.fillText(letter, 14, 10);
   }
 
   /** Hearts are drawn in red pen and coloured in with hatching. */

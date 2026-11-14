@@ -1,5 +1,6 @@
 import { INPUT } from "./config";
-import type { SymbolName } from "./input/events";
+import type { AslLetter } from "./asl/hand";
+import type { CastName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
 export type Landmark = { x: number; y: number; z: number };
@@ -27,7 +28,21 @@ export const state = {
   lastStroke: null as { x: number; y: number }[] | null,
   lastRecog: null as RecogResult | null,
   /** Symbols a monster currently needs; the recognizer favours these. Empty outside the arena. */
-  wanted: [] as SymbolName[],
+  wanted: [] as CastName[],
+  /** Title-screen choice: play the ASL fingerspelling mode instead of drawing spells. */
+  aslSelected: false,
+  /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
+  aslActive: false,
+  /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */
+  aslLetter: null as AslLetter | null,
+  aslProgress: 0,
+  /** Who decided that letter (your recorded examples or the trained model) and how sure it was. */
+  aslSource: null as "yours" | "model" | null,
+  aslConfidence: 0,
+  /** The ASL trainer is open: handshapes are read but nothing is cast. */
+  aslTraining: false,
+  /** This frame's hand as classifier input (a new array per camera frame); the trainer records these. */
+  aslFeat: null as number[] | null,
   recorder: { active: false, symbol: "circle" as SymbolName },
   demo: false,
 };

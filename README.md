@@ -39,10 +39,38 @@ Everything runs in the browser. There is no backend. The hand model (`public/mod
 - **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
 - **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
+### ASL fingerspelling mode
+
+Press `A` on the title screen to switch between drawing mode and ASL mode, then start as usual. It needs the camera.
+
+- Each monster carries a **letter**. Make that letter's ASL handshape and hold it for about half a second to cast it.
+- A reference card appears along the bottom for every letter a monster needs right now.
+- The line under the wave number shows what the camera thinks you are signing, with a bar that fills as you hold it.
+- **Letters:** all 24 static letters (J and Z are movements, so they are left out). Wave 1 uses A B C L Y; wave 2 adds D F I O V W; wave 3 adds E K R S U; wave 4 adds G H M N P Q T X. Monsters move slower than in drawing mode.
+
+**How letters are recognised.** A small neural network (`src/asl/model.json`, 138 KB) reads the 21 hand landmarks. It was trained on [`sid220/asl-now-fingerspelling`](https://huggingface.co/datasets/sid220/asl-now-fingerspelling) (MIT licence): about 1,900 landmark recordings of the alphabet from several people, made with the same MediaPipe hand model this game uses. `scripts/asl/train.py` rebuilds it.
+
+- On a held-out fifth of that dataset it gets 98% right. That number is optimistic, because the same people are in both halves.
+- On a second, independent image dataset (not trained on, not shipped) it gets 81% of handshapes right. The weak letters there are K, T, P and N (43–65%); A, B, C, F, I, V, Y are above 94%. That dataset's images are rotated at random, so this check ignores which way the hand points and counts K/P, G/Q and H/U as the same shape.
+- It has no "not a letter" answer, so a relaxed hand can read as some letter. Recording your relaxed hand (below) fixes that.
+
+**Teach it your own hand.** In ASL mode, press `R` on the title screen. Pick a letter with the arrow keys, press Space, and hold the letter for about 3 seconds while tilting it slightly. From then on that letter is recognised from your examples instead of the model. The last tile, "rest", records your relaxed hand so it reads as no letter.
+
+Your examples are saved automatically and survive restarts:
+
+- to `data/asl-examples.json` in the repo when running `npm run dev` (commit it to share with teammates; `npm run build` bundles it), and
+- to the browser's storage, which is all a deployed static site has.
+
+Backspace forgets the selected letter, and Shift+Backspace forgets everything.
+
+The reference cards are drawn from a real example of each letter in the training data, as the camera saw it. They are rough sketches, hard to read for the closed-fist letters (A, E, M, N, S, T), so keep a real ASL chart nearby.
+
 ### Hotkeys
 
 | Key | Action |
 |---|---|
+| `A` | on the title screen: switch between drawing mode and ASL fingerspelling mode |
+| `R` | on the title screen in ASL mode: record your own examples of each letter |
 | `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |
 | `D` | debug overlay: camera preview with hand skeleton and drawing box, pinch ratio, FPS, last recognition + score, resampled stroke |
 | `K` | calibrate the drawing area: sweep your pinch over a comfortable area for 4 s |
@@ -85,6 +113,11 @@ src/
   main.ts                 boot: start screen (camera + audio unlock) → Phaser; global hotkeys
   config.ts               every tunable: pinch thresholds, One Euro, drawing box, recognizer, waves, scoring
   state.ts                shared app state (mode, tracker status, last recognition…)
+  asl/
+    features.ts           landmarks → the 63 numbers the classifier reads (position, size and mirror removed)
+    hand.ts               trained model + your recorded examples → letter; hold-to-cast
+    model.json            the trained network and one typical example per letter (built by scripts/asl/train.py)
+    examples.ts           loading and saving your recorded examples
   input/
     events.ts             the input → game event bus (InputEvent)
     mouseAdapter.ts       mouse/touch drag → same events

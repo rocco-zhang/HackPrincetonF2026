@@ -1,11 +1,24 @@
 import { ARENA, GAME, waveSpec } from "../../config";
-import { SYMBOLS, type SymbolName } from "../../input/events";
+import type { AslLetter } from "../../asl/hand";
+import { aslName, SYMBOLS, type CastName } from "../../input/events";
 
 /** Which symbols each wave can use: teach a few first, then all six. */
-export function symbolPool(wave: number): SymbolName[] {
+export function symbolPool(wave: number): CastName[] {
   if (wave <= 1) return ["hline", "vline", "v"];
   if (wave === 2) return ["hline", "vline", "v", "caret", "circle"];
   return SYMBOLS;
+}
+
+/** ASL mode: the letters each wave adds, easiest and most distinct handshapes first. */
+export const ASL_WAVES: AslLetter[][] = [
+  ["A", "B", "C", "L", "Y"],
+  ["D", "F", "I", "O", "V", "W"],
+  ["E", "K", "R", "S", "U"],
+  ["G", "H", "M", "N", "P", "Q", "T", "X"],
+];
+
+export function aslPool(wave: number): CastName[] {
+  return ASL_WAVES.slice(0, Math.max(1, wave)).flat().map(aslName);
 }
 
 /** Point just outside the arena along a ray from the center. */
@@ -20,7 +33,7 @@ export function edgePoint(angle: number, margin = 50) {
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
-export type SpawnOrder = { angle: number; symbols: SymbolName[]; speed: number; palette: number };
+export type SpawnOrder = { angle: number; symbols: CastName[]; speed: number; palette: number };
 
 export class Spawner {
   wave = 0;
@@ -33,6 +46,7 @@ export class Spawner {
   constructor(
     private rand: () => number,
     private speedScale = 1,
+    private poolFor: (wave: number) => CastName[] = symbolPool,
   ) {}
 
   startWave(n: number) {
@@ -52,7 +66,7 @@ export class Spawner {
     return this.spawned >= this.spec.count && this.scripted.length === 0;
   }
 
-  update(dt: number, liveFronts: SymbolName[]): SpawnOrder[] {
+  update(dt: number, liveFronts: CastName[]): SpawnOrder[] {
     const out: SpawnOrder[] = [];
     this.elapsed += dt;
     while (this.scripted.length && this.scripted[0].at <= this.elapsed) {
@@ -70,11 +84,11 @@ export class Spawner {
     return out;
   }
 
-  makeOrder(liveFronts: SymbolName[]): SpawnOrder {
-    const pool = symbolPool(this.wave);
+  makeOrder(liveFronts: CastName[]): SpawnOrder {
+    const pool = this.poolFor(this.wave);
     const pick = () => pool[Math.floor(this.rand() * pool.length)];
     const len = 1 + Math.floor(this.rand() * this.spec.maxQueue);
-    const symbols: SymbolName[] = [];
+    const symbols: CastName[] = [];
     // bias toward sharing a front symbol with someone already on screen → multi-hits
     const first = liveFronts.length && this.rand() < 0.35 ? liveFronts[Math.floor(this.rand() * liveFronts.length)] : pick();
     symbols.push(pool.includes(first) ? first : pick());
