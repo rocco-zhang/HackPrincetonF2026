@@ -1,29 +1,14 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
-import { ASL_LETTERS } from "../../asl/hand";
-import { SYMBOLS, type SymbolName } from "../../input/events";
 import { pvp } from "../../net/pvp";
-import { state } from "../../state";
+import { friendsIcon, gearIcon, trophyIcon } from "../icons";
 import { FONT, HIGHLIGHTER, INK_CSS, MUTED_CSS, TITLE_FONT } from "../palette";
-import { sfx } from "../sfx";
-import { HoldToStart } from "../systems/HoldToStart";
+import { Menu } from "../systems/Menu";
 
-const LABELS: Record<SymbolName, string> = {
-  hline: "dash",
-  vline: "pillar",
-  v: "vee",
-  caret: "peak",
-  circle: "ring",
-  zigzag: "bolt",
-};
-
+/** The base screen: pick singleplayer (Classic) or multiplayer (Duel); friends, achievements and settings in the corner. */
 export class Title extends Phaser.Scene {
-  private hold!: HoldToStart;
-  private prompt!: Phaser.GameObjects.Text;
-  private tagline!: Phaser.GameObjects.Text;
-  private modeLine!: Phaser.GameObjects.Text;
-  private drawRow!: Phaser.GameObjects.Container;
-  private aslRow!: Phaser.GameObjects.Container;
+  private menu!: Menu;
+  private note!: Phaser.GameObjects.Text;
 
   constructor() {
     super("Title");
@@ -37,139 +22,63 @@ export class Title extends Phaser.Scene {
     for (let i = 0; i < 6; i++) {
       // kept to the side margins so they never sit behind the text
       const x = i % 2 ? Phaser.Math.Between(60, 190) : Phaser.Math.Between(W - 190, W - 60);
-      const m = this.add.image(x, 110 + Math.floor(i / 2) * 200 + Phaser.Math.Between(-30, 30), `monster${i % 3}`).setFlipX(i % 2 === 0);
+      const m = this.add.image(x, 190 + Math.floor(i / 2) * 180 + Phaser.Math.Between(-30, 30), `monster${i % 3}`).setFlipX(i % 2 === 0);
       this.tweens.add({ targets: m, x: m.x + Phaser.Math.Between(-30, 30), y: m.y + Phaser.Math.Between(-30, 30), duration: Phaser.Math.Between(3000, 5000), yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     }
 
     // a swipe of highlighter behind the title
-    const hl = this.add.graphics({ x: W / 2, y: 158 }).setAngle(-1.6);
+    const hl = this.add.graphics({ x: W / 2, y: 208 }).setAngle(-1.6);
     hl.fillStyle(HIGHLIGHTER, 0.85);
     hl.fillRect(-300, -34, 600, 78);
     hl.fillStyle(HIGHLIGHTER, 0.5);
     hl.fillRect(-312, -26, 628, 20);
+    this.add.text(W / 2, 200, "SPELLCAM", { fontFamily: TITLE_FONT, fontSize: "132px", color: INK_CSS }).setOrigin(0.5).setPadding(32).setAngle(-1.6);
     this.add
-      .text(W / 2, 150, "SPELLCAM", { fontFamily: TITLE_FONT, fontSize: "132px", color: INK_CSS })
-      .setOrigin(0.5)
-      .setPadding(32)
-      .setAngle(-1.6);
-    this.tagline = this.add
-      .text(W / 2, 236, "", { fontFamily: FONT, fontSize: "25px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+      .text(W / 2, 292, "You're a stick figure. The paper monsters want you. Draw them away.", { fontFamily: FONT, fontSize: "25px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5);
 
-    // what you cast with: six drawn symbols, or (ASL mode) ten fingerspelled letters
-    const gap = 150;
-    this.drawRow = this.add.container(0, 0);
-    SYMBOLS.forEach((s, i) => {
-      const x = W / 2 + (i - (SYMBOLS.length - 1) / 2) * gap;
-      const icon = this.add.image(x, 360, `sym_${s}`).setScale(1.3);
-      this.tweens.add({ targets: icon, y: 350, duration: 900 + i * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      const label = this.add.text(x, 420, LABELS[s], { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 }).setOrigin(0.5);
-      this.drawRow.add([icon, label]);
-    });
-    this.aslRow = this.add.container(0, 0);
-    ASL_LETTERS.forEach((l, i) => {
-      const x = W / 2 + ((i % 12) - 5.5) * 86;
-      this.aslRow.add(this.add.image(x, i < 12 ? 322 : 424, `aslcard_${l}`).setScale(0.56).setAngle(i % 2 ? 2 : -2));
-    });
-    this.input.keyboard?.on("keydown-R", () => {
-      if (state.aslSelected) this.scene.start("AslTrainer");
+    const menu = (this.menu = new Menu(this));
+    const go = (scene: string, data?: object) => () => this.scene.start(scene, data);
+
+    // the two ways to play, side by side
+    const modes = [
+      { dx: -180, over: "singleplayer", label: "Classic", sub: "you against the waves", scene: "Classic", angle: -1.4 },
+      { dx: 180, over: "multiplayer", label: "Duel", sub: "you against a friend", scene: "Duel", angle: 1.2 },
+    ];
+    for (const m of modes) {
+      this.add.text(W / 2 + m.dx, 384, m.over, { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 }).setOrigin(0.5);
+      menu.add({ x: W / 2 + m.dx, y: 474, w: 300, h: 128, label: m.label, sub: m.sub, font: TITLE_FONT, fontSize: 58, angle: m.angle, primary: true, onClick: go(m.scene) });
+    }
+
+    // friends → achievements → settings, top right
+    const corner = [
+      { name: "friends", icon: friendsIcon },
+      { name: "achievements", icon: trophyIcon },
+      { name: "settings", icon: gearIcon },
+    ];
+    corner.forEach((c, i) => {
+      const x = W - 62 - (corner.length - 1 - i) * 104;
+      menu.add({ x, y: 56, w: 68, h: 64, icon: c.icon, angle: i % 2 ? 1.5 : -1.5, onClick: go("Panel", { kind: c.name }) });
+      this.add.text(x, 104, c.name, { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
     });
 
-    this.modeLine = this.add
-      .text(W / 2, 606, "", { fontFamily: FONT, fontSize: "22px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
-      .setOrigin(0.5);
-    this.input.keyboard?.on("keydown-A", () => {
-      if (pvp.active && !pvp.isHost) return; // in a versus game the host picks the mode
-      state.aslSelected = !state.aslSelected;
-      pvp.sendMode(state.aslSelected);
-      this.showMode();
-    });
-    // versus: back on the title screen means not ready yet; the game starts when both are
-    if (pvp.active) pvp.setReady(false);
-    const offPvp = pvp.on((e) => {
-      if (e.type === "message" && e.msg.t === "hello") {
-        state.aslSelected = e.msg.asl;
-        this.showMode();
-      } else if (e.type === "start") {
-        sfx.start();
-        this.scene.start("Arena", { asl: state.aslSelected, pvp: true });
-      } else if (e.type === "state") this.showMode();
-    });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offPvp);
-    this.showMode();
+    this.note = this.add.text(W / 2, 592, "", { fontFamily: FONT, fontSize: "20px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 }).setOrigin(0.5);
+    this.add.text(W / 2, H - 28, "pinch or click a button   ·   C classic   ·   V duel   ·   G demo run", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
 
     if (import.meta.env.DEV) {
-      this.add.text(W-20,24,"Input lab / settings",{fontFamily:FONT,fontSize:"20px",color:INK_CSS,backgroundColor:"#ffe99c",padding:{x:12,y:8}})
-        .setOrigin(1,0).setInteractive({useHandCursor:true})
-        .on("pointerdown",()=>{location.href="/dev/pinch";});
+      menu.add({
+        x: 150, y: 56, w: 260, h: 64, label: "Input lab / settings", fontSize: 20,
+        onClick: () => { location.href = "/dev/pinch"; },
+      });
     }
-    this.prompt = this.add
-      .text(W / 2, 546, "", { fontFamily: FONT, fontSize: "34px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
-      .setOrigin(0.5)
-      .setPadding(32);
-    this.tweens.add({ targets: this.prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
 
-    this.add
-      .text(W / 2, H - 28, "A drawing/ASL · V versus · M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
-        fontFamily: FONT,
-        fontSize: "15px",
-        color: MUTED_CSS,
-      })
-      .setOrigin(0.5);
-
-    this.hold = new HoldToStart(this, 1000, () => {
-      if (state.aslSelected && state.mode !== "hand") {
-        // handshapes need the camera; say so in the prompt and wait
-        this.hold.rearm();
-        return;
-      }
-      if (pvp.active) {
-        // versus: holding marks you ready; the round starts when your opponent is too
-        pvp.setReady(true);
-        sfx.start();
-        this.hold.rearm();
-        return;
-      }
-      sfx.start();
-      this.cameras.main.flash(250, 255, 255, 255);
-      this.scene.start("Arena", { demo: false, asl: state.aslSelected });
-    });
-  }
-
-  private showMode() {
-    const asl = state.aslSelected;
-    this.drawRow.setVisible(!asl);
-    this.aslRow.setVisible(asl);
-    this.tagline.setText(
-      asl ? "Learn ASL fingerspelling: make a monster's letter with your hand to tear it up." : "You're a stick figure. The paper monsters want you. Draw them away.",
-    );
-    const mode = asl ? "ASL fingerspelling" : "Drawing";
-    this.modeLine.setText(
-      pvp.active ? `Versus  ·  ${mode} mode${pvp.isHost ? "  ·  A: change mode" : " (the host picks)"}  ·  V: connection`
-      : asl ? "ASL fingerspelling mode  ·  R: teach it your own hand  ·  A: drawing mode  ·  V: versus a friend"
-      : "Drawing mode  ·  A: ASL fingerspelling mode  ·  V: versus a friend",
-    );
+    this.input.keyboard?.on("keydown-C", go("Classic"));
+    this.input.keyboard?.on("keydown-V", go("Duel"));
   }
 
   update() {
-    this.hold.update();
-    let msg: string;
-    if (state.aslSelected && state.mode !== "hand") {
-      msg = "ASL mode needs the camera: press M to turn it on";
-    } else if (pvp.status === "reconnecting") {
-      msg = "Connection trouble: waiting for your opponent…";
-    } else if (pvp.active && pvp.myReady) {
-      msg = "Ready! Waiting for your opponent…";
-    } else if (pvp.active) {
-      const how = state.mode === "hand" ? "Pinch and hold" : "Hold the mouse button (or press Space)";
-      msg = `${how} when you're ready${pvp.theirReady ? ": your opponent is waiting" : ""}`;
-    } else if (state.mode === "hand") {
-      msg = state.handVisible || performance.now() - state.lastHandSeen < 600
-        ? "Pinch thumb + index and hold to begin"
-        : "Raise your hand in front of the camera";
-    } else {
-      msg = "Hold the mouse button (or press Space) to begin";
-    }
-    if (this.prompt.text !== msg) this.prompt.setText(msg);
+    this.menu.update();
+    const msg = pvp.active ? "You're connected to a friend: open Duel to play them." : "";
+    if (this.note.text !== msg) this.note.setText(msg);
   }
 }

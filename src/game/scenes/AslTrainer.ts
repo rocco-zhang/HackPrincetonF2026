@@ -93,7 +93,7 @@ export class AslTrainer extends Phaser.Scene {
       if (ev.shiftKey) void clearAllAslExamples().then(() => (this.note = "Forgot all your examples. Every letter uses the built-in model again."));
       else void setAslExamples(this.cls, []).then(() => (this.note = `Forgot your ${this.label}. It uses the built-in model again.`));
     });
-    kb.on("keydown-ESC", () => this.scene.start("Title"));
+    kb.on("keydown-ESC", () => this.scene.start("Panel", { kind: "settings" }));
   }
 
   private get cls(): AslClass {
@@ -111,7 +111,7 @@ export class AslTrainer extends Phaser.Scene {
   private startRecording() {
     if (this.phase !== "idle") return;
     if (state.mode !== "hand") {
-      this.note = "This needs the camera: press M to turn on hand input.";
+      this.note = "This needs the camera.";
       return;
     }
     this.phase = "ready";
@@ -165,7 +165,7 @@ export class AslTrainer extends Phaser.Scene {
 
     const hand = state.mode === "hand";
     this.reading.setText(
-      !hand ? "camera is off (press M)"
+      !hand ? "camera is off"
       : !state.handVisible ? "no hand in view"
       : state.aslLetter ? `camera reads: ${state.aslLetter}  (${state.aslSource === "yours" ? "your example" : "built-in model"})`
       : "camera reads: no letter",

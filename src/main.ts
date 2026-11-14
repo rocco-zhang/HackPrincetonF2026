@@ -3,21 +3,25 @@ import Phaser from "phaser";
 import "@fontsource/patrick-hand/latin-400.css";
 import "@fontsource/permanent-marker/latin-400.css";
 import "./style.css";
+import { actions } from "./actions";
 import { ARENA } from "./config";
 import { applyMirror, listCameras, nextCamera, startCamera } from "./input/camera";
 import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
 import { bus, emit, SYMBOLS } from "./input/events";
 import { loadAslExamples } from "./asl/examples";
-import { aslClassifier, cancelHandStroke, initHandTracker, startCalibration } from "./input/handTracker";
+import { aslClassifier, initHandTracker, startCalibration } from "./input/handTracker";
 import { initMouseAdapter } from "./input/mouseAdapter";
 import { Arena } from "./game/scenes/Arena";
+import { Classic } from "./game/scenes/Classic";
+import { Duel } from "./game/scenes/Duel";
+import { Panel } from "./game/scenes/Panel";
 import { AslTrainer } from "./game/scenes/AslTrainer";
 import { Boot } from "./game/scenes/Boot";
 import { GameOver } from "./game/scenes/GameOver";
 import { Title } from "./game/scenes/Title";
-import { toggleMute, unlockAudio } from "./game/sfx";
-import { initLobby, lobbyOpen, openLobby } from "./net/lobby";
+import { audio, toggleMute, unlockAudio } from "./game/sfx";
+import { initLobby, lobbyOpen } from "./net/lobby";
 import { pvp } from "./net/pvp";
 import { state } from "./state";
 import { experiment, type Variant } from "./input/pinchExperiment";
@@ -78,7 +82,7 @@ try {
 initCastPipeline();
 // your recorded ASL examples (data/asl-examples.json, or this browser) override the trained model
 void loadAslExamples((e) => aslClassifier.setExamples(e));
-const mouse = initMouseAdapter();
+initMouseAdapter();
 initDebugOverlay(() => game);
 initLobby(() => game);
 
@@ -92,15 +96,15 @@ function startGame() {
     transparent: true,
     audio: { noAudio: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [Boot, Title, Arena, GameOver, AslTrainer],
+    scene: [Boot, Title, Classic, Duel, Panel, Arena, GameOver, AslTrainer],
   });
-  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp };
+  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp, audio };
 }
 
 /** (Re)start the Arena from whatever scene is running. */
 function startArena(demo: boolean) {
   const cur = game?.scene.getScenes(true).find((s) => s.scene.key !== "Boot");
-  cur?.scene.start("Arena", { demo });
+  cur?.scene.start("Arena", { demo, subjects: state.subjects });
 }
 
 const gate = document.getElementById("gate")!;
@@ -112,7 +116,6 @@ if (import.meta.env.DEV) {
 }
 const gateMsg = document.getElementById("gateMsg")!;
 const enableBtn = document.getElementById("enable") as HTMLButtonElement;
-const mouseBtn = document.getElementById("mouseOnly") as HTMLButtonElement;
 const camPick = document.getElementById("camPick") as HTMLLabelElement;
 const camSelect = document.getElementById("camSelect") as HTMLSelectElement;
 
@@ -167,14 +170,14 @@ async function enableHands() {
       await initHandTracker();
     } catch (err) {
       console.error(err);
-      throw new Error("Hand tracking failed to load. You can still play with the mouse.");
+      throw new Error("Hand tracking failed to load. Check the connection and try again.");
     }
   }
 }
 
 enableBtn.addEventListener("click", async () => {
   unlockAudio();
-  enableBtn.disabled = mouseBtn.disabled = true;
+  enableBtn.disabled = true;
   gateMsg.textContent = "Starting camera…";
   try {
     await enableHands();
@@ -184,53 +187,52 @@ enableBtn.addEventListener("click", async () => {
   } catch (err) {
     gateMsg.textContent = (err as Error).message;
     enableBtn.textContent = "Try camera again";
-    enableBtn.disabled = mouseBtn.disabled = false;
+    enableBtn.disabled = false;
   }
 });
 
-mouseBtn.addEventListener("click", () => {
-  unlockAudio();
-  state.mode = "mouse";
-  closeGate();
-});
-
+// Testing without a camera: with ?mouse in the URL the mouse plays the whole game.
 if (new URLSearchParams(location.search).has("mouse")) {
   state.mode = "mouse";
   closeGate();
+  // no button was clicked, so sound has to wait for the first click or key press
+  const unlock = () => {
+    unlockAudio();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock);
+  window.addEventListener("keydown", unlock);
 }
 
-async function setMode(mode: "mouse" | "hand") {
-  if (mode === state.mode) return;
-  mouse.cancel();
-  cancelHandStroke();
-  if (mode === "hand") {
-    try {
-      toast("Starting hand tracking…");
-      await enableHands();
-    } catch (err) {
-      toast((err as Error).message);
-      return;
-    }
+actions.toggleSound = () => toast(toggleMute() ? "Sound off" : "Sound on");
+actions.toggleDebug = () => void (state.debug = !state.debug);
+actions.toggleMirror = () => {
+  state.mirror = !state.mirror;
+  applyMirror();
+  toast(state.mirror ? "Mirror on" : "Mirror off");
+};
+actions.nextCamera = async () => {
+  try {
+    toast(`Camera: ${await nextCamera()}`);
+  } catch (err) {
+    toast((err as Error).message);
   }
-  state.mode = mode;
-  toast(mode === "hand" ? "✋ Hand input" : "🖱 Mouse input");
-}
+};
+actions.calibrate = async () => {
+  if (!state.trackerReady || !state.cameraOn) return toast("This needs the camera");
+  if (state.calibrating) return;
+  toast("Calibrating: sweep your pinch over the area you want to draw in (4 s)");
+  const ok = await startCalibration();
+  toast(ok ? "Drawing area set ✓" : "Calibration failed: keep your hand visible and move it more");
+};
 
-window.addEventListener("keydown", async (ev) => {
+window.addEventListener("keydown", (ev) => {
   if (!gate.classList.contains("hidden") || ev.repeat || ev.metaKey || ev.ctrlKey) return;
   if (lobbyOpen()) return; // typing a room code
   const k = ev.key.toLowerCase();
-  if (k === "v") {
-    // versus lobby, from the title screen only
-    if (game?.scene.isActive("Title")) {
-      ev.preventDefault();
-      openLobby();
-    }
-    return;
-  }
-  if (k === "d") state.debug = !state.debug;
-  else if (k === "m") void setMode(state.mode === "hand" ? "mouse" : "hand");
-  else if (k === "n") toast(toggleMute() ? "Sound off" : "Sound on");
+  if (k === "d") actions.toggleDebug();
+  else if (k === "n") actions.toggleSound();
   else if (k === "t") {
     state.recorder.active = !state.recorder.active;
     toast(state.recorder.active ? `Recording templates: draw "${state.recorder.symbol}" (1-6 to switch)` : "Template recording off");
@@ -238,25 +240,10 @@ window.addEventListener("keydown", async (ev) => {
     state.recorder.symbol = SYMBOLS[Number(k) - 1];
     toast(`Recording "${state.recorder.symbol}"`);
   } else if (state.recorder.active && k === "e") exportTemplates();
-  else if (k === "f") {
-    state.mirror = !state.mirror;
-    applyMirror();
-    toast(state.mirror ? "Mirror on" : "Mirror off");
-  } else if (k === "c") {
-    try {
-      toast(`Camera: ${await nextCamera()}`);
-    } catch (err) {
-      toast((err as Error).message);
-    }
-  } else if (k === "k") {
-    if (!state.trackerReady || !state.cameraOn) return toast("Turn on hand input first (M)");
-    if (state.calibrating) return;
-    toast("Calibrating: sweep your pinch over the area you want to draw in (4 s)");
-    const ok = await startCalibration();
-    toast(ok ? "Drawing area set ✓" : "Calibration failed: keep your hand visible and move it more");
-  } else if (k === "g" && game && !pvp.active) {
-    startArena(true);
-  }
+  else if (k === "f") actions.toggleMirror();
+  else if (k === "c" && !game?.scene.isActive("Title")) void actions.nextCamera(); // on the title screen C opens Classic
+  else if (k === "k") void actions.calibrate();
+  else if (k === "g" && game && !pvp.active) startArena(true);
 });
 
 }

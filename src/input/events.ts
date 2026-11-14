@@ -8,15 +8,24 @@ export const SYMBOLS: SymbolName[] = ["hline", "vline", "v", "caret", "circle", 
 
 // What a monster can carry and a player can cast: a drawn symbol, or (ASL mode) a fingerspelled letter.
 export type AslName = `asl_${AslLetter}`;
-export type CastName = SymbolName | AslName;
+/** The answer to a math problem. The prompt ("3 + 4") is drawn separately. */
+export type MathName = `math_${number}`;
+/** A languages-mode answer, named by the easy marks it takes, such as `lang_hline-circle`. */
+export type LangName = `lang_${string}`;
+export type CastName = SymbolName | AslName | MathName | LangName;
 export const aslName = (l: AslLetter) => `asl_${l}` as AslName;
+export const mathName = (answer: number) => `math_${answer}` as MathName;
+export const mathAnswer = (n: MathName) => Number(n.slice(5));
 export const ASL_NAMES: AslName[] = ASL_LETTERS.map(aslName);
 export const isSymbol = (n: CastName): n is SymbolName => (SYMBOLS as string[]).includes(n);
-/** Short text for a cast name: the letter itself for ASL. */
-export const castLabel = (n: CastName) => (isSymbol(n) ? n : n.slice(4));
+export const isMath = (n: CastName): n is MathName => n.startsWith("math_");
+export const isLang = (n: CastName): n is LangName => n.startsWith("lang_");
+/** Short text for a cast name: the letter itself for ASL, the number for arithmetic. */
+export const castLabel = (n: CastName) => (isSymbol(n) ? n : isMath(n) ? String(mathAnswer(n)) : isLang(n) ? n.slice(5) : n.slice(4));
 
 export type InputEvent =
-  | { type: "cursor"; p: Pt; inking: boolean } // every frame: where the fingertip is, and whether it's drawing
+  // every frame: where the fingertip is, and whether it's drawing. `src` is "mouse" for the real pointer (menus), otherwise the hand.
+  | { type: "cursor"; p: Pt; inking: boolean; src?: "mouse" }
   | { type: "strokeStart"; p: Pt }
   | { type: "strokePoint"; p: Pt }
   | { type: "strokeEnd"; points: Pt[] }

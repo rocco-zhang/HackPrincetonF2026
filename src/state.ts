@@ -1,13 +1,59 @@
-import { INPUT } from "./config";
+import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
+import { cleanSubjects, type Subject } from "./game/subjects";
 import type { CastName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
 export type Landmark = { x: number; y: number; z: number };
 
+const DIFFICULTY_KEY = "spellcam.difficulty";
+
+function loadDifficulty(): Difficulty {
+  try {
+    const v = localStorage.getItem(DIFFICULTY_KEY) as Difficulty | null;
+    if (v && DIFFICULTIES.includes(v)) return v;
+  } catch {
+    // storage blocked: fall back to the default
+  }
+  return "medium";
+}
+
+/** Remember the title-screen difficulty choice for next time. */
+export function saveDifficulty(d: Difficulty) {
+  state.difficulty = d;
+  try {
+    localStorage.setItem(DIFFICULTY_KEY, d);
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
+
+const SUBJECTS_KEY = "spellcam.subjects";
+
+function loadSubjects(): Subject[] {
+  try {
+    return cleanSubjects(JSON.parse(localStorage.getItem(SUBJECTS_KEY) ?? "null"));
+  } catch {
+    return ["shapes"];
+  }
+}
+
+/** Remember which subjects were picked for next time. */
+export function saveSubjects(list: Subject[]) {
+  state.subjects = cleanSubjects(list);
+  try {
+    localStorage.setItem(SUBJECTS_KEY, JSON.stringify(state.subjects));
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
+
 /** Shared app state read by the debug overlay, HUD and input adapters. */
 export const state = {
+  /** "hand" in normal play. "mouse" only with the ?mouse URL (testing without a camera): the mouse then draws too. */
   mode: "mouse" as "mouse" | "hand",
+  /** A round is running. The mouse works in menus but not here (unless ?mouse). */
+  inRound: false,
   cameraOn: false,
   trackerReady: false,
   delegate: "" as "" | "GPU" | "CPU",
@@ -29,10 +75,16 @@ export const state = {
   lastRecog: null as RecogResult | null,
   /** Symbols a monster currently needs; the recognizer favours these. Empty outside the arena. */
   wanted: [] as CastName[],
-  /** Title-screen choice: play the ASL fingerspelling mode instead of drawing spells. */
-  aslSelected: false,
+  /** Setup-screen choice (in a duel, the host's): what the monsters carry. Each wave uses the next one. */
+  subjects: loadSubjects(),
+  /** Setup-screen choice (in a duel, the host's). */
+  difficulty: loadDifficulty(),
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
+  /** An arithmetic round is running. */
+  mathActive: false,
+  /** A languages round is running. Each mark is drawn and casts on its own. */
+  langActive: false,
   /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */
   aslLetter: null as AslLetter | null,
   aslProgress: 0,
