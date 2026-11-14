@@ -17,6 +17,7 @@ export const state = {
   lastHandSeen: 0,
   landmarks: null as Landmark[] | null,
   pinchRatio: null as number | null,
+  pinchRatio3d: null as number | null,
   inking: false,
   trackerFps: 0,
   drawBox: { ...INPUT.drawBox },

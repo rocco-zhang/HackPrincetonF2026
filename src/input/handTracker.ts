@@ -98,6 +98,10 @@ function dist(a: Landmark, b: Landmark, vw: number, vh: number) {
   return Math.hypot((a.x - b.x) * vw, (a.y - b.y) * vh);
 }
 
+function dist3(a: Landmark, b: Landmark) {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const v = video();
@@ -128,6 +132,7 @@ function loop() {
     state.landmarks = null;
     state.handVisible = false;
     state.pinchRatio = null;
+    state.pinchRatio3d = null;
     state.inking = gate.update(null, now);
     if (!state.inking) strokes.finish(gate.releasedAt);
     else if (handActive && lastP) strokes.update(lastP, true);
@@ -140,7 +145,13 @@ function loop() {
   state.lastHandSeen = now;
   const vw = v.videoWidth, vh = v.videoHeight;
   const handSize = dist(lm[0], lm[9], vw, vh);
-  const ratio = handSize > 0 ? dist(lm[4], lm[8], vw, vh) / handSize : null;
+  let ratio = handSize > 0 ? dist(lm[4], lm[8], vw, vh) / handSize : null;
+  // 3D check: tips that overlap in the image but are apart in depth are not a pinch
+  const wl = res.worldLandmarks?.[0] as Landmark[] | undefined;
+  const size3 = wl ? dist3(wl[0], wl[9]) : 0;
+  const ratio3 = wl && size3 > 0 ? dist3(wl[4], wl[8]) / size3 : null;
+  state.pinchRatio3d = ratio3;
+  if (ratio !== null && ratio3 !== null && ratio3 > INPUT.pinch3dMax) ratio = Math.max(ratio, ratio3);
   state.pinchRatio = ratio;
   state.inking = gate.update(ratio, now);
   // cut the stroke back to where the (debounced) release began

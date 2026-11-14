@@ -3,9 +3,12 @@
 export const ARENA = { width: 1280, height: 720 } as const;
 
 export const INPUT = {
-  // pinch = dist(thumb tip, index tip) / dist(wrist, middle-finger base)
-  pinchOn: 0.35,
-  pinchOff: 0.6,
+  // pinch = dist(thumb tip, index tip) / dist(wrist, middle-finger base), measured in the image (2D).
+  pinchOn: 0.28,
+  pinchOff: 0.5,
+  // The same ratio from MediaPipe's 3D world landmarks is only a veto: above this, the tips are
+  // apart in depth and merely line up from the camera's point of view, so it is not a pinch.
+  pinch3dMax: 0.5,
   framesToStart: 2,
   framesToStop: 3,
   // A release must also last this long before the stroke ends, so blurred or dropped

@@ -100,7 +100,7 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
     const lines = [
       `mode: ${state.mode}   camera: ${state.cameraOn ? "on" : "off"}   tracker: ${state.trackerReady ? `${state.delegate} / model ${state.modelSource}` : "not loaded"}`,
       `tracker fps: ${state.trackerFps.toFixed(0)}   game fps: ${game ? game.loop.actualFps.toFixed(0) : "-"}`,
-      `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   inking: ${state.inking}`,
+      `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   3D: ${state.pinchRatio3d?.toFixed(2) ?? "-"} (veto > ${INPUT.pinch3dMax})   inking: ${state.inking}`,
       r
         ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${RECOG.acceptScore}, ≥ ${RECOG.acceptScoreWanted} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
         : "last: -",
