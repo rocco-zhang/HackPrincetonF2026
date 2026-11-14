@@ -62,6 +62,7 @@ export async function initHandTracker() {
 /** Record where the player's hand moves for `ms`, then fit the drawing box to it. */
 export function startCalibration(ms = 4000): Promise<boolean> {
   state.calibrating = true;
+  state.calibMessage = "Calibrating: sweep your pinch across the area you want to draw in";
   return new Promise((resolve) => {
     calib = { until: performance.now() + ms, pts: [], done: resolve };
   });
@@ -71,6 +72,7 @@ function finishCalibration() {
   const c = calib!;
   calib = null;
   state.calibrating = false;
+  state.calibMessage = "";
   if (c.pts.length < 20) return c.done?.(false);
   const v = video();
   const vw = v.videoWidth || INPUT.videoWidth;

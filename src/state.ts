@@ -19,6 +19,8 @@ export const state = {
   pinchRatio: null as number | null,
   pinchRatio3d: null as number | null,
   inking: false,
+  /** Instruction shown in a banner while the drawing-area calibration (K) is running. */
+  calibMessage: "",
   trackerFps: 0,
   drawBox: { ...INPUT.drawBox },
   calibrating: false,

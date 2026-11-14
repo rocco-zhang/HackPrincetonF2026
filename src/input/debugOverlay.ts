@@ -35,12 +35,13 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
     const W = canvas.width / s;
 
     if (state.calibrating) {
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(W / 2 - 260, 20, 520, 60);
-      ctx.fillStyle = "#fff";
       ctx.font = "bold 20px system-ui";
+      const bw = Math.min(W - 24, ctx.measureText(state.calibMessage).width + 48);
+      ctx.fillStyle = "rgba(0,0,0,0.72)";
+      ctx.fillRect(W / 2 - bw / 2, 20, bw, 60);
+      ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
-      ctx.fillText("Calibrating: sweep your pinch across the area you want to draw in", W / 2, 56);
+      ctx.fillText(state.calibMessage, W / 2, 56, bw - 24);
       ctx.textAlign = "left";
     }
 

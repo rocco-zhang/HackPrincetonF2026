@@ -55,6 +55,15 @@ export async function nextCamera(): Promise<string> {
   return next.label || "camera";
 }
 
+/** Cameras the browser knows about. Labels and ids are blank until camera permission is granted. */
+export async function listCameras() {
+  try {
+    return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+  } catch {
+    return [];
+  }
+}
+
 export function applyMirror() {
   video().classList.toggle("mirrored", state.mirror);
 }

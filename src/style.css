@@ -9,7 +9,7 @@ body {
   /* the desk the sheet of paper is lying on */
   background: #6f8f86;
   color: #33312e;
-  font-family: "Chalkboard SE", "Chalkboard", "Comic Sans MS", "Bradley Hand", cursive;
+  font-family: "Chalkboard SE", "Chalkboard", "Patrick Hand", "Comic Sans MS", cursive;
   overflow: hidden;
   user-select: none;
 }
@@ -81,7 +81,7 @@ body {
   margin: 0;
   font-size: clamp(56px, 10vw, 120px);
   letter-spacing: 0.04em;
-  font-family: "Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive;
+  font-family: "Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive;
   font-weight: 400;
   color: #33312e;
   padding: 0 0.25em;
@@ -146,6 +146,30 @@ body {
 
 #gate button.secondary:active {
   transform: rotate(1deg) translateY(2px);
+}
+
+#camPick {
+  font-size: 17px;
+}
+
+#camPick[hidden] {
+  display: none;
+}
+
+#camSelect {
+  font: inherit;
+  color: inherit;
+  max-width: 320px;
+  margin-left: 6px;
+  padding: 5px 8px;
+  background: #fffefa;
+  border: 2px solid #33312e;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+#camSelect:focus-visible {
+  outline: 3px dashed #d7372f;
+  outline-offset: 4px;
 }
 
 #gateMsg {

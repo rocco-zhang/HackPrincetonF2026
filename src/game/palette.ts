@@ -32,6 +32,7 @@ export const MONSTER_PALETTES = [
   { name: "sticky note", rim: "#ffe66b" },
 ];
 
-// Handwriting fonts that ship with macOS; no web font, so the game still works offline.
-export const FONT = '"Chalkboard SE", "Chalkboard", "Comic Sans MS", "Bradley Hand", cursive';
-export const TITLE_FONT = '"Marker Felt", "Chalkboard SE", "Comic Sans MS", cursive';
+// macOS handwriting fonts first; elsewhere the bundled Patrick Hand / Permanent Marker
+// (imported in main.ts, served locally, so the game still works offline).
+export const FONT = '"Chalkboard SE", "Chalkboard", "Patrick Hand", "Comic Sans MS", cursive';
+export const TITLE_FONT = '"Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive';

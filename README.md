@@ -15,7 +15,7 @@ npm install        # also copies the MediaPipe wasm into public/ and fetches the
 npm run dev        # http://localhost:5173
 ```
 
-Click **Enable camera & sound** to play with your hand, or **Play with mouse only**. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
+Click **Enable camera & sound** to play with your hand, or **Play with mouse only**. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
 
 Everything runs in the browser. There is no backend. The hand model (`public/models/hand_landmarker.task`) is committed, and the wasm runtime is copied from `node_modules` on install, so the game never needs a CDN or venue Wi‑Fi. If the local files are missing, it falls back to the CDN automatically.
 
@@ -76,7 +76,7 @@ The recognizer tests draw 12 jittered strokes per base shape and direction (rand
 
 ## Deploy
 
-`npm run build` produces a static `dist/`. Host it on GitHub Pages, Vercel or Netlify. Camera access needs **HTTPS** when deployed, which all three provide. For the live demo, run from `localhost` with the local model file.
+`npm run build` produces a static `dist/`. `.github/workflows/pages.yml` tests, builds and publishes it to GitHub Pages on every push to `main`; turn it on once under repo Settings → Pages → Source: "GitHub Actions". Vercel or Netlify also work. Camera access needs **HTTPS** when deployed, which all three provide. For the live demo, run from `localhost` with the local model file.
 
 ## Code map
 
@@ -110,7 +110,7 @@ src/
 - **The cursor follows the index-finger base knuckle** (`INPUT.cursorAnchor: "knuckle"`), which does not move when the fingers pinch or open. Set it to `"pinch"` for the thumb–index midpoint instead. A release has to last 180 ms (300 ms if the hand is lost) before a stroke ends, and the stroke is cut back to where the release began. The first and last 3 points of each hand stroke are also trimmed.
 - **Symbols a monster currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
 - **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
-- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts that ship with macOS. Colours live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
+- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colours live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
 - **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
 - **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
 - **Out of scope for now:** mana, pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).

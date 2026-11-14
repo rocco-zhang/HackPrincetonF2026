@@ -1,7 +1,10 @@
 import Phaser from "phaser";
+// Bundled handwriting fonts, used when the macOS ones (Chalkboard SE, Marker Felt) are missing.
+import "@fontsource/patrick-hand/latin-400.css";
+import "@fontsource/permanent-marker/latin-400.css";
 import "./style.css";
 import { ARENA } from "./config";
-import { applyMirror, nextCamera, startCamera } from "./input/camera";
+import { applyMirror, listCameras, nextCamera, startCamera } from "./input/camera";
 import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
 import { bus, emit, SYMBOLS } from "./input/events";
@@ -15,6 +18,13 @@ import { toggleMute, unlockAudio } from "./game/sfx";
 import { state } from "./state";
 
 let game: Phaser.Game | null = null;
+
+// Left over from a removed pinch-calibration feature; nothing reads it any more.
+try {
+  localStorage.removeItem("spellcam.pinch.v1");
+} catch {
+  // storage unavailable
+}
 
 initCastPipeline();
 const mouse = initMouseAdapter();
@@ -45,15 +55,55 @@ const gate = document.getElementById("gate")!;
 const gateMsg = document.getElementById("gateMsg")!;
 const enableBtn = document.getElementById("enable") as HTMLButtonElement;
 const mouseBtn = document.getElementById("mouseOnly") as HTMLButtonElement;
+const camPick = document.getElementById("camPick") as HTMLLabelElement;
+const camSelect = document.getElementById("camSelect") as HTMLSelectElement;
+
+/** Fill the camera picker. Browsers only reveal camera names once permission is granted. */
+async function refreshCameras() {
+  const cams = await listCameras();
+  const chosen = camSelect.value;
+  camSelect.replaceChildren(
+    ...cams.map((c, i) => {
+      const o = document.createElement("option");
+      o.value = c.deviceId;
+      o.textContent = c.label || `Camera ${i + 1}`;
+      return o;
+    }),
+  );
+  if (cams.some((c) => c.deviceId === chosen)) camSelect.value = chosen;
+  camPick.hidden = cams.length < 2;
+}
+void refreshCameras();
+navigator.mediaDevices?.addEventListener?.("devicechange", () => void refreshCameras());
+camSelect.addEventListener("change", async () => {
+  if (!state.cameraOn) return; // used when the camera is first started
+  try {
+    await startCamera(camSelect.value);
+  } catch (err) {
+    gateMsg.textContent = (err as Error).message;
+  }
+});
+
+// Canvas text is drawn once, so the fallback fonts have to be loaded before the game starts.
+const fontsReady = Promise.race([
+  Promise.allSettled(['32px "Patrick Hand"', '32px "Permanent Marker"'].map((f) => document.fonts.load(f))),
+  new Promise((r) => setTimeout(r, 1500)),
+]);
 
 function closeGate() {
   gate.classList.add("hidden");
-  startGame();
+  void fontsReady.then(startGame);
 }
 
 /** Camera + hand tracker. Throws with a friendly message on failure. */
 async function enableHands() {
-  if (!state.cameraOn) await startCamera();
+  if (!state.cameraOn) {
+    try {
+      await startCamera(camSelect.value || undefined);
+    } finally {
+      void refreshCameras(); // names are available now, and a denied prompt may have changed the list
+    }
+  }
   if (!state.trackerReady) {
     try {
       await initHandTracker();
@@ -133,6 +183,7 @@ window.addEventListener("keydown", async (ev) => {
     }
   } else if (k === "k") {
     if (!state.trackerReady || !state.cameraOn) return toast("Turn on hand input first (M)");
+    if (state.calibrating) return;
     toast("Calibrating: sweep your pinch over the area you want to draw in (4 s)");
     const ok = await startCalibration();
     toast(ok ? "Drawing area set ✓" : "Calibration failed: keep your hand visible and move it more");

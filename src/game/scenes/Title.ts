@@ -65,7 +65,7 @@ export class Title extends Phaser.Scene {
     this.tweens.add({ targets: this.prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
 
     this.add
-      .text(W / 2, H - 28, "M switch hand/mouse · K calibrate drawing area · C next camera · F mirror · D debug · T record templates · G demo run", {
+      .text(W / 2, H - 28, "M hand/mouse · K calibrate area · C next camera · F mirror · D debug · T record templates · G demo run", {
         fontFamily: FONT,
         fontSize: "15px",
         color: MUTED_CSS,
