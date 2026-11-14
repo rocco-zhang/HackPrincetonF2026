@@ -30,6 +30,8 @@ export function initMouseAdapter() {
   const stage = document.getElementById("stage")!;
   stage.addEventListener("pointerdown", (ev) => {
     if (ev.button !== 0) return;
+    // Capturing the pointer retargets the click to #stage, so the start-screen buttons would never get it.
+    if ((ev.target as Element).closest?.("#gate")) return;
     down = true;
     try {
       stage.setPointerCapture(ev.pointerId);
