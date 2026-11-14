@@ -98,6 +98,11 @@ export class Title extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, offPvp);
     this.showMode();
 
+    if (import.meta.env.DEV) {
+      this.add.text(W-20,24,"Input lab / settings",{fontFamily:FONT,fontSize:"20px",color:INK_CSS,backgroundColor:"#ffe99c",padding:{x:12,y:8}})
+        .setOrigin(1,0).setInteractive({useHandCursor:true})
+        .on("pointerdown",()=>{location.href="/dev/pinch";});
+    }
     this.prompt = this.add
       .text(W / 2, 546, "", { fontFamily: FONT, fontSize: "34px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })
       .setOrigin(0.5)

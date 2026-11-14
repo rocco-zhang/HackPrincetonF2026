@@ -1,6 +1,6 @@
 import { ARENA, INPUT } from "../config";
 import { state } from "../state";
-import { startCamera, stopCamera, video, listCameras, applyMirror } from "./camera";
+import { startCamera, video, listCameras, applyMirror } from "./camera";
 import { onInput, SYMBOLS, type Pt, type InputEvent } from "./events";
 import { cancelHandStroke, initHandTracker, pinchEngine, observationListeners, inferenceMs, processObservation, setReplaying, replaying } from "./handTracker";
 import { calibrationRatio, calibratePinch, experiment, type Observation } from "./pinchExperiment";
@@ -18,6 +18,13 @@ export function initPinchLab() {
     <table class="lab-symbols" aria-label="Castable symbols"><thead><tr><th>Draw</th><th>Horizontal</th><th>Vertical</th><th>Vee</th><th>Caret</th><th>Circle</th><th>Zigzag</th></tr></thead><tbody><tr><th>Shape</th><td>&#8212;</td><td>|</td><td>V</td><td>&#8743;</td><td>O</td><td>W / M</td></tr><tr><th>Log name</th>${SYMBOLS.map(s=>`<td>${s}</td>`).join("")}</tr></tbody></table>
     <div class="lab-layout"><aside>
       <h2>Pinch experiments</h2><p>Pinch, draw, then open your fingers to commit. No monsters or timers.</p>
+      <button id="lab-save">Save settings as local defaults</button><p id="lab-save-status" role="status">Saves to config/pinch.local.json on this dev server.</p>
+      <label><input id="lab-min-length" type="checkbox"> Require minimum stroke length (40 game pixels)</label>
+      <label><input id="lab-min-points" type="checkbox"> Require minimum point count (8 captured points)</label>
+      <p>With both checks off, recognition still requires at least 2 points.</p>
+      <label>Symbol acceptance threshold<input id="lab-recognition-threshold" type="number" min="0" max="1" step="0.01"></label>
+      <label>Wanted-symbol threshold (gameplay)<input id="lab-wanted-threshold" type="number" min="0" max="1" step="0.01"></label>
+      <p>Template similarity, not probability. Higher is stricter. Wanted symbols must also be within 0.08 of the best match. Straight lines use geometric rules. Point count and path-length checks are optional; the debug thumbnail resamples to 64 points.</p>
       <label>Start ratio (close below)<input id="lab-start-ratio" type="number" min="0.05" max="0.40" step="0.001"></label>
       <label>End ratio (open above)<input id="lab-end-ratio" type="number" min="0.15" max="0.85" step="0.001"></label>
       <p>End must stay at least 0.10 above Start to prevent rapid on/off switching. Speed assistance adjusts this base End ratio.</p>
@@ -35,7 +42,7 @@ export function initPinchLab() {
       <details><summary>How buffering works</summary><p>Keep 750 ms of timestamped positions and pinch ratios. After a close is confirmed, recover up to 80 ms before the closing evidence, using samples below the open threshold. A rising ratio above close + 0.10, with a rise over 0.06 in one observation, can propose an opening before the normal open threshold. It must still satisfy End confirmation. Cut the stroke back to the first opening sample, then recognize it once. Tracking loss has its own 300 ms grace; gaps over 200 ms terminate the segment. Consumed samples cannot cast again. Previews never commit.</p><p>Buffering off uses the same confirmation controls without prefix recovery or the opening-trend rule. Legacy F additionally compares up to nine slightly trimmed endpoints against templates after release; it is not enabled by this toggle.</p></details>
       <label>Cursor anchor<select id="lab-anchor"><option value="knuckle">Index knuckle</option><option value="tip">Index fingertip</option><option value="thumb">Thumb tip</option><option value="pinch">Thumb/index midpoint</option></select></label>
       <p><a id="lab-game" href="/">Test these settings in the game</a></p>
-      <label>Camera<select id="lab-camera"></select></label><button id="lab-start">Enable camera</button><button id="lab-stop">Stop camera</button>
+      <label>Camera<select id="lab-camera"></select></label><button id="lab-retry-camera" hidden>Retry camera</button>
       <label><input id="lab-mirror" type="checkbox" checked> Mirror camera</label>
       <h3>Personal pinch calibration</h3><p>Sampling starts immediately when clicked and collects 2 seconds of tracked thumb/index distance relative to hand size. Hold the requested pose steady. Each button replaces the previous samples for that pose. Apply calibration uses both sets for the current setup, with buffering either on or off.</p>
       <button id="lab-closed">Sample closed pinch</button><button id="lab-open">Sample open hand</button><button id="lab-calibrate">Apply calibration</button><button id="lab-default">Reset thresholds</button>
@@ -47,11 +54,11 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
       <button id="lab-marker">Mark intended start / end</button><button id="lab-record">Start recording</button><button id="lab-export">Download session</button>
       <label>Import session<input id="lab-import" type="file" accept="application/json"></label><button id="lab-replay">Replay with current settings</button><button id="lab-cancel">Stop replay</button>
       <button id="lab-clear">Clear results</button>
-      <p id="lab-message" role="status">Camera is off. You can import and replay a recording without it.</p>
+      <p id="lab-message" role="status">Starting camera automatically. Allow camera access when prompted.</p>
     </aside><main>
       <h2>Camera &amp; drawing surface</h2>
       <canvas id="lab-camera-view" width="640" height="480" aria-label="Live camera with hand skeleton and drawing area"></canvas>
-      <p id="lab-preview-status">Enable the camera to see your hand and its tracked joints.</p>
+      <p id="lab-preview-status">Starting camera and hand tracking...</p>
       <p>Draw directly over the video inside the enlarged yellow box. Pink: current stroke. Gray: previous stroke. Outside positions clamp to the box edges.</p>
     </main><aside class="lab-detections">
       <h2>Detections</h2><p id="lab-gate-reason" role="status"></p><div id="lab-gesture" aria-live="polite">Waiting for hand</div>
@@ -96,11 +103,32 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
   el<HTMLInputElement>("use3d").checked=experiment.use3d;
   el<HTMLSelectElement>("anchor").value=experiment.anchor;
 
+  el<HTMLInputElement>("min-points").checked=experiment.minStrokePointsEnabled;
+  el<HTMLInputElement>("min-length").checked=experiment.minStrokeLengthEnabled;
+  el<HTMLInputElement>("recognition-threshold").value=String(experiment.recognitionThreshold);
+  el<HTMLInputElement>("wanted-threshold").value=String(experiment.wantedRecognitionThreshold);
   let casts = 0, fizzles = 0, strokes = 0;
   const log = (text:string) => { const li=document.createElement("li");li.textContent=text;el("results").prepend(li);while(el("results").children.length>3)el("results").lastChild!.remove();};
   const reset = () => { cancelHandStroke(); current=[];completed=[];cursor=null;casts=0;fizzles=0;strokes=0;el("results").replaceChildren();state.lastRecog=null; };
   const stopReplay = () => {replayToken++;replay=false;setReplaying(false);reset();};
   const change = () => { if(replay) stopReplay(); else reset(); };
+  el<HTMLButtonElement>("save").onclick=async()=>{
+    const button=el<HTMLButtonElement>("save");button.disabled=true;el("save-status").textContent="Saving...";
+    try {
+      const {variant,anchor,timing,on,off,startFrames,endFrames,startMs,releaseMs,speedAssist,speedAssistRange,depthVeto,use3d,minStrokeLengthEnabled,minStrokePointsEnabled,recognitionThreshold,wantedRecognitionThreshold}=experiment;
+      const response=await fetch("/__pinch-config",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({variant,anchor,timing,on,off,startFrames,endFrames,startMs,releaseMs,speedAssist,speedAssistRange,depthVeto,use3d,minStrokeLengthEnabled,minStrokePointsEnabled,recognitionThreshold,wantedRecognitionThreshold})});
+      const result=await response.json();if(!response.ok)throw Error(result.error??"Save failed");
+      el("save-status").textContent="Saved to config/pinch.local.json. Reloads and new gameplay sessions use these defaults. No server restart needed.";
+    } catch(err){el("save-status").textContent=`Could not save: ${String(err)}`;}
+    finally{button.disabled=false;}
+  };
+  el<HTMLInputElement>("min-points").onchange=()=>{change();experiment.minStrokePointsEnabled=el<HTMLInputElement>("min-points").checked;};
+  el<HTMLInputElement>("min-length").onchange=()=>{change();experiment.minStrokeLengthEnabled=el<HTMLInputElement>("min-length").checked;};
+  for(const id of ["recognition-threshold","wanted-threshold"])el<HTMLInputElement>(id).onchange=()=>{
+    const input=el<HTMLInputElement>(id),key=id==="recognition-threshold"?"recognitionThreshold":"wantedRecognitionThreshold",value=Number(input.value);
+    if(!input.checkValidity()||!Number.isFinite(value)){input.value=String(experiment[key]);return;}
+    change();experiment[key]=value;
+  };
   el<HTMLSelectElement>("timing").onchange = () => {change();experiment.timing=el<HTMLSelectElement>("timing").value as typeof experiment.timing;syncTiming();};
   for(const id of ["begin","end"]) el<HTMLInputElement>(id).onchange=()=>{
     const input=el<HTMLInputElement>(id),value=Number(input.value);
@@ -135,11 +163,22 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
   el<HTMLSelectElement>("anchor").onchange = e => {change();experiment.anchor=(e.target as HTMLSelectElement).value as typeof experiment.anchor;};
 
   el<HTMLInputElement>("mirror").onchange = e => {change();state.mirror=(e.target as HTMLInputElement).checked;applyMirror();};
-  async function cameras() { const cams=await listCameras();el<HTMLSelectElement>("camera").replaceChildren(...cams.map((c,i)=>{const o=document.createElement("option");o.value=c.deviceId;o.textContent=c.label||`Camera ${i+1}`;return o;})); }
-  void cameras();
-  el("start").onclick = async () => {try {stopReplay();await startCamera(el<HTMLSelectElement>("camera").value||undefined);state.mode="hand";await initHandTracker();await cameras();message("Camera ready. Draw one of: — | V ^ O zigzag.");}catch(e){message(String(e));}};
-  el("stop").onclick = () => {stopCamera();reset();state.landmarks=null;state.handVisible=false;message("Camera stopped.");};
-  el<HTMLSelectElement>("camera").onchange = async () => {if(state.cameraOn){reset();try{await startCamera(el<HTMLSelectElement>("camera").value);}catch(e){message(String(e));}}};
+  async function cameras() {
+    const cams=await listCameras(), select=el<HTMLSelectElement>("camera");
+    const active=(video().srcObject as MediaStream|null)?.getVideoTracks()[0]?.getSettings().deviceId??select.value;
+    select.replaceChildren(...cams.map((c,i)=>{const o=document.createElement("option");o.value=c.deviceId;o.textContent=c.label||`Camera ${i+1}`;return o;}));
+    if(cams.some(c=>c.deviceId===active))select.value=active;
+  }
+  let cameraStarting=false;
+  async function startLiveCamera(){
+    if(cameraStarting)return;cameraStarting=true;el("retry-camera").hidden=true;
+    el<HTMLSelectElement>("camera").disabled=true;message("Starting camera and hand tracking...");
+    try{stopReplay();await startCamera(el<HTMLSelectElement>("camera").value||undefined);state.mode="hand";await initHandTracker();await cameras();message("Camera and hand tracking ready.");}
+    catch(e){message(String(e));el("retry-camera").hidden=false;}
+    finally{cameraStarting=false;el<HTMLSelectElement>("camera").disabled=false;}
+  }
+  el("retry-camera").onclick=()=>void startLiveCamera();
+  el<HTMLSelectElement>("camera").onchange=()=>void startLiveCamera();
   const poseSummary = () => {
     const stats=(v:number[])=>{if(!v.length)return "not sampled";const sorted=[...v].sort((a,b)=>a-b);return `${v.length} samples; ratio p10 ${sorted[Math.floor((v.length-1)*.1)].toFixed(3)}, median ${sorted[Math.floor((v.length-1)*.5)].toFixed(3)}, p90 ${sorted[Math.floor((v.length-1)*.9)].toFixed(3)}`;};
     el("pose-results").textContent=`Closed: ${stats(poses.closed)}\nOpen: ${stats(poses.open)}`;
@@ -172,7 +211,7 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
     if(e.type==="cursor")cursor=e.p;
     if(e.type==="strokeStart")current=[e.p];
     if(e.type==="strokePoint")current.push(e.p);
-    if(e.type==="strokeEnd"){completed=e.points;current=[];strokes++;if(e.points.length<INPUT.minStrokePoints)log("Ignored: too few points");}
+    if(e.type==="strokeEnd"){completed=e.points;current=[];strokes++;if(e.points.length<(experiment.minStrokePointsEnabled?INPUT.minStrokePoints:2))log("Ignored: too few points");}
     if(e.type==="symbol"){casts++;log(`CAST ${e.name} · similarity ${e.score.toFixed(3)}`);}
     if(e.type==="fizzle"){fizzles++;log(`REJECTED · best ${e.best?.name??"none"} ${e.best?.score.toFixed(3)??""}`);}
   });
@@ -203,14 +242,14 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
       if(i<observations.length)requestAnimationFrame(tick);else{
         // Explicit missing-hand tail completes a held final stroke without inventing an opening.
         const last=observations.at(-1)!;for(let dt=33;dt<=experiment.lostHandMs+100;dt+=33)processObservation({...last,t:last.t+dt,landmarks:null,world:null});
-        replay=false;message("Replay complete. Results remain visible; stop replay or enable camera to resume live input.");
+        replay=false;message("Replay complete. Results remain visible; stop replay to resume live input.");
       }};requestAnimationFrame(tick);
   };
   el("cancel").onclick=()=>{stopReplay();message("Replay stopped. Live input resumed if camera is enabled.");};
   el("clear").onclick=reset;
   const line=(pts:Pt[],color:string)=>{if(!pts.length)return;ctx.strokeStyle=color;ctx.lineWidth=5;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();};
   function draw(){requestAnimationFrame(draw);ctx.clearRect(0,0,1280,720);line(completed,"#a7b9b3");line(current,"#cf3976");
-    el<HTMLAnchorElement>("game").href=`/?pinch=${experiment.variant}&anchor=${experiment.anchor}&release=${experiment.releaseMs}&on=${experiment.on}&off=${experiment.off}&drawbox=wide&timing=${experiment.timing}&begin=${experiment.timing==="frames"?experiment.startFrames:experiment.startMs}&end=${experiment.timing==="frames"?experiment.endFrames:experiment.releaseMs}&calibrated=${experiment.calibrated}&speedAssist=${experiment.speedAssist}&speedRange=${experiment.speedAssistRange}&depthVeto=${experiment.depthVeto}&use3d=${experiment.use3d}`;
+    el<HTMLAnchorElement>("game").href=`/?pinch=${experiment.variant}&anchor=${experiment.anchor}&release=${experiment.releaseMs}&on=${experiment.on}&off=${experiment.off}&drawbox=wide&timing=${experiment.timing}&begin=${experiment.timing==="frames"?experiment.startFrames:experiment.startMs}&end=${experiment.timing==="frames"?experiment.endFrames:experiment.releaseMs}&calibrated=${experiment.calibrated}&speedAssist=${experiment.speedAssist}&speedRange=${experiment.speedAssistRange}&depthVeto=${experiment.depthVeto}&use3d=${experiment.use3d}&recognitionThreshold=${experiment.recognitionThreshold}&wantedRecognitionThreshold=${experiment.wantedRecognitionThreshold}&minStrokeLengthEnabled=${experiment.minStrokeLengthEnabled}&minStrokePointsEnabled=${experiment.minStrokePointsEnabled}`;
     if(cursor){ctx.fillStyle=state.inking?"#cf3976":"#257c81";ctx.beginPath();ctx.arc(cursor.x,cursor.y,9,0,Math.PI*2);ctx.fill();}
     const v=video(), liveVideo=state.cameraOn && v.readyState>=2 && !replaying;
     const width=liveVideo?v.videoWidth:640,height=liveVideo?v.videoHeight:480;
@@ -250,6 +289,8 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
     const on=experiment.on,off=pinchEngine.effectiveOff;
     const px=(ratio:number)=>pinchEngine.handSizePx===null?"-":(ratio*pinchEngine.handSizePx).toFixed(1);
     el("thresholds").textContent=[
+      `Stroke minimum: ${experiment.minStrokePointsEnabled?"8 points":"2 points (8-point check OFF)"}; path length ${experiment.minStrokeLengthEnabled?"40px":"OFF"}`,
+      `Symbol thresholds: ${experiment.recognitionThreshold.toFixed(2)} normal / ${experiment.wantedRecognitionThreshold.toFixed(2)} wanted`,
       `Thumb-index distance: ${pinchEngine.distancePx?.toFixed(1)??"-"} camera px`,
       `Hand size (wrist to middle knuckle): ${pinchEngine.handSizePx?.toFixed(1)??"-"} px`,
       `Raw 2D normalized distance: ${pinchEngine.rawRatio?.toFixed(4)??"-"}`,
@@ -267,7 +308,7 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
       ...(buffered?[`Trend release: ratio > ${pinchEngine.effectiveTrend.toFixed(3)} and rise > 0.060 / observation; sustained opening uses same release delay`,`History: ${experiment.historyMs} ms; prefix recovery: ${experiment.prefixMs} ms`]:[]),
       "All variants use thumb/index tips for pinch detection. Cursor anchor only changes position."
     ].join("\n");
-    el("preview-status").textContent=replaying?"Landmark replay / live video hidden (video is not recorded).":liveVideo?"Live camera / skeleton overlaid. Yellow dots: thumb and index tips. Yellow box: drawing area.":"Camera off. Enable the camera to see live video.";
+    el("preview-status").textContent=replaying?"Landmark replay / live video hidden (video is not recorded).":liveVideo?"Live camera / skeleton overlaid. Yellow dots: thumb and index tips. Yellow box: drawing area.":"Camera unavailable. Use Retry camera if access was denied or startup failed.";
     if(calibration){
       const remaining=Math.max(0,calibration.until-performance.now());
       el("sample-state").textContent=`Sampling ${calibration.kind}: ${(remaining/1000).toFixed(1)}s left`;
@@ -285,4 +326,5 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
     el("stats").textContent=`${experiment.version} · ${experiment.variant} · ${experiment.anchor} · ${replaying?"REPLAY":recording?"RECORDING":"LIVE"}\n2D raw ${pinchEngine.rawRatio?.toFixed(3)??"—"} · gated ${pinchEngine.ratio?.toFixed(3)??"—"} · 3D ${pinchEngine.ratio3?.toFixed(3)??"—"}\n${state.delegate||"—"} · ${state.trackerFps.toFixed(1)} observations/s · inference ${inferenceMs.toFixed(1)} ms · camera ${settings?.width??"—"}×${settings?.height??"—"} @ ${settings?.frameRate??"—"}\n${strokes} strokes · ${casts} casts · ${fizzles} rejected · ${samples.length} recorded observations\nLast: ${r?.name??r?.method??"—"} · similarity ${r?.score.toFixed(3)??"—"}\n${pinchEngine.decision}`;
 
   }requestAnimationFrame(draw);
+  void startLiveCamera();
 }

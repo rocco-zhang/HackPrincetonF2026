@@ -1,4 +1,4 @@
-import type { experiment } from "./pinchExperiment";
+import type { experiment } from "./pinchConfig";
 
 /** Local dev defaults only; reject invalid files rather than silently mixing settings. */
 export function parsePinchSettings(value: unknown): Partial<typeof experiment> {
@@ -18,6 +18,10 @@ export function parsePinchSettings(value: unknown): Partial<typeof experiment> {
     speedAssistRange: x => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= .3,
     depthVeto: x => typeof x === "boolean",
     use3d: x => typeof x === "boolean",
+    minStrokeLengthEnabled: x => typeof x === "boolean",
+    minStrokePointsEnabled: x => typeof x === "boolean",
+    recognitionThreshold: x => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1,
+    wantedRecognitionThreshold: x => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1,
   };
   for (const [key, entry] of Object.entries(v)) if (!rules[key]?.(entry)) throw Error(`Invalid pinch config setting: ${key}`);
   const on = typeof v.on === "number" ? v.on : .28;

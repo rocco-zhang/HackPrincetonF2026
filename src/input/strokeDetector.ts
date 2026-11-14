@@ -1,4 +1,5 @@
 import { INPUT } from "../config";
+import { experiment } from "./pinchConfig";
 import { emit, type InputEvent, type Pt } from "./events";
 
 /**
@@ -120,5 +121,5 @@ export class StrokeDetector {
 }
 
 export function isStrokeTooSmall(pts: { x: number; y: number }[]) {
-  return pts.length < INPUT.minStrokePoints || pathLength(pts) < INPUT.minStrokeLength;
+  return pts.length < 2 || (experiment.minStrokePointsEnabled && pts.length < INPUT.minStrokePoints) || (experiment.minStrokeLengthEnabled && pathLength(pts) < INPUT.minStrokeLength);
 }

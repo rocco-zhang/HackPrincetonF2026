@@ -24,6 +24,11 @@ import { experiment, type Variant } from "./input/pinchExperiment";
 
 if (import.meta.env.DEV) {
   Object.assign(experiment, __PINCH_LOCAL_CONFIG__);
+  try {
+    const response=await fetch("/__pinch-config",{cache:"no-store"});
+    if(!response.ok)throw Error("Could not load saved pinch settings");
+    Object.assign(experiment,await response.json());
+  } catch(err) {console.warn("Using startup pinch defaults",err);}
   const params = new URLSearchParams(location.search);
   if (params.get("drawbox") === "wide") state.drawBox={x0:.14,y0:.125,x1:.86,y1:.665};
   const variant = params.get("pinch");
@@ -42,11 +47,17 @@ if (import.meta.env.DEV) {
       }
     }
   }
+  for(const key of ["recognitionThreshold","wantedRecognitionThreshold"] as const){
+    const value=Number(params.get(key));
+    if(params.has(key)&&Number.isFinite(value)&&value>=0&&value<=1)experiment[key]=value;
+  }
   // Only explicit lab calibration is carried into gameplay; never infer thresholds from a match.
   if (params.has("speedAssist")) experiment.speedAssist=params.get("speedAssist")==="true";
   const speedRange=Number(params.get("speedRange"));
   if(params.has("speedRange")&&Number.isFinite(speedRange)&&speedRange>=0&&speedRange<=.3)experiment.speedAssistRange=speedRange;
   if (params.has("depthVeto")) experiment.depthVeto=params.get("depthVeto")!=="false";
+  if (params.has("minStrokePointsEnabled")) experiment.minStrokePointsEnabled=params.get("minStrokePointsEnabled")!=="false";
+  if (params.has("minStrokeLengthEnabled")) experiment.minStrokeLengthEnabled=params.get("minStrokeLengthEnabled")!=="false";
   if (params.has("use3d")) experiment.use3d=params.get("use3d")==="true";
   const on = Number(params.get("on")), off = Number(params.get("off"));
   if (on >= .05 && on <= .7 && off >= on + .1 && off <= .85) {experiment.on=on;experiment.off=off;experiment.calibrated=params.get("calibrated")==="true";}
@@ -93,6 +104,12 @@ function startArena(demo: boolean) {
 }
 
 const gate = document.getElementById("gate")!;
+if (import.meta.env.DEV) {
+  const labButton=document.createElement("button");
+  labButton.textContent="Input lab / pinch settings";labButton.className="secondary";
+  labButton.onclick=()=>{location.href="/dev/pinch";};
+  gate.insertBefore(labButton,document.getElementById("gateMsg"));
+}
 const gateMsg = document.getElementById("gateMsg")!;
 const enableBtn = document.getElementById("enable") as HTMLButtonElement;
 const mouseBtn = document.getElementById("mouseOnly") as HTMLButtonElement;

@@ -5,14 +5,10 @@ import { OneEuro2D } from "./oneEuro";
 import { PinchGate, StrokeDetector } from "./strokeDetector";
 import type { RecogResult } from "./recognizer";
 
-export type Variant = "A" | "B" | "C" | "D" | "E" | "F";
+import { experiment } from "./pinchConfig";
+export { experiment, type Variant } from "./pinchConfig";
 export type Observation = { t: number; landmarks: Landmark[] | null; world: Landmark[] | null; width: number; height: number };
-export const experiment = {
-  version: "pinch-v1", variant: "A" as Variant, anchor: "knuckle" as "knuckle" | "tip" | "thumb" | "pinch",
-  timing: "time" as "time" | "frames", startFrames: 2, endFrames: 3, calibrated: false,
-  releaseMs: 80, startMs: 30, lostHandMs: 300, historyMs: 750, prefixMs: 80,
-  on: INPUT.pinchOn, off: INPUT.pinchOff, speedAssist: false, speedAssistRange: .08, depthVeto: true, use3d: false,
-};
+
 /** Same normalized signal for live segmentation and explicit calibration. No 2D fallback in 3D mode. */
 export function calibrationRatio(o: Observation): number | null {
   const points=experiment.use3d?o.world:o.landmarks;

@@ -4,6 +4,7 @@
 //  2. Straight lines are classified by angle before $1, since $1's
 //     scale-to-square blows up the noise of a 1D stroke.
 import { RECOG } from "../config";
+import { experiment } from "./pinchConfig";
 import { SYMBOLS, type SymbolName } from "./events";
 import { syntheticTemplates, type XY } from "./shapes";
 import { isStrokeTooSmall, pathLength } from "./strokeDetector";
@@ -189,7 +190,7 @@ export class Recognizer {
    * `wanted` = symbols that would hit something right now. They are tried first with a
    * lower bar (RECOG.acceptScoreWanted); if none fits, the stroke is matched against everything.
    */
-  recognize(raw: XY[], wanted: readonly SymbolName[] = [], accept = RECOG.acceptScore): RecogResult {
+  recognize(raw: XY[], wanted: readonly SymbolName[] = [], accept = experiment.recognitionThreshold): RecogResult {
     if (raw.length < 2 || isStrokeTooSmall(raw)) {
       return { name: null, score: 0, accepted: false, method: "tooSmall", resampled: [] };
     }
@@ -220,7 +221,7 @@ export class Recognizer {
     };
     const w = pick(wanted);
     const overall = pick(bestD.keys());
-    if (w.name && w.score >= RECOG.acceptScoreWanted && w.score >= overall.score - RECOG.wantedMargin) {
+    if (w.name && w.score >= experiment.wantedRecognitionThreshold && w.score >= overall.score - RECOG.wantedMargin) {
       return { name: w.name, score: w.score, accepted: true, method: "dollar", best: { name: w.name, score: w.score }, resampled: cand };
     }
     const { name: bestName, score } = overall;

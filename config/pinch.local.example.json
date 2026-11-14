@@ -9,5 +9,9 @@
   "timing": "frames",
   "startFrames": 1,
   "endFrames": 1,
-  "anchor": "thumb"
+  "anchor": "thumb",
+  "minStrokeLengthEnabled": false,
+  "minStrokePointsEnabled": false,
+  "recognitionThreshold": 0.76,
+  "wantedRecognitionThreshold": 0.55
 }

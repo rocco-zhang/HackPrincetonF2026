@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import { INPUT, RECOG } from "../config";
+import { INPUT } from "../config";
 import { state } from "../state";
 import { video } from "./camera";
 import { SYMBOLS } from "./events";
@@ -106,8 +106,9 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
       `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   3D: ${state.pinchRatio3d?.toFixed(2) ?? "-"} (veto > ${INPUT.pinch3dMax})   inking: ${state.inking}`,
       `ASL: ${state.aslActive || state.aslTraining ? `reading ${state.aslLetter ?? "-"} (${state.aslSource ?? "-"} ${(state.aslConfidence * 100).toFixed(0)}%)  hold ${(state.aslProgress * 100).toFixed(0)}%` : "off (A on the title screen)"}`,
       r
-        ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${RECOG.acceptScore}, ≥ ${RECOG.acceptScoreWanted} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
+        ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${experiment.recognitionThreshold}, ≥ ${experiment.wantedRecognitionThreshold} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
         : "last: -",
+      `stroke: ${state.lastStroke?.length ?? 0} captured points after trimming (minimum ${experiment.minStrokePointsEnabled?INPUT.minStrokePoints:2}); length minimum ${experiment.minStrokeLengthEnabled?`${INPUT.minStrokeLength}px`:"OFF"}; thumbnail: ${r?.resampled.length ?? 0} resampled points`,
       `templates: ${SYMBOLS.filter((n) => n !== "hline" && n !== "vline").map((n) => `${n} ${recognizer?.count(n) ?? 0}`).join("  ")}  (lines: angle rule)`,
       `keys: D debug · T record · M mouse/hand · K calibrate · C camera · F mirror · G demo`,
     ];
