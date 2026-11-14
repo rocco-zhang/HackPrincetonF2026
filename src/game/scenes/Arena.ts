@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { ARENA, GAME } from "../../config";
 import { onInput, type SymbolName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
+import { state } from "../../state";
 import { Monster } from "../entities/Monster";
 import { Player } from "../entities/Player";
 import { MONSTER_PALETTES, SYMBOL_COLOR } from "../palette";
@@ -61,7 +62,10 @@ export class Arena extends Phaser.Scene implements CastHost {
         case "fizzle": if (this.phase !== "over") this.casting.onFizzle(e.points); return;
       }
     });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      off();
+      state.wanted = [];
+    });
     this.input.keyboard?.on("keydown-ESC", () => this.scene.start("Title"));
 
     this.startWave(1);
@@ -102,10 +106,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     const dt = Math.min(0.05, deltaMs / 1000);
     this.casting.update(dt);
     this.hud.update(this.score);
+    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as SymbolName[];
+    state.wanted = this.phase === "over" ? [] : fronts;
     if (this.phase === "over") return;
 
     if (this.phase === "play") {
-      const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as SymbolName[];
       for (const o of this.spawner.update(dt, fronts)) this.spawn(o);
     }
 

@@ -21,7 +21,7 @@ Everything runs in the browser. There is no backend. The hand model (`public/mod
 
 ## How to play
 
-- **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor is the midpoint between the two fingertips.
+- **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release.
 - **Mouse:** drag to draw, release to cast.
 - **Start / restart:** pinch and hold (or hold the mouse button, or press Space).
 - **Symbols:**
@@ -106,9 +106,10 @@ src/
 
 ## Decisions and known gaps
 
-- **Not yet verified on a real hand.** The build machine had no webcam in the loop. The MediaPipe model loads locally on the GPU delegate in ~150 ms, and the whole game was play-tested with simulated mouse strokes. But pinch thresholds (`INPUT.pinchOn` 0.35 / `pinchOff` 0.5), One Euro parameters (`minCutoff` 1.0, `beta` 0.01) and the default drawing box all need tuning on a real webcam. Use `D` to see the live pinch ratio.
-- **The cursor is always the thumb–index midpoint**, not just while pinched. This avoids a jump in the cursor when the pinch closes. The first and last 3 points of each hand stroke are trimmed before recognition.
-- **The recognizer is \$1 without rotation invariance.** It searches only ±15° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
+- **Not yet verified on a real hand.** The build machine had no webcam in the loop. The MediaPipe model loads locally on the GPU delegate in ~150 ms, and the whole game was play-tested with simulated mouse strokes. But pinch thresholds (`INPUT.pinchOn` 0.35 / `pinchOff` 0.6, plus a 180 ms release grace period), One Euro parameters (`minCutoff` 1.0, `beta` 0.01) and the default drawing box all need tuning on a real webcam. Use `D` to see the live pinch ratio.
+- **The cursor follows the index-finger base knuckle** (`INPUT.cursorAnchor: "knuckle"`), which does not move when the fingers pinch or open. Set it to `"pinch"` for the thumb–index midpoint instead. A release has to last 180 ms (300 ms if the hand is lost) before a stroke ends, and the stroke is cut back to where the release began. The first and last 3 points of each hand stroke are also trimmed.
+- **Symbols a Hollow currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
+- **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
 - **Art and sound are procedural** (canvas drawing and Web Audio oscillators). There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
 - **The webcam feed sits faintly behind the whole arena** (22% opacity), with a full preview in the debug overlay.
 - **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.

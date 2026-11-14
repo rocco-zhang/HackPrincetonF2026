@@ -124,7 +124,10 @@ function distanceAtBestAngle(pts: XY[], tmpl: XY[], tolDeg: number) {
 }
 
 /** Straight-line check: high chord/path ratio and a thin principal-axis spread. */
-export function lineCheck(pts: XY[]): { kind: "hline" | "vline" | "diagonal"; straightness: number } | null {
+export function lineCheck(
+  pts: XY[],
+  wanted: readonly SymbolName[] = [],
+): { kind: "hline" | "vline" | "diagonal"; straightness: number } | null {
   // coarse resample so per-frame jitter doesn't inflate the path length
   const L = pathLength(resample(pts, 12));
   if (L === 0) return null;
@@ -152,8 +155,12 @@ export function lineCheck(pts: XY[]): { kind: "hline" | "vline" | "diagonal"; st
   if (l1 <= 0 || Math.sqrt(l2 / l1) > RECOG.lineThinness) return null;
 
   const angle = (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI; // 0 = horizontal, 90 = vertical
-  const tol = RECOG.lineAngleTolerance;
-  const kind = angle <= tol ? "hline" : angle >= 90 - tol ? "vline" : "diagonal";
+  // A slanted line is ambiguous on its own, but not when only one of dash / pillar is needed.
+  const wantH = wanted.includes("hline");
+  const wantV = wanted.includes("vline");
+  const tolH = wantH && !wantV ? RECOG.lineAngleToleranceWanted : wantH && wantV ? 45 : RECOG.lineAngleTolerance;
+  const tolV = wantV && !wantH ? RECOG.lineAngleToleranceWanted : wantH && wantV ? 45 : RECOG.lineAngleTolerance;
+  const kind = angle <= tolH ? "hline" : angle >= 90 - tolV ? "vline" : "diagonal";
   return { kind, straightness };
 }
 
@@ -178,11 +185,15 @@ export class Recognizer {
     return this.templates.filter((t) => t.name === name && (!source || t.source === source)).length;
   }
 
-  recognize(raw: XY[], accept = RECOG.acceptScore): RecogResult {
+  /**
+   * `wanted` = symbols that would hit something right now. They are tried first with a
+   * lower bar (RECOG.acceptScoreWanted); if none fits, the stroke is matched against everything.
+   */
+  recognize(raw: XY[], wanted: readonly SymbolName[] = [], accept = RECOG.acceptScore): RecogResult {
     if (raw.length < 2 || isStrokeTooSmall(raw)) {
       return { name: null, score: 0, accepted: false, method: "tooSmall", resampled: [] };
     }
-    const line = lineCheck(raw);
+    const line = lineCheck(raw, wanted);
     if (line) {
       const resampled = resample(raw);
       if (line.kind === "diagonal") {
@@ -193,17 +204,27 @@ export class Recognizer {
     }
 
     const cand = normalize(raw);
-    let bestD = Infinity;
-    let bestName: SymbolName | null = null;
+    const bestD = new Map<SymbolName, number>();
     for (const t of this.templates) {
       const d = distanceAtBestAngle(cand, t.points, RECOG.rotationTolerance);
-      if (d < bestD) {
-        bestD = d;
-        bestName = t.name;
-      }
+      if (d < (bestD.get(t.name) ?? Infinity)) bestD.set(t.name, d);
     }
+    const pick = (names: Iterable<SymbolName>) => {
+      let name: SymbolName | null = null;
+      let d = Infinity;
+      for (const n of names) {
+        const dn = bestD.get(n);
+        if (dn !== undefined && dn < d) [name, d] = [n, dn];
+      }
+      return { name, score: Math.max(0, 1 - d / HALF_DIAG) };
+    };
+    const w = pick(wanted);
+    const overall = pick(bestD.keys());
+    if (w.name && w.score >= RECOG.acceptScoreWanted && w.score >= overall.score - RECOG.wantedMargin) {
+      return { name: w.name, score: w.score, accepted: true, method: "dollar", best: { name: w.name, score: w.score }, resampled: cand };
+    }
+    const { name: bestName, score } = overall;
     if (!bestName) return { name: null, score: 0, accepted: false, method: "dollar", resampled: cand };
-    const score = Math.max(0, 1 - bestD / HALF_DIAG);
     const accepted = score >= accept;
     return {
       name: accepted ? bestName : null,

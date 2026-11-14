@@ -102,7 +102,7 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
       `tracker fps: ${state.trackerFps.toFixed(0)}   game fps: ${game ? game.loop.actualFps.toFixed(0) : "-"}`,
       `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   inking: ${state.inking}`,
       r
-        ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${RECOG.acceptScore})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
+        ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${RECOG.acceptScore}, ≥ ${RECOG.acceptScoreWanted} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`
         : "last: -",
       `templates: ${SYMBOLS.filter((n) => n !== "hline" && n !== "vline").map((n) => `${n} ${recognizer?.count(n) ?? 0}`).join("  ")}  (lines: angle rule)`,
       `keys: D debug · T record · M mouse/hand · K calibrate · C camera · F mirror · G demo`,

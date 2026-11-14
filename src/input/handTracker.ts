@@ -128,8 +128,9 @@ function loop() {
     state.landmarks = null;
     state.handVisible = false;
     state.pinchRatio = null;
-    state.inking = gate.update(null);
-    if (handActive && lastP) strokes.update(lastP, state.inking);
+    state.inking = gate.update(null, now);
+    if (!state.inking) strokes.finish(gate.releasedAt);
+    else if (handActive && lastP) strokes.update(lastP, true);
     if (calib && now > calib.until) finishCalibration();
     return;
   }
@@ -141,12 +142,15 @@ function loop() {
   const handSize = dist(lm[0], lm[9], vw, vh);
   const ratio = handSize > 0 ? dist(lm[4], lm[8], vw, vh) / handSize : null;
   state.pinchRatio = ratio;
-  state.inking = gate.update(ratio);
+  state.inking = gate.update(ratio, now);
+  // cut the stroke back to where the (debounced) release began
+  if (!state.inking) strokes.finish(gate.releasedAt);
 
-  // Cursor = midpoint of thumb tip and index tip. Using it all the time (not only
-  // while pinched) avoids a jump when the pinch closes and the index tip moves.
-  let nx = (lm[4].x + lm[8].x) / 2;
-  const ny = (lm[4].y + lm[8].y) / 2;
+  // Cursor anchor: see INPUT.cursorAnchor. The same point is used whether or not the
+  // hand is pinched, so the cursor doesn't jump when inking starts.
+  const knuckle = INPUT.cursorAnchor === "knuckle";
+  let nx = knuckle ? lm[5].x : (lm[4].x + lm[8].x) / 2;
+  const ny = knuckle ? lm[5].y : (lm[4].y + lm[8].y) / 2;
   if (state.mirror) nx = 1 - nx;
 
   if (calib) {

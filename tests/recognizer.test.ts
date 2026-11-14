@@ -62,6 +62,34 @@ describe("recognizer", () => {
     expect(rec.recognize(tiny).method).toBe("tooSmall");
   });
 
+  it("resolves a slanted line when only one of dash / pillar is needed", () => {
+    const diag: XY[] = Array.from({ length: 30 }, (_, i) => ({ x: i * 10, y: i * 10 }));
+    expect(rec.recognize(diag, ["hline"]).name).toBe("hline");
+    expect(rec.recognize(diag, ["vline", "circle"]).name).toBe("vline");
+    expect(rec.recognize(diag, ["v"]).accepted).toBe(false);
+  });
+
+  it("accepts sloppier strokes for a needed symbol, without stealing clear other symbols", () => {
+    const sloppy = (name: SymbolName, seed: number) => {
+      const rand = mulberry32(seed);
+      return BASE_SHAPES[name].flatMap((base) =>
+        Array.from({ length: 12 }, () =>
+          jitteredStroke(base, rand, { size: 250, scaleJitter: 0.4, rotJitterDeg: 22, vertexJitter: 0.16, pointNoise: 0.03, points: 40 }),
+        ),
+      );
+    };
+    for (const name of ["v", "caret", "circle", "zigzag"] as SymbolName[]) {
+      const strokes = sloppy(name, 500 + SYMBOLS.indexOf(name));
+      const plain = strokes.filter((s) => rec.recognize(s).name === name).length;
+      const helped = strokes.filter((s) => rec.recognize(s, [name]).name === name).length;
+      expect(helped, name).toBeGreaterThanOrEqual(plain);
+      expect(helped / strokes.length, `${name} with context`).toBeGreaterThanOrEqual(0.9);
+    }
+    // a clean ring is still a ring when only a vee is needed
+    for (const s of testStrokes("circle", 9)) expect(rec.recognize(s, ["v"]).name).not.toBe("v");
+    for (const s of testStrokes("caret", 9)) expect(rec.recognize(s, ["v"]).name).not.toBe("v");
+  });
+
   it("mostly fizzles random scribbles", () => {
     const rand = mulberry32(42);
     let fizzles = 0;

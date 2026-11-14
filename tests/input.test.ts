@@ -62,6 +62,30 @@ describe("PinchGate", () => {
     expect(g.inking).toBe(false);
   });
 
+  it("with timestamps, a release must last releaseMs and reports when it began", () => {
+    const g = new PinchGate(0.35, 0.5, 2, 3, 180, 300);
+    g.update(0.2, 0);
+    g.update(0.2, 33);
+    expect(g.inking).toBe(true);
+    // a 4-frame (~130 ms) blur mid-stroke does not end it
+    for (const t of [66, 100, 133, 166]) expect(g.update(0.9, t)).toBe(true);
+    expect(g.update(0.2, 200)).toBe(true);
+    // a real release ends it after 180 ms, dated to its first frame
+    for (const t of [233, 266, 300, 333, 366, 400]) g.update(0.9, t);
+    expect(g.inking).toBe(true);
+    expect(g.update(0.9, 433)).toBe(false);
+    expect(g.releasedAt).toBe(233);
+  });
+
+  it("with timestamps, a lost hand gets the longer lostHandMs grace", () => {
+    const g = new PinchGate(0.35, 0.5, 2, 3, 180, 300);
+    g.update(0.2, 0);
+    g.update(0.2, 33);
+    for (const t of [66, 100, 200, 300]) expect(g.update(null, t)).toBe(true);
+    expect(g.update(null, 366)).toBe(false);
+    expect(g.releasedAt).toBe(66);
+  });
+
   it("does not start in the hysteresis band", () => {
     const g = new PinchGate(0.35, 0.5, 2, 3);
     for (let i = 0; i < 10; i++) g.update(0.4);
@@ -70,6 +94,15 @@ describe("PinchGate", () => {
 });
 
 describe("StrokeDetector", () => {
+  it("cuts the stroke back to the release time", () => {
+    const events: InputEvent[] = [];
+    const sd = new StrokeDetector(0, (e) => events.push(e));
+    for (let i = 0; i < 20; i++) sd.update({ x: i * 10, y: 0, t: i * 33 }, true);
+    sd.finish(14 * 33);
+    const end = events[events.length - 1];
+    expect(end.type === "strokeEnd" && end.points.length).toBe(15);
+  });
+
   it("emits start/points/end and trims the ends", () => {
     const events: InputEvent[] = [];
     const sd = new StrokeDetector(3, (e) => events.push(e));

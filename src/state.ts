@@ -23,6 +23,8 @@ export const state = {
   calibrating: false,
   lastStroke: null as { x: number; y: number }[] | null,
   lastRecog: null as RecogResult | null,
+  /** Symbols a Hollow currently needs; the recognizer favours these. Empty outside the arena. */
+  wanted: [] as SymbolName[],
   recorder: { active: false, symbol: "circle" as SymbolName },
   demo: false,
 };

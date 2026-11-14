@@ -5,9 +5,16 @@ export const ARENA = { width: 1280, height: 720 } as const;
 export const INPUT = {
   // pinch = dist(thumb tip, index tip) / dist(wrist, middle-finger base)
   pinchOn: 0.35,
-  pinchOff: 0.5,
+  pinchOff: 0.6,
   framesToStart: 2,
   framesToStop: 3,
+  // A release must also last this long before the stroke ends, so blurred or dropped
+  // frames mid-stroke don't cut it. The stroke is cut back to where the release began.
+  releaseMs: 180,
+  lostHandMs: 300,
+  // What the cursor follows. "knuckle" (index-finger base) stays put while the fingers
+  // pinch and open; "pinch" (thumb/index-tip midpoint) is closer to the fingertip but hooks strokes.
+  cursorAnchor: "knuckle" as "knuckle" | "pinch",
   // One Euro filter on the cursor (game pixels, seconds)
   euroMinCutoff: 1.0,
   euroBeta: 0.01,
@@ -25,13 +32,18 @@ export const INPUT = {
 };
 
 export const RECOG = {
-  acceptScore: 0.8,
+  acceptScore: 0.76,
+  // lower bar when matching only against symbols a Hollow currently needs
+  acceptScoreWanted: 0.55,
+  // ...but only if it scores within this much of the best match overall, so a clear ring stays a ring
+  wantedMargin: 0.08,
   // straight-line special case
-  lineStraightness: 0.9, // chord / path length
-  lineThinness: 0.22, // minor / major spread (PCA)
-  lineAngleTolerance: 25, // degrees from horizontal / vertical
+  lineStraightness: 0.86, // chord / path length
+  lineThinness: 0.28, // minor / major spread (PCA)
+  lineAngleTolerance: 35, // degrees from horizontal / vertical
+  lineAngleToleranceWanted: 55, // when only one of dash / pillar is needed
   // small rotation tolerance for $1 (orientation-sensitive otherwise)
-  rotationTolerance: 15, // degrees
+  rotationTolerance: 25, // degrees
 };
 
 export const GAME = {

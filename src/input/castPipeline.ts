@@ -45,7 +45,7 @@ export function initCastPipeline() {
       return;
     }
 
-    const r = recognizer.recognize(pts);
+    const r = recognizer.recognize(pts, state.wanted);
     state.lastRecog = r;
     // after every listener has seen this strokeEnd
     queueMicrotask(() => {

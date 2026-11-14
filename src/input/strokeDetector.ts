@@ -1,37 +1,59 @@
 import { INPUT } from "../config";
 import { emit, type InputEvent, type Pt } from "./events";
 
-/** Pinch on/off with hysteresis + frame debounce. `ratio` is null when no hand is visible. */
+/**
+ * Pinch on/off with hysteresis + frame debounce. `ratio` is null when no hand is visible.
+ * When `now` (ms) is passed, a release must also last `releaseMs` (`lostHandMs` if the hand
+ * vanished) before inking stops; `releasedAt` is then when that release began.
+ */
 export class PinchGate {
   inking = false;
+  releasedAt: number | null = null;
   private streak = 0;
+  private since: number | null = null;
 
   constructor(
     public onRatio = INPUT.pinchOn,
     public offRatio = INPUT.pinchOff,
     public framesToStart = INPUT.framesToStart,
     public framesToStop = INPUT.framesToStop,
+    public releaseMs = INPUT.releaseMs,
+    public lostHandMs = INPUT.lostHandMs,
   ) {}
 
-  update(ratio: number | null): boolean {
+  update(ratio: number | null, now?: number): boolean {
     const wantsChange = this.inking
       ? ratio === null || ratio > this.offRatio
       : ratio !== null && ratio < this.onRatio;
-    if (wantsChange) {
-      this.streak++;
-      if (this.streak >= (this.inking ? this.framesToStop : this.framesToStart)) {
-        this.inking = !this.inking;
-        this.streak = 0;
-      }
-    } else {
+    if (!wantsChange) {
       this.streak = 0;
+      this.since = null;
+      return this.inking;
+    }
+    this.streak++;
+    if (this.since === null) this.since = now ?? null;
+    if (this.inking) {
+      const waited = now === undefined || this.since === null ? Infinity : now - this.since;
+      if (this.streak >= this.framesToStop && waited >= (ratio === null ? this.lostHandMs : this.releaseMs)) {
+        this.inking = false;
+        this.releasedAt = this.since;
+        this.streak = 0;
+        this.since = null;
+      }
+    } else if (this.streak >= this.framesToStart) {
+      this.inking = true;
+      this.releasedAt = null;
+      this.streak = 0;
+      this.since = null;
     }
     return this.inking;
   }
 
   reset() {
     this.inking = false;
+    this.releasedAt = null;
     this.streak = 0;
+    this.since = null;
   }
 }
 
@@ -70,11 +92,16 @@ export class StrokeDetector {
     }
   }
 
-  finish() {
+  /** End the stroke. `cutoffT` drops points drawn after that time (the start of a debounced release). */
+  finish(cutoffT?: number | null) {
     if (!this.active) return;
     this.active = false;
     let pts = this.points;
     this.points = [];
+    if (cutoffT != null) {
+      const kept = pts.filter((p) => p.t <= cutoffT);
+      if (kept.length >= 2) pts = kept;
+    }
     if (this.trim > 0 && pts.length > this.trim * 2 + INPUT.minStrokePoints) {
       pts = pts.slice(this.trim, pts.length - this.trim);
     }
