@@ -208,7 +208,9 @@ body {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) rotate(-0.6deg);
-  width: min(560px, calc(100vw - 32px));
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   padding: 22px 28px 20px;
   background: #fffefa;
   border: 2.5px solid #33312e;
@@ -241,7 +243,7 @@ body {
   color: #d7372f;
 }
 
-#lobbyActions,
+.lobbyRow,
 #lobbyFoot {
   display: flex;
   gap: 12px;
@@ -255,7 +257,8 @@ body {
 }
 
 #lobby button,
-#lobbyCode {
+#lobbyCode,
+#lobbyName {
   font: inherit;
   font-size: 20px;
   color: #33312e;
@@ -285,7 +288,105 @@ body {
 }
 
 #lobby button:focus-visible,
-#lobbyCode:focus-visible {
+#lobbyCode:focus-visible,
+#lobbyName:focus-visible {
   outline: 3px dashed #d7372f;
   outline-offset: 4px;
+}
+
+#lobbyMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#lobbyNameRow {
+  font-size: 18px;
+}
+
+#lobbyName {
+  width: 9em;
+  margin-left: 6px;
+  padding: 6px 12px;
+  font-size: 18px;
+  background: #fffefa;
+}
+
+#lobby button.small {
+  padding: 3px 12px;
+  font-size: 15px;
+  box-shadow: none;
+}
+
+#lobby button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* open public games: a list on lined paper */
+#lobbyRooms {
+  text-align: left;
+  border-top: 2px dashed #33312e55;
+  border-bottom: 2px dashed #33312e55;
+  padding: 10px 2px;
+}
+
+#lobbyRoomsHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+#lobbyRoomList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#lobbyRoomList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-bottom: 1px solid #8fb3d955;
+  font-size: 18px;
+}
+
+#lobbyRoomList li.empty {
+  color: #8a857a;
+  font-size: 16px;
+  justify-content: center;
+  border-bottom: none;
+}
+
+#lobbyRoomList .roomName {
+  flex: 1;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#lobbyRoomList .roomMode {
+  color: #8a857a;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+#lobbyRoomList .roomBusy {
+  color: #8a857a;
+  font-size: 15px;
+  font-style: italic;
+  min-width: 4.4em;
+  text-align: center;
+}
+
+#lobbyPrivate {
+  font-size: 16px;
+  color: #8a857a;
 }

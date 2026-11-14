@@ -274,8 +274,8 @@ export class Title extends Phaser.Scene {
       pvp.active ? `Versus  ·  ${mode} mode${pvp.isHost ? "  ·  A: change mode" : " (the host picks)"}  ·  V: connection`
       : lang ? "Languages mode  ·  Korean, then Japanese, then short words  ·  A: drawing mode"
       : math ? "Math mode  ·  draw the digits  ·  addition, then − × ÷, then harder  ·  A: languages"
-      : asl ? "ASL mode  ·  R: teach it your own hand  ·  A: math mode  ·  V: versus a friend"
-      : "Drawing mode  ·  A: ASL mode  ·  V: versus a friend",
+      : asl ? "ASL mode  ·  R: teach it your own hand  ·  A: math mode  ·  V: versus"
+      : "Drawing mode  ·  A: ASL mode  ·  V: versus",
     );
   }
 

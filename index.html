@@ -20,13 +20,27 @@
       </div>
     </div>
     <div id="lobby" hidden>
-      <h2>Play versus a friend</h2>
+      <h2>Versus</h2>
       <p id="lobbyStatus"></p>
-      <div id="lobbyActions">
-        <button id="lobbyHost">Host a game</button>
-        <span>or</span>
-        <input id="lobbyCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Friend's four-letter code" />
-        <button id="lobbyJoin">Join</button>
+      <div id="lobbyMenu">
+        <label id="lobbyNameRow">Your name <input id="lobbyName" maxlength="16" autocomplete="off" spellcheck="false" /></label>
+        <div class="lobbyRow">
+          <button id="lobbyQuick">Quick match</button>
+          <button id="lobbyHostPublic" class="secondary">Host a public game</button>
+        </div>
+        <div id="lobbyRooms">
+          <div id="lobbyRoomsHead">
+            <span>Open games</span>
+            <button id="lobbyRefresh" class="secondary small">Refresh</button>
+          </div>
+          <ul id="lobbyRoomList"></ul>
+        </div>
+        <div class="lobbyRow" id="lobbyPrivate">
+          <button id="lobbyHost" class="secondary">Host a private game</button>
+          <span>or join a code</span>
+          <input id="lobbyCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Friend's four-letter code" />
+          <button id="lobbyJoin" class="secondary">Join</button>
+        </div>
       </div>
       <div id="lobbyFoot">
         <button id="lobbyLeave" class="secondary">Disconnect</button>

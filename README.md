@@ -79,19 +79,21 @@ Press `A` until the title says **Languages mode**. Wave 1 is five Korean letters
 
 ### Versus mode (two computers)
 
-Both players open the game, and on the title screen press `V`.
+Both players open the game, and on the title screen press `V` to open the lobby. Set your name there, then find an opponent one of three ways:
 
-1. One player clicks **Host a game** and reads out the four-letter code.
-2. The other types the code and clicks **Join**.
-3. Both hold to start (pinch, mouse button or Space). The round begins when both are ready.
+- **Quick match** joins an open public game, preferring one with your mode and difficulty. If nobody is waiting, it hosts one and keeps looking, so two people who press it at the same time still find each other.
+- **Open games** lists every public game with its host, mode and difficulty. Click **Join** on one, or click **Host a public game** to list your own.
+- **Host a private game** gives a four-letter code to read out; the other player types it and clicks **Join**.
+
+Once connected, both hold to start (pinch, mouse button or Space). The round begins when both are ready.
 
 - Each player has their own arena. Killing monsters sends extra monsters to your opponent: every two kills sends one, and multi-hits send more.
 - The opponent's hearts, score and wave are shown under your hearts. Whoever runs out of hearts first loses.
-- Both play the same mode. The host chooses drawing, ASL, math, or languages with `A`, and the guest's game follows.
+- Both play the same mode and difficulty. The host chooses drawing, ASL, math, or languages with `A` and the difficulty with `1`–`3`, and the guest's game follows.
 - Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
 - After a round, hold to return to the title screen and ready up again for a rematch.
 
-The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results.
+The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results. Without a server, the lobby works by giving public games a fixed set of 12 broker ids: hosting claims a free one, and the lobby lists games by briefly connecting to each id and asking who's there. So at most 12 public games run at once; private games aren't limited.
 
 ### Hotkeys
 
