@@ -201,3 +201,91 @@ body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* "play versus a friend" panel: a sheet of paper on top of the game */
+#lobby {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-0.6deg);
+  width: min(560px, calc(100vw - 32px));
+  padding: 22px 28px 20px;
+  background: #fffefa;
+  border: 2.5px solid #33312e;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  box-shadow: 6px 9px 0 #281e0a33;
+  text-align: center;
+  z-index: 30;
+  user-select: text;
+}
+
+#lobby[hidden],
+#lobby [hidden] {
+  display: none;
+}
+
+#lobby h2 {
+  margin: 0 0 8px;
+  font-family: "Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive;
+  font-weight: 400;
+  font-size: 34px;
+}
+
+#lobbyStatus {
+  min-height: 2.6em;
+  margin: 0 0 14px;
+  font-size: 19px;
+}
+
+#lobbyStatus.error {
+  color: #d7372f;
+}
+
+#lobbyActions,
+#lobbyFoot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#lobbyFoot {
+  margin-top: 16px;
+}
+
+#lobby button,
+#lobbyCode {
+  font: inherit;
+  font-size: 20px;
+  color: #33312e;
+  padding: 8px 18px;
+  border: 2.5px solid #33312e;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+#lobby button {
+  cursor: pointer;
+  background: #ffe95c;
+  box-shadow: 2px 3px 0 #281e0a33;
+}
+
+#lobby button.secondary {
+  background: #fffefa;
+  border-width: 2px;
+  font-size: 17px;
+}
+
+#lobbyCode {
+  width: 5.2em;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  background: #fffefa;
+}
+
+#lobby button:focus-visible,
+#lobbyCode:focus-visible {
+  outline: 3px dashed #d7372f;
+  outline-offset: 4px;
+}

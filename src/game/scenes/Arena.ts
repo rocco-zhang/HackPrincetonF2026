@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { ARENA, GAME } from "../../config";
 import { castLabel, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
+import { pvp } from "../../net/pvp";
 import { state } from "../../state";
 import { Monster } from "../entities/Monster";
 import { Player } from "../entities/Player";
@@ -28,6 +29,10 @@ export class Arena extends Phaser.Scene implements CastHost {
   private phase: "banner" | "play" | "over" = "banner";
   private demo = false;
   private asl = false;
+  private versus = false;
+  private charge = 0; // versus: builds up with kills; each whole point sends a monster
+  private lastStatus = 0;
+  private themText: Phaser.GameObjects.Text | null = null;
   private aslCards = new Map<CastName, Phaser.GameObjects.Image>();
   private aslText: Phaser.GameObjects.Text | null = null;
   private aslBar: Phaser.GameObjects.Graphics | null = null;
@@ -36,9 +41,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     super("Arena");
   }
 
-  init(data: { demo?: boolean; asl?: boolean }) {
+  init(data: { demo?: boolean; asl?: boolean; pvp?: boolean }) {
     this.asl = !!data?.asl;
-    this.demo = !!data?.demo && !this.asl;
+    this.versus = !!data?.pvp;
+    this.charge = 0;
+    this.demo = !!data?.demo && !this.asl && !this.versus;
     this.monsters = [];
     this.hearts = GAME.hearts;
     this.score = 0;
@@ -58,6 +65,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     // ASL rounds are slower: finding a handshape takes longer than drawing a line
     this.spawner = new Spawner(this.demo ? mulberry32(DEMO_SEED) : Math.random, this.asl ? 0.7 : this.demo ? 0.85 : 1, this.asl ? aslPool : symbolPool);
     state.aslActive = this.asl;
+    this.themText = null;
+    if (this.versus) this.setupVersus();
     this.aslCards = new Map();
     this.aslText = this.aslBar = null;
     if (this.asl) {
@@ -83,7 +92,10 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.wanted = [];
       state.aslActive = false;
     });
-    this.input.keyboard?.on("keydown-ESC", () => this.scene.start("Title"));
+    this.input.keyboard?.on("keydown-ESC", () => {
+      if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
+      this.scene.start("Title");
+    });
 
     this.startWave(1);
   }
@@ -137,6 +149,68 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
   }
 
+  /** Versus: opponent's hearts and score, incoming attacks, and how the match ends. */
+  private setupVersus() {
+    this.themText = this.add
+      .text(18, 62, "", { fontFamily: FONT, fontSize: "20px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+      .setDepth(1000);
+    const off = pvp.on((e) => {
+      if (this.phase === "over") return;
+      if (e.type === "forfeit") return this.endVersus(true, "Your opponent disconnected.");
+      if (e.type !== "message") return;
+      if (e.msg.t === "dead") this.endVersus(true, e.msg.forfeit ? "Your opponent left the game." : undefined);
+      else if (e.msg.t === "attack") this.incoming(e.msg.n);
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+  }
+
+  /** Monsters the opponent sent: one symbol each, arriving from spread-out directions. */
+  private incoming(n: number) {
+    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
+    const base = Math.random() * Math.PI * 2;
+    for (let i = 0; i < Math.min(n, 6); i++) {
+      const o = this.spawner.makeOrder(fronts);
+      this.spawn({ ...o, symbols: o.symbols.slice(0, 1), angle: base + (i * Math.PI * 2) / Math.max(n, 3) });
+    }
+    this.fx.floatText(this.player.x, this.player.y - 96, n > 1 ? `${n} incoming!` : "incoming!", ACCENT_CSS, 26);
+    sfx.hurt();
+  }
+
+  /** Versus: kills charge up attacks. A plain kill is worth half a monster; multi-hits are worth more. */
+  private chargeAttack(kills: number, hits: number) {
+    this.charge += kills * 0.5 + Math.max(0, hits - 1) * 0.5;
+    const n = Math.floor(this.charge);
+    if (n < 1) return;
+    this.charge -= n;
+    pvp.send({ t: "attack", n });
+    this.fx.floatText(this.player.x, this.player.y - 124, n > 1 ? `sent ${n}!` : "sent 1!", ORANGE_CSS, 22);
+  }
+
+  private endVersus(won: boolean, note?: string) {
+    if (this.phase === "over") return;
+    this.phase = "over";
+    if (won) sfx.wave();
+    else sfx.gameOver();
+    for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
+    this.time.delayedCall(1100, () =>
+      this.scene.start("GameOver", { score: this.score, wave: this.wave, asl: this.asl, versus: { won, note, theirScore: pvp.them.score } }),
+    );
+  }
+
+  private updateVersus() {
+    const now = performance.now();
+    if (now - this.lastStatus > 500) {
+      this.lastStatus = now;
+      pvp.send({ t: "status", hearts: this.hearts, score: this.score, wave: this.wave });
+    }
+    const t = pvp.them;
+    this.themText?.setText(
+      pvp.status === "reconnecting"
+        ? `opponent lost connection: ${Math.ceil(pvp.graceLeft / 1000)} s to come back`
+        : `opponent  ${"♥".repeat(Math.max(0, t.hearts))}${"♡".repeat(Math.max(0, GAME.hearts - t.hearts))}  ${t.score.toLocaleString()}  wave ${t.wave}`,
+    );
+  }
+
   /** Three monsters with the same symbol, so the demo shows a triple hit early. */
   private scriptDemoOpening() {
     const speed = this.spawner.speed;
@@ -160,6 +234,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
     if (this.asl) this.updateAsl();
+    if (this.versus && this.phase !== "over") this.updateVersus();
     if (this.phase === "over") return;
 
     if (this.phase === "play") {
@@ -192,6 +267,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
     this.streak++;
     this.hud.setMultiplier(this.streakMult);
+    if (this.versus) this.chargeAttack(hits.filter((m) => m.queue.length === 0).length, hits.length);
     if (hits.length >= 2) {
       const label = MULTI_NAMES[Math.min(hits.length, MULTI_NAMES.length - 1)];
       const c = castColor(name);
@@ -256,6 +332,10 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private gameOver() {
+    if (this.versus) {
+      pvp.send({ t: "dead", score: this.score });
+      return this.endVersus(false);
+    }
     this.phase = "over";
     sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });

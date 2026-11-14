@@ -17,6 +17,8 @@ import { Boot } from "./game/scenes/Boot";
 import { GameOver } from "./game/scenes/GameOver";
 import { Title } from "./game/scenes/Title";
 import { toggleMute, unlockAudio } from "./game/sfx";
+import { initLobby, lobbyOpen, openLobby } from "./net/lobby";
+import { pvp } from "./net/pvp";
 import { state } from "./state";
 
 let game: Phaser.Game | null = null;
@@ -33,6 +35,7 @@ initCastPipeline();
 void loadAslExamples((e) => aslClassifier.setExamples(e));
 const mouse = initMouseAdapter();
 initDebugOverlay(() => game);
+initLobby(() => game);
 
 function startGame() {
   if (game) return;
@@ -46,7 +49,7 @@ function startGame() {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [Boot, Title, Arena, GameOver, AslTrainer],
   });
-  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker };
+  (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp };
 }
 
 /** (Re)start the Arena from whatever scene is running. */
@@ -164,7 +167,16 @@ async function setMode(mode: "mouse" | "hand") {
 
 window.addEventListener("keydown", async (ev) => {
   if (!gate.classList.contains("hidden") || ev.repeat || ev.metaKey || ev.ctrlKey) return;
+  if (lobbyOpen()) return; // typing a room code
   const k = ev.key.toLowerCase();
+  if (k === "v") {
+    // versus lobby, from the title screen only
+    if (game?.scene.isActive("Title")) {
+      ev.preventDefault();
+      openLobby();
+    }
+    return;
+  }
   if (k === "d") state.debug = !state.debug;
   else if (k === "m") void setMode(state.mode === "hand" ? "mouse" : "hand");
   else if (k === "n") toast(toggleMute() ? "Sound off" : "Sound on");
@@ -191,7 +203,7 @@ window.addEventListener("keydown", async (ev) => {
     toast("Calibrating: sweep your pinch over the area you want to draw in (4 s)");
     const ok = await startCalibration();
     toast(ok ? "Drawing area set ✓" : "Calibration failed: keep your hand visible and move it more");
-  } else if (k === "g" && game) {
+  } else if (k === "g" && game && !pvp.active) {
     startArena(true);
   }
 });

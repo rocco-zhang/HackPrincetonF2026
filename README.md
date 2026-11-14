@@ -17,7 +17,7 @@ npm run dev        # http://localhost:5173
 
 Click **Enable camera & sound** to play with your hand, or **Play with mouse only**. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
 
-Everything runs in the browser. There is no backend. The hand model (`public/models/hand_landmarker.task`) is committed, and the wasm runtime is copied from `node_modules` on install, so the game never needs a CDN or venue Wi‑Fi. If the local files are missing, it falls back to the CDN automatically.
+Everything runs in the browser. There is no backend (versus mode connects the two browsers directly). The hand model (`public/models/hand_landmarker.task`) is committed, and the wasm runtime is copied from `node_modules` on install, so the game never needs a CDN or venue Wi‑Fi. If the local files are missing, it falls back to the CDN automatically.
 
 ## How to play
 
@@ -65,11 +65,28 @@ Backspace forgets the selected letter, and Shift+Backspace forgets everything.
 
 The reference cards are drawn from a real example of each letter in the training data, as the camera saw it. They are rough sketches, hard to read for the closed-fist letters (A, E, M, N, S, T), so keep a real ASL chart nearby.
 
+### Versus mode (two computers)
+
+Both players open the game, and on the title screen press `V`.
+
+1. One player clicks **Host a game** and reads out the four-letter code.
+2. The other types the code and clicks **Join**.
+3. Both hold to start (pinch, mouse button or Space). The round begins when both are ready.
+
+- Each player has their own arena. Killing monsters sends extra monsters to your opponent: every two kills sends one, and multi-hits send more.
+- The opponent's hearts, score and wave are shown under your hearts. Whoever runs out of hearts first loses.
+- Both play the same mode. The host chooses drawing or ASL with `A`, and the guest's game follows.
+- Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
+- After a round, hold to return to the title screen and ready up again for a rematch.
+
+The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results.
+
 ### Hotkeys
 
 | Key | Action |
 |---|---|
 | `A` | on the title screen: switch between drawing mode and ASL fingerspelling mode |
+| `V` | on the title screen: play versus a friend on another computer |
 | `R` | on the title screen in ASL mode: record your own examples of each letter |
 | `M` | switch hand ↔ mouse input (mouse is also the automatic fallback) |
 | `D` | debug overlay: camera preview with hand skeleton and drawing box, pinch ratio, FPS, last recognition + score, resampled stroke |
@@ -118,6 +135,9 @@ src/
     hand.ts               trained model + your recorded examples → letter; hold-to-cast
     model.json            the trained network and one typical example per letter (built by scripts/asl/train.py)
     examples.ts           loading and saving your recorded examples
+  net/
+    pvp.ts                versus mode: PeerJS connection, messages, ready-up, drop detection and forfeit
+    lobby.ts              the host / join panel
   input/
     events.ts             the input → game event bus (InputEvent)
     mouseAdapter.ts       mouse/touch drag → same events

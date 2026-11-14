@@ -19,6 +19,20 @@
         <p id="gateMsg"></p>
       </div>
     </div>
+    <div id="lobby" hidden>
+      <h2>Play versus a friend</h2>
+      <p id="lobbyStatus"></p>
+      <div id="lobbyActions">
+        <button id="lobbyHost">Host a game</button>
+        <span>or</span>
+        <input id="lobbyCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Friend's four-letter code" />
+        <button id="lobbyJoin">Join</button>
+      </div>
+      <div id="lobbyFoot">
+        <button id="lobbyLeave" class="secondary">Disconnect</button>
+        <button id="lobbyClose" class="secondary">Close</button>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
