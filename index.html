@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SPELLCAM</title>
+  </head>
+  <body>
+    <div id="stage">
+      <video id="cam" playsinline muted></video>
+      <div id="game"></div>
+      <canvas id="debug"></canvas>
+      <div id="gate">
+        <h1>SPELLCAM</h1>
+        <p class="tag">Draw spells in the air. Banish the hollow ones.</p>
+        <button id="enable">Enable camera &amp; sound</button>
+        <button id="mouseOnly" class="secondary">Play with mouse only</button>
+        <p id="gateMsg"></p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
