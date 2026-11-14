@@ -55,8 +55,12 @@ export const state = {
   aslSelected: false,
   /** Title-screen choice (in versus, the host's). */
   difficulty: loadDifficulty(),
+  /** Title-screen choice: monsters carry arithmetic, answered from the keyboard. */
+  mathSelected: false,
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
+  /** An arithmetic round is running: drawing is ignored and answers are typed. */
+  mathActive: false,
   /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */
   aslLetter: null as AslLetter | null,
   aslProgress: 0,

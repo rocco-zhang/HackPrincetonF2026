@@ -1,6 +1,6 @@
 import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
 import type { AslLetter } from "../../asl/hand";
-import { aslName, SYMBOLS, type CastName } from "../../input/events";
+import { isMath, mathAnswer, SYMBOLS, aslName, type CastName } from "../../input/events";
 
 /** Which symbols each wave can use: teach a few first, then all six. */
 export function symbolPool(wave: number): CastName[] {
@@ -33,7 +33,13 @@ export function edgePoint(angle: number, margin = 50) {
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
-export type SpawnOrder = { angle: number; symbols: CastName[]; speed: number; palette: number };
+export type SpawnOrder = { angle: number; symbols: CastName[]; labels?: string[]; speed: number; palette: number };
+
+export type CardSource = {
+  make: (wave: number, prefer?: number) => { name: CastName; label: string };
+  queue: (wave: number) => number;
+  interval: number;
+};
 
 export class Spawner {
   wave = 0;
@@ -47,6 +53,7 @@ export class Spawner {
     private rand: () => number,
     private speedScale = 1,
     private poolFor: (wave: number) => CastName[] = symbolPool,
+    private cards?: CardSource,
     private difficulty: Difficulty = "medium",
   ) {}
 
@@ -83,7 +90,7 @@ export class Spawner {
     if (this.spawned >= this.spec.count) return out;
     this.timer -= dt;
     if (this.timer <= 0) {
-      this.timer = this.spec.interval * (0.75 + this.rand() * 0.5);
+      this.timer = this.spec.interval * (this.cards?.interval ?? 1) * (0.75 + this.rand() * 0.5);
       out.push(this.makeOrder(liveFronts));
       this.spawned++;
     }
@@ -91,6 +98,7 @@ export class Spawner {
   }
 
   makeOrder(liveFronts: CastName[]): SpawnOrder {
+    if (this.cards) return this.makeCards(liveFronts);
     const pool = this.poolFor(Spawner.poolWave(this.wave, this.difficulty));
     const pick = () => pool[Math.floor(this.rand() * pool.length)];
     const len = 1 + Math.floor(this.rand() * this.spec.maxQueue);
@@ -106,6 +114,27 @@ export class Spawner {
     return {
       angle: this.rand() * Math.PI * 2,
       symbols,
+      speed: this.spec.speed * this.speedScale * (0.9 + this.rand() * 0.2),
+      palette: Math.floor(this.rand() * 3),
+    };
+  }
+
+  private makeCards(liveFronts: CastName[]): SpawnOrder {
+    const len = this.cards!.queue(this.wave);
+    const symbols: CastName[] = [];
+    const labels: string[] = [];
+    const shared = liveFronts.filter(isMath);
+    const prefer = shared.length && this.rand() < (0.4 * DIFFICULTY[this.difficulty].shareChance) / DIFFICULTY.medium.shareChance ? mathAnswer(shared[Math.floor(this.rand() * shared.length)]) : undefined;
+    for (let i = 0; i < len; i++) {
+      let card = this.cards!.make(this.wave, i === 0 ? prefer : undefined);
+      for (let k = 0; k < 6 && labels.includes(card.label); k++) card = this.cards!.make(this.wave);
+      symbols.push(card.name);
+      labels.push(card.label);
+    }
+    return {
+      angle: this.rand() * Math.PI * 2,
+      symbols,
+      labels,
       speed: this.spec.speed * this.speedScale * (0.9 + this.rand() * 0.2),
       palette: Math.floor(this.rand() * 3),
     };

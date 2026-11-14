@@ -41,7 +41,7 @@ export class Casting {
   }
 
   onCursor(p: Pt, inking: boolean) {
-    this.cursor.setVisible(!state.aslActive); // nothing to aim in ASL mode
+    this.cursor.setVisible(!state.aslActive);
     this.cursor.setPosition(p.x, p.y);
     this.cursorRing.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
     this.cursorDot.setVisible(inking);

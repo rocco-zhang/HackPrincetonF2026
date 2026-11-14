@@ -5,7 +5,7 @@ import Peer, { type DataConnection } from "peerjs";
 import { DIFFICULTY, type Difficulty } from "../config";
 
 export type PvpMessage =
-  | { t: "hello"; asl: boolean; difficulty?: Difficulty } // host → guest: which mode and difficulty we're playing
+  | { t: "hello"; asl: boolean; math?: boolean; difficulty?: Difficulty } // host → guest: which mode and difficulty we're playing
   | { t: "ready"; v: boolean }
   | { t: "start" } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
@@ -128,9 +128,9 @@ export const pvp = {
   },
 };
 
-type ModeChoice = { asl: boolean; difficulty: Difficulty };
+type ModeChoice = { asl: boolean; math: boolean; difficulty: Difficulty };
 /** Set by the lobby so a new connection can announce the host's mode and difficulty. */
-export let currentMode: () => ModeChoice = () => ({ asl: false, difficulty: "medium" });
+export let currentMode: () => ModeChoice = () => ({ asl: false, math: false, difficulty: "medium" });
 export const setModeSource = (fn: () => ModeChoice) => (currentMode = fn);
 
 function emit(e: PvpEvent) {

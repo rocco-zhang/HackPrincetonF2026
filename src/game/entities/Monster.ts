@@ -13,14 +13,18 @@ export class Monster extends Phaser.GameObjects.Container {
   bubble: SymbolBubble;
   private shadow: Phaser.GameObjects.Ellipse;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, symbols: CastName[], speed: number, palette: number) {
+  /** The question taped above this monster, when it is carrying math. */
+  prompts: string[];
+
+  constructor(scene: Phaser.Scene, x: number, y: number, symbols: CastName[], speed: number, palette: number, labels?: string[]) {
     super(scene, x, y);
     this.queue = [...symbols];
+    this.prompts = labels ? [...labels] : [];
     this.speed = speed;
     this.palette = palette;
     this.shadow = scene.add.ellipse(0, 44, 50, 10, 0x281e0a, 0.14);
     this.sprite = scene.add.image(0, 0, `monster${palette}`);
-    this.bubble = new SymbolBubble(scene, -78, symbols);
+    this.bubble = new SymbolBubble(scene, labels ? -92 : -78, symbols, labels);
     this.add([this.shadow, this.sprite, this.bubble]);
     this.setSize(GAME.monsterRadius * 2, GAME.monsterRadius * 2);
     scene.add.existing(this);
