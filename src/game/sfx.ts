@@ -166,6 +166,14 @@ export const sfx = {
   multi: (n: number) => [0, 4, 7, 12].slice(0, n + 1).forEach((st, i) =>
     tone({ freq: 523 * Math.pow(2, st / 12), dur: 0.3, delay: i * 0.06, type: "triangle", gain: 0.2 })),
   wave: () => [392, 523, 659].forEach((f, i) => tone({ freq: f, dur: 0.35, delay: i * 0.09, type: "triangle", gain: 0.2 })),
+  fire: () => {
+    noise({ dur: 0.35, freq: 400, to: 1800, q: 0.6, gain: 0.28, type: "bandpass" });
+    tone({ freq: 180, to: 90, dur: 0.28, type: "sawtooth", gain: 0.12 });
+  },
+  water: () => {
+    tone({ freq: 520, to: 240, dur: 0.32, type: "sine", gain: 0.22 });
+    noise({ dur: 0.22, freq: 1800, to: 600, q: 0.7, gain: 0.12, type: "lowpass" });
+  },
   start: () => [262, 392, 523, 784].forEach((f, i) => tone({ freq: f, dur: 0.25, delay: i * 0.07, gain: 0.2 })),
   gameOver: () => [392, 330, 262, 196].forEach((f, i) => tone({ freq: f, dur: 0.45, delay: i * 0.18, type: "triangle", gain: 0.22 })),
   tick: () => tone({ freq: 880, dur: 0.04, gain: 0.06 }),

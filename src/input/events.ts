@@ -25,12 +25,13 @@ export const castLabel = (n: CastName) => (isSymbol(n) ? n : isMath(n) ? String(
 
 export type InputEvent =
   // every frame: where the fingertip is, and whether it's drawing. `src` is "mouse" for the real pointer (menus), otherwise the hand.
-  | { type: "cursor"; p: Pt; inking: boolean; src?: "mouse" }
-  | { type: "strokeStart"; p: Pt }
-  | { type: "strokePoint"; p: Pt }
-  | { type: "strokeEnd"; points: Pt[] }
-  | { type: "symbol"; name: CastName; score: number; points: Pt[] } // recognized cast
-  | { type: "fizzle"; points: Pt[]; best?: { name: SymbolName; score: number } }; // drawn but not recognized
+  // `hand` is 0 or 1 when both hands are drawing.
+  | { type: "cursor"; p: Pt; inking: boolean; src?: "mouse"; hand?: number }
+  | { type: "strokeStart"; p: Pt; hand?: number }
+  | { type: "strokePoint"; p: Pt; hand?: number }
+  | { type: "strokeEnd"; points: Pt[]; hand?: number }
+  | { type: "symbol"; name: CastName; score: number; points: Pt[]; hand?: number } // recognized cast
+  | { type: "fizzle"; points: Pt[]; best?: { name: SymbolName; score: number }; hand?: number }; // drawn but not recognized
 
 // tiny event bus: input → game
 export const bus = new EventTarget();

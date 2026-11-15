@@ -49,8 +49,8 @@ export function initCastPipeline() {
     state.lastRecog = r;
     // after every listener has seen this strokeEnd
     queueMicrotask(() => {
-      if (r.accepted && r.name) emit({ type: "symbol", name: r.name, score: r.score, points: pts });
-      else emit({ type: "fizzle", points: pts, best: r.best });
+      if (r.accepted && r.name) emit({ type: "symbol", name: r.name, score: r.score, points: pts, hand: e.hand });
+      else emit({ type: "fizzle", points: pts, best: r.best, hand: e.hand });
     });
   });
 }

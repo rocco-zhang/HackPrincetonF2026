@@ -8,6 +8,8 @@ export class Hud {
   private scoreText: Phaser.GameObjects.Text;
   private multText: Phaser.GameObjects.Text;
   private waveText: Phaser.GameObjects.Text;
+  private fireText: Phaser.GameObjects.Text;
+  private waterText: Phaser.GameObjects.Text;
   private hint: Phaser.GameObjects.Text;
   private warn: Phaser.GameObjects.Text;
   private shownScore = 0;
@@ -34,6 +36,16 @@ export class Hud {
       .text(ARENA.width / 2, 18, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5, 0)
       .setDepth(depth);
+    this.fireText = scene.add
+      .text(ARENA.width / 2 - 16, 46, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: "#e25b2a", stroke: "#f9f5ea", strokeThickness: 5 })
+      .setOrigin(1, 0)
+      .setDepth(depth)
+      .setVisible(false);
+    this.waterText = scene.add
+      .text(ARENA.width / 2 + 16, 46, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: "#2f7dff", stroke: "#f9f5ea", strokeThickness: 5 })
+      .setOrigin(0, 0)
+      .setDepth(depth)
+      .setVisible(false);
     this.hint = scene.add
       .text(18, ARENA.height - 14, "", { fontFamily: FONT, fontSize: "16px", color: MUTED_CSS })
       .setOrigin(0, 1)
@@ -64,6 +76,11 @@ export class Hud {
 
   setWave(n: number) {
     this.waveText.setText(this.difficulty === "medium" ? `Wave ${n}` : `Wave ${n}  ·  ${DIFFICULTY[this.difficulty].label}`);
+  }
+
+  setSpells(fire: number, water: number, on: boolean) {
+    this.fireText.setVisible(on).setText(`fire ${fire} · horns`);
+    this.waterText.setVisible(on).setText(`palm · water ${water}`);
   }
 
   setMultiplier(m: number) {

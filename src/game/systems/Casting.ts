@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
 import type { CastName, Pt } from "../../input/events";
+import { beautify } from "../../input/smooth";
 import { state } from "../../state";
 import type { Monster } from "../entities/Monster";
 import type { Player } from "../entities/Player";
@@ -23,59 +24,74 @@ export interface CastHost {
 /** Cursor, ink trail, and turning recognized symbols into spells. */
 export class Casting {
   private gfx: Phaser.GameObjects.Graphics;
-  private cursor: Phaser.GameObjects.Container;
-  private cursorRing: Phaser.GameObjects.Arc;
-  private cursorDot: Phaser.GameObjects.Image;
-  private current: Pt[] = [];
+  private cursors = new Map<number, { root: Phaser.GameObjects.Container; ring: Phaser.GameObjects.Arc; dot: Phaser.GameObjects.Image }>();
+  private cursorAt = new Map<number, number>();
+  private currents = new Map<number, Pt[]>();
   private fading: FadingTrail[] = [];
-  private lastEnded: FadingTrail | null = null;
+  private lastByHand = new Map<number, FadingTrail>();
 
   constructor(
     private scene: Phaser.Scene,
     private host: CastHost,
   ) {
     this.gfx = scene.add.graphics().setDepth(700);
-    this.cursorRing = scene.add.circle(0, 0, 16, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9);
-    this.cursorDot = scene.add.image(0, 0, "star").setScale(0.55).setTint(ACCENT).setVisible(false);
-    this.cursor = scene.add.container(-100, -100, [this.cursorRing, this.cursorDot]).setDepth(960);
+    this.cursorFor(0);
   }
 
-  onCursor(p: Pt, inking: boolean) {
-    this.cursor.setVisible(!state.aslActive);
-    this.cursor.setPosition(p.x, p.y);
-    this.cursorRing.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
-    this.cursorDot.setVisible(inking);
-  }
-
-  onStrokeStart(p: Pt) {
-    this.current = [p];
-  }
-
-  onStrokePoint(p: Pt) {
-    this.current.push(p);
-  }
-
-  onStrokeEnd() {
-    if (this.current.length > 1) {
-      this.lastEnded = { pts: this.current, color: INK, age: 0 };
-      this.fading.push(this.lastEnded);
+  private cursorFor(hand: number) {
+    let cursor = this.cursors.get(hand);
+    if (!cursor) {
+      const ring = this.scene.add.circle(0, 0, 16, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9);
+      const dot = this.scene.add.image(0, 0, "star").setScale(0.55).setTint(ACCENT).setVisible(false);
+      const root = this.scene.add.container(-100, -100, [ring, dot]).setDepth(960);
+      cursor = { root, ring, dot };
+      this.cursors.set(hand, cursor);
     }
-    this.current = [];
+    return cursor;
   }
 
-  onFizzle(points: Pt[]) {
-    if (this.lastEnded) this.lastEnded.color = 0xb5b0a5;
+  onCursor(p: Pt, inking: boolean, hand = 0) {
+    const cursor = this.cursorFor(hand);
+    this.cursorAt.set(hand, performance.now());
+    cursor.root.setVisible(!state.aslActive);
+    cursor.root.setPosition(p.x, p.y);
+    cursor.ring.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
+    cursor.dot.setVisible(inking);
+  }
+
+  onStrokeStart(p: Pt, hand = 0) {
+    this.currents.set(hand, [p]);
+  }
+
+  onStrokePoint(p: Pt, hand = 0) {
+    this.currents.get(hand)?.push(p);
+  }
+
+  onStrokeEnd(hand = 0) {
+    const pts = this.currents.get(hand) ?? [];
+    this.currents.delete(hand);
+    if (pts.length > 1) {
+      const trail: FadingTrail = { pts, color: INK, age: 0 };
+      this.fading.push(trail);
+      this.lastByHand.set(hand, trail);
+    }
+  }
+
+  onFizzle(points: Pt[], hand = 0) {
+    const trail = this.lastByHand.get(hand);
+    if (trail) trail.color = 0xb5b0a5;
     const end = points[points.length - 1] ?? { x: ARENA.width / 2, y: ARENA.height / 2 };
     this.host.fx.puff(end.x, end.y);
     this.host.fx.floatText(end.x, end.y - 20, "oops", "#8a857a", 18);
     sfx.fizzle();
   }
 
-  cast(name: CastName) {
+  cast(name: CastName, hand = 0) {
     const color = castColor(name);
-    if (this.lastEnded) {
-      this.lastEnded.color = color;
-      this.lastEnded.age = -0.1; // linger a bit longer when it worked
+    const trail = this.lastByHand.get(hand);
+    if (trail) {
+      trail.color = color;
+      trail.age = -0.1; // linger a bit longer when it worked
     }
     sfx.symbol(name);
     const { player } = this.host;
@@ -124,27 +140,34 @@ export class Casting {
   update(dt: number) {
     const g = this.gfx;
     g.clear();
+    const now = performance.now();
+    for (const [hand, cursor] of this.cursors) {
+      if (now - (this.cursorAt.get(hand) ?? 0) > 250) cursor.root.setVisible(false);
+    }
     for (const f of this.fading) f.age += dt;
     this.fading = this.fading.filter((f) => f.age < 0.45);
     for (const f of this.fading) {
       const a = 1 - Math.max(0, f.age) / 0.45;
       this.drawTrail(f.pts, f.color, a);
     }
-    if (this.current.length > 1) this.drawTrail(this.current, INK, 1);
+    for (const pts of this.currents.values()) {
+      if (pts.length > 1) this.drawTrail(pts, INK, 1);
+    }
   }
 
   private drawTrail(pts: Pt[], color: number, alpha: number) {
     const g = this.gfx;
+    const shown = state.langActive ? pts : beautify(pts);
     const pass = (width: number, c: number, a: number) => {
       g.lineStyle(width, c, a);
       g.beginPath();
-      g.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.moveTo(shown[0].x, shown[0].y);
+      for (let i = 1; i < shown.length; i++) g.lineTo(shown[i].x, shown[i].y);
       g.strokePath();
     };
     // pencil line; dots round off the joins and ends
     pass(5.5, color, 0.92 * alpha);
     g.fillStyle(color, 0.92 * alpha);
-    for (const p of pts) g.fillCircle(p.x, p.y, 2.75);
+    for (const p of shown) g.fillCircle(p.x, p.y, 2.75);
   }
 }

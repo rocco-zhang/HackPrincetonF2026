@@ -5,7 +5,8 @@ import { state, type Landmark } from "../state";
 import { video } from "./camera";
 import { aslFeatures } from "../asl/features";
 import { AslCaster, AslClassifier } from "../asl/hand";
-import { aslName, emit } from "./events";
+import { aslName, emit, type InputEvent } from "./events";
+import { drawingHandId } from "./hands";
 import { experiment, PinchExperiment, type Observation } from "./pinchExperiment";
 import { recognizer } from "./castPipeline";
 
@@ -16,7 +17,12 @@ const CDN_MODEL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
 let landmarker: HandLandmarker | null = null;
-export const pinchEngine = new PinchExperiment(emit, p => recognizer.recognize(p));
+function withHand(hand: number, e: InputEvent): InputEvent {
+  if (e.type === "cursor" || e.type === "strokeStart" || e.type === "strokePoint" || e.type === "strokeEnd") return { ...e, hand };
+  return e;
+}
+export const pinchEngine = new PinchExperiment((e) => emit(withHand(0, e)), (p) => recognizer.recognize(p));
+const otherEngine = new PinchExperiment((e) => emit(withHand(1, e)), (p) => recognizer.recognize(p));
 export let replaying = false;
 export const observationListeners = new Set<(o: Observation) => void>();
 export let inferenceMs = 0;
@@ -56,7 +62,7 @@ export async function initHandTracker() {
     HandLandmarker.createFromOptions(vision, {
       baseOptions: { modelAssetPath: local ? LOCAL_MODEL : CDN_MODEL, delegate },
       runningMode: "VIDEO",
-      numHands: 1,
+      numHands: 2,
       minHandDetectionConfidence: 0.5,
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
@@ -153,25 +159,46 @@ function loop() {
     fpsStart = now;
   }
 
-  const lm = res.landmarks?.[0] as Landmark[] | undefined;
-  state.landmarks = lm ?? null;
+  const hands = (res.landmarks ?? []) as Landmark[][];
+  const worlds = (res.worldLandmarks ?? []) as Landmark[][];
+  const labels = ((res as { handednesses?: { categoryName?: string }[][] }).handednesses ?? []).map((h) => h[0]?.categoryName);
+  const found: (Landmark[] | null)[] = [null, null];
+  const foundWorld: (Landmark[] | null)[] = [null, null];
+  hands.forEach((lm, i) => {
+    const id = drawingHandId(labels[i], i);
+    if (found[id]) return;
+    found[id] = lm;
+    foundWorld[id] = worlds[i] ?? null;
+  });
+  const lm = found[0] ?? found[1];
+  state.landmarks = lm;
   state.handVisible = !!lm;
-  const o: Observation = {t:now, landmarks:lm ?? null, world:(res.worldLandmarks?.[0] as Landmark[] | undefined) ?? null, width:v.videoWidth, height:v.videoHeight};
-  for (const listener of observationListeners) listener(o);
+  const width = v.videoWidth, height = v.videoHeight;
+  const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height };
+  for (const listener of observationListeners) listener(primary);
   const asl = state.mode === "hand" && (state.aslActive || state.aslTraining);
   if (asl) {
-    pinchEngine.reset(); state.inking = false;
-    state.landmarks = lm ?? null; state.handVisible = !!lm;
-    stepAsl(lm,v.videoWidth/v.videoHeight,now);
+    pinchEngine.reset();
+    otherEngine.reset();
+    state.inking = false;
+    stepAsl(lm ?? undefined, width / height, now);
   } else if (state.mode === "hand") {
-    state.aslLetter = null; state.aslFeat = null; state.aslProgress = 0;
-    if (!calib) processObservation(o);
+    state.aslLetter = null;
+    state.aslFeat = null;
+    state.aslProgress = 0;
+    if (!calib) {
+      processObservation(primary);
+      otherEngine.process({ t: now, landmarks: found[1], world: foundWorld[1], width, height }, state.mirror, state.drawBox);
+      state.landmarks = found[0] ?? found[1];
+      state.handVisible = !!(found[0] || found[1]);
+      state.inking = pinchEngine.inking || otherEngine.inking;
+    }
   }
   if (lm) state.lastHandSeen = now;
   if (calib) {
     if (lm) {
-      const a = experiment.anchor === "knuckle" ? lm[5] : experiment.anchor === "tip" ? lm[8] : experiment.anchor === "thumb" ? lm[4] : {x:(lm[4].x+lm[8].x)/2,y:(lm[4].y+lm[8].y)/2};
-      calib.pts.push({x:state.mirror ? 1-a.x : a.x,y:a.y});
+      const a = experiment.anchor === "knuckle" ? lm[5] : experiment.anchor === "tip" ? lm[8] : experiment.anchor === "thumb" ? lm[4] : { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
+      calib.pts.push({ x: state.mirror ? 1 - a.x : a.x, y: a.y });
     }
     if (now > calib.until) finishCalibration();
   }
@@ -179,5 +206,6 @@ function loop() {
 
 export function cancelHandStroke() {
   pinchEngine.reset();
+  otherEngine.reset();
   state.inking = false;
 }

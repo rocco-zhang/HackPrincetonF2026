@@ -59,7 +59,7 @@ export class Duel extends Phaser.Scene {
       });
     });
 
-    // right: the spell deck (no spells exist yet, so the slots are empty)
+    // right: the spell deck. Fire and water are earned during a shapes wave, not chosen here.
     const rx = 1020;
     heading(this, rx, 124, "Spell deck");
     const g = this.add.graphics();
@@ -72,7 +72,7 @@ export class Duel extends Phaser.Scene {
       this.add.text(x, y, "?", { fontFamily: FONT, fontSize: "54px", color: MUTED_CSS }).setOrigin(0.5).setAlpha(0.6).setAngle(i % 2 ? 5 : -5);
     }
     this.add
-      .text(rx, 468, "Spells are coming.\nThe ones you bring to a duel will go here.", { fontFamily: FONT, fontSize: "18px", color: MUTED_CSS, align: "center" })
+      .text(rx, 468, "Fire and water are earned\nin a shapes wave.", { fontFamily: FONT, fontSize: "18px", color: MUTED_CSS, align: "center" })
       .setOrigin(0.5, 0);
 
     // bottom: finding an opponent

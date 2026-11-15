@@ -16,6 +16,7 @@ import { Hud } from "../systems/Hud";
 import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, pickLang, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
+import { emptySpells, readSpellPose, rollSpell, SPELL_AFTER_INK, SPELL_HOLD, type SpellBag, type SpellId } from "../spells";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
 const SHAPE_GLYPH: Partial<Record<CastName, string>> = { caret: "Λ", circle: "◯", zigzag: "zigzag" };
@@ -42,6 +43,11 @@ export class Arena extends Phaser.Scene implements CastHost {
   private subject: Subject = "shapes";
   private level = 1;
   private roll: () => number = Math.random;
+  private bag: SpellBag = emptySpells();
+  private pose: SpellId | null = null;
+  private poseFor = 0;
+  private poseReady = true;
+  private sinceInk = 1;
   private marks: Mark[] = [];
   private buffer = "";
   private answerHold = 0;
@@ -68,8 +74,17 @@ export class Arena extends Phaser.Scene implements CastHost {
   private get lang() {
     return isScript(this.subject);
   }
+  /** Fire and water are earned and cast while drawing shapes, in Classic and in Duel. */
+  private get spellsOn() {
+    return this.subject === "shapes";
+  }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
+    this.bag = emptySpells();
+    this.pose = null;
+    this.poseFor = 0;
+    this.poseReady = true;
+    this.sinceInk = 1;
     this.versus = !!data?.pvp;
     this.demo = !!data?.demo && !this.versus;
     // the demo run is scripted for drawn shapes
@@ -126,23 +141,23 @@ export class Arena extends Phaser.Scene implements CastHost {
 
     const off = onInput((e) => {
       switch (e.type) {
-        case "cursor": return this.casting.onCursor(e.p, e.inking);
-        case "strokeStart": return this.casting.onStrokeStart(e.p);
-        case "strokePoint": return this.casting.onStrokePoint(e.p);
+        case "cursor": return this.casting.onCursor(e.p, e.inking, e.hand);
+        case "strokeStart": return this.casting.onStrokeStart(e.p, e.hand);
+        case "strokePoint": return this.casting.onStrokePoint(e.p, e.hand);
         case "strokeEnd":
-          this.casting.onStrokeEnd();
+          this.casting.onStrokeEnd(e.hand);
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points);
           return;
         case "symbol":
           if (this.lang && this.phase === "play") { this.onLangMark(e.name); return; }
-          if (!this.math && this.phase !== "over") this.casting.cast(e.name);
+          if (!this.math && this.phase !== "over") this.casting.cast(e.name, e.hand);
           return;
         case "fizzle":
           if (this.lang && this.phase === "play") {
             this.fx.floatText(this.player.x, this.player.y - 80, "line, stick, V, peak, or circle", "#8a857a", 18);
             return;
           }
-          if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points);
+          if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points, e.hand);
           return;
       }
     });
@@ -154,11 +169,17 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.mathActive = false;
       state.langActive = false;
     });
+    this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
+      if (ev.repeat || !this.spellsOn) return;
+      if (ev.key === "1") this.castSpell("fire");
+      if (ev.key === "2") this.castSpell("water");
+    });
     this.input.keyboard?.on("keydown-ESC", () => {
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
       this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
     });
 
+    this.hud.setSpells(0, 0, this.spellsOn);
     this.startWave(1);
   }
 
@@ -206,6 +227,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.answerText?.setVisible(this.math || this.lang).setFontSize(this.math ? 36 : 28);
     if (this.lang) this.refreshLang();
     else this.refreshAnswer();
+    this.hud.setSpells(this.bag.fire, this.bag.water, this.spellsOn);
   }
 
   private startWave(n: number) {
@@ -383,6 +405,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.aslText) this.updateAsl();
     if (this.math) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
+    if (this.spellsOn && this.phase === "play") this.tickSpells(dt);
     if (this.phase === "over") return;
 
     if (this.phase === "play") {
@@ -400,8 +423,128 @@ export class Arena extends Phaser.Scene implements CastHost {
       const bonus = Math.round(500 * this.wave * DIFFICULTY[this.difficulty].scoreMult);
       this.score += bonus;
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
+      if (this.spellsOn) this.awardSpell();
       this.startWave(this.wave + 1);
     }
+  }
+
+  private awardSpell() {
+    const drop = rollSpell(Math.random);
+    this.bag[drop.id] += drop.count;
+    this.hud.setSpells(this.bag.fire, this.bag.water, true);
+    const how = drop.id === "fire" ? "horns" : "open palm";
+    this.fx.floatText(this.player.x, this.player.y - 136, `+${drop.count} ${drop.id} · ${how}`, drop.id === "fire" ? "#e25b2a" : "#2f7dff", 26);
+  }
+
+  /** A held horns or open palm spends one charge on the nearest monster. */
+  private tickSpells(dt: number) {
+    if (state.inking) {
+      this.sinceInk = 0;
+      this.pose = null;
+      this.poseFor = 0;
+      return;
+    }
+    this.sinceInk += dt;
+    const pose = state.mode === "hand" && this.sinceInk >= SPELL_AFTER_INK ? readSpellPose(state.landmarks) : null;
+    if (!pose) {
+      this.pose = null;
+      this.poseFor = 0;
+      this.poseReady = true;
+      return;
+    }
+    if (pose !== this.pose) {
+      this.pose = pose;
+      this.poseFor = 0;
+      this.poseReady = true;
+    }
+    this.poseFor += dt;
+    if (this.poseReady && this.poseFor >= SPELL_HOLD) {
+      this.poseReady = false;
+      this.castSpell(pose);
+    }
+  }
+
+  private castSpell(id: SpellId) {
+    if (!this.spellsOn || this.phase !== "play") return;
+    if (this.bag[id] <= 0) {
+      this.fx.floatText(this.player.x, this.player.y - 80, `no ${id}`, "#8a857a", 18);
+      return;
+    }
+    let nearest: Monster | null = null;
+    let best = Infinity;
+    for (const m of this.monsters) {
+      if (m.dying || !m.active) continue;
+      const d = m.distanceTo(this.player.x, this.player.y);
+      if (d < best) {
+        best = d;
+        nearest = m;
+      }
+    }
+    if (!nearest) {
+      this.fx.floatText(this.player.x, this.player.y - 80, "nobody near", "#8a857a", 18);
+      return;
+    }
+    this.bag[id] -= 1;
+    this.hud.setSpells(this.bag.fire, this.bag.water, true);
+    nearest.dying = true;
+    const target = nearest;
+    this.animateSpell(id, target, () => {
+      if (!target.active) return;
+      const pts = Math.round(GAME.scorePerKill * this.streakMult);
+      this.score += pts;
+      this.fx.floatText(target.x, target.y - 40, `+${pts}`, ORANGE_CSS, 28);
+      if (this.versus) this.chargeAttack(1, 1);
+      this.kill(target);
+    });
+  }
+
+  private animateSpell(id: SpellId, target: Monster, onHit: () => void) {
+    const fromX = this.player.x;
+    const fromY = this.player.y - 24;
+    const toX = target.x;
+    const toY = target.y;
+    if (id === "fire") {
+      sfx.fire();
+      for (let i = 0; i < 8; i++) {
+        const flame = this.add.circle(fromX, fromY, 8 + (i % 3) * 4, i % 2 ? 0xfff1c9 : 0xff5a1f, 0.92).setDepth(860);
+        this.tweens.add({
+          targets: flame,
+          x: toX + (i - 3.5) * 8,
+          y: toY - (i % 4) * 10,
+          duration: 200 + i * 26,
+          ease: "Quad.easeIn",
+          onComplete: () => flame.destroy(),
+        });
+      }
+      this.time.delayedCall(400, () => {
+        this.fx.burst(toX, toY, 0xff4d1a, 42);
+        this.fx.burst(toX, toY, 0xffd27a, 18);
+        this.cameras.main.flash(140, 255, 110, 30);
+        this.cameras.main.shake(110, 0.006);
+        onHit();
+      });
+      return;
+    }
+    sfx.water();
+    const ring = this.add.circle(fromX, fromY, 16, 0x4db4ff, 0.35).setDepth(850);
+    this.tweens.add({ targets: ring, scale: 4, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+    const drop = this.add.circle(fromX, fromY - 20, 14, 0x2f7dff, 0.95).setDepth(860);
+    this.tweens.add({
+      targets: drop,
+      x: toX,
+      y: toY,
+      duration: 300,
+      ease: "Quad.easeIn",
+      onComplete: () => {
+        drop.destroy();
+        this.fx.burst(toX, toY, 0x4db4ff, 34);
+        this.fx.puff(toX, toY, 0xd7f1ff, 22);
+        const splash = this.add.ellipse(toX, toY + 18, 24, 10, 0x7ec8ff, 0.85).setDepth(860);
+        this.tweens.add({ targets: splash, scaleX: 5, scaleY: 2.2, alpha: 0, duration: 320, onComplete: () => splash.destroy() });
+        this.cameras.main.flash(120, 70, 150, 255);
+        onHit();
+      },
+    });
   }
 
   private get streakMult() {

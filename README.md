@@ -54,16 +54,17 @@ These are experimental parameters, not measured improvements. The lab displays d
 
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons down the right edge: settings, accessibility, achievements, friends. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
-- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
+- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and a spell deck that is still empty before a match. Fire and water are earned during a shapes wave. See [Versus mode](#versus-mode-two-computers).
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Accessibility:** color-blind marker colors (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
 
-- **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release.
+- **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
+- **Spells:** clearing a shapes wave awards a random stack, such as 3 fire or 1 water. Horns (index and pinky out) casts fire, and an open palm casts water. The spell hits the nearest monster. With `?mouse`, `1` is fire and `2` is water.
 - **Symbols:**
 
   | Name | Symbol |
@@ -77,6 +78,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 
   Any drawing direction works.
 - **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
+- **Spells:** clearing a wave in drawing mode, solo or versus, awards a random stack such as 3 fire or 1 water. Hold the horns hand (index and pinky out, like spiderman) to cast fire, or an open palm to cast water. The spell hits the nearest monster. With the mouse, `1` is fire and `2` is water. Hold the pose after you finish a stroke, so opening your hand to stop drawing does not cast.
 - **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
 ### ASL fingerspelling mode
@@ -153,6 +155,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
+| `1` / `2` | during a shapes wave: cast a fire or water spell, if you have one |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 
@@ -202,7 +205,9 @@ src/
     events.ts             the input → game event bus (InputEvent)
     mouseAdapter.ts       the mouse as a menu pointer (and, with ?mouse, a full stand-in for the hand)
     camera.ts             getUserMedia, camera switching, mirroring
-    handTracker.ts        MediaPipe loop (GPU → CPU fallback), pinch → cursor → strokes, calibration
+    handTracker.ts        MediaPipe loop (GPU → CPU fallback), two hands, pinch → cursor → strokes, calibration
+    hands.ts              which detected hand is the left one and which is the right one
+    smooth.ts             a light ease of lines and closed circles; a V is left alone
     oneEuro.ts            One Euro filter
     strokeDetector.ts     pinch hysteresis + debounce, stroke start/points/end, end trimming
     recognizer.ts         orientation-sensitive $1 + straight-line special case
@@ -216,6 +221,7 @@ src/
     icons.ts              pencil-drawn button icons
     entities/             Player, Monster, SymbolBubble
     systems/              Spawner, Casting (trail + spells), Hud, Fx, HoldToStart, Menu (pinch-or-click buttons), pickers (difficulty + subjects)
+    spells.ts             fire and water: wave rewards and the horns / open-palm gestures
     sfx.ts                procedural Web Audio sound effects, the looping background music (public/audio/bg_music.mp3), and their volume settings
 ```
 
