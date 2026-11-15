@@ -9,7 +9,7 @@ import { ACCENT, castColor, INK } from "../palette";
 import { sfx } from "../sfx";
 import type { Fx } from "./Fx";
 
-type FadingTrail = { pts: Pt[]; color: number; age: number };
+type FadingTrail = { pts: Pt[]; color: number; age: number; at: number };
 /** Kept strokes are fainter than the one being drawn, so the new stroke reads clearly on top. */
 const HELD_ALPHA = 0.5;
 
@@ -32,6 +32,8 @@ export class Casting {
   private fading: FadingTrail[] = [];
   /** Strokes kept on screen because they are part of a card or number that isn't finished yet. */
   private held: FadingTrail[] = [];
+  /** The strokes a finished card was made of, handed from releaseHeld to the cast that follows it. */
+  private finished: FadingTrail[] = [];
   private lastByHand = new Map<number, FadingTrail>();
 
   constructor(
@@ -75,7 +77,7 @@ export class Casting {
     const pts = this.currents.get(hand) ?? [];
     this.currents.delete(hand);
     if (pts.length > 1) {
-      const trail: FadingTrail = { pts, color: INK, age: 0 };
+      const trail: FadingTrail = { pts, color: INK, age: 0, at: performance.now() };
       this.fading.push(trail);
       this.lastByHand.set(hand, trail);
     }
@@ -97,6 +99,7 @@ export class Casting {
       if (color !== undefined) trail.color = color;
       this.fading.push(trail);
     }
+    this.finished = color === undefined ? [] : this.held;
     this.held = [];
   }
 
@@ -138,6 +141,10 @@ export class Casting {
     }
     this.host.onCast(name, targets);
     const multi = targets.length;
+    // it hit something: the figure writes what was drawn in the air (nothing to write for a signed letter)
+    const drawn = [...new Set([...this.finished, ...(trail && performance.now() - trail.at < 1000 ? [trail] : [])])];
+    this.finished = [];
+    if (multi > 0 && drawn.length) player.airDraw(drawn.map((t) => (state.langActive ? t.pts : beautify(t.pts))), color);
 
     targets.forEach((m, i) => {
       const killed = m.queue.length === 0;

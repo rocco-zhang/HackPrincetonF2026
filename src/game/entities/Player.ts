@@ -1,12 +1,15 @@
 import Phaser from "phaser";
 import { CAST_HEADROOM, CAST_TIP } from "../scenes/Boot";
-import { HIGHLIGHTER, INK, SYMBOL_COLOR } from "../palette";
+import { HIGHLIGHTER, INK, PAPER, SYMBOL_COLOR } from "../palette";
 
 const CORE_Y = -10;
 /** The casting image is taller at the top, so it sits this much higher to keep the feet in place. */
 const CAST_Y = CORE_Y - CAST_HEADROOM / 2;
 /** Stay in the casting pose this long after drawing stops, so quick strokes don't make it twitch. */
 const CAST_LINGER_MS = 280;
+/** The air drawing after a spell lands: how big, and how long it takes to trace. */
+const AIR_SIZE = 46;
+const AIR_DRAW_MS = 460;
 
 /** You: a stick figure in the middle of the page. */
 export class Player extends Phaser.GameObjects.Container {
@@ -16,6 +19,7 @@ export class Player extends Phaser.GameObjects.Container {
   private sparkles: Phaser.GameObjects.Particles.ParticleEmitter;
   private casting = false;
   private lastCast = -Infinity;
+  private airGfx: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -76,6 +80,74 @@ export class Player extends Phaser.GameObjects.Container {
       g.arc(0, 0, r + (i % 3) - 1, a, a + 0.19);
       g.strokePath();
     }
+  }
+
+  /**
+   * A spell landed: the figure writes it in the air with the pencil. `strokes` are what was drawn
+   * (any size, anywhere); they are shrunk into a small box above the pencil tip and traced out
+   * stroke by stroke in the spell's color, then fade.
+   */
+  airDraw(strokes: { x: number; y: number }[][], color: number) {
+    const lines = strokes.filter((s) => s.length > 1);
+    if (!lines.length) return;
+    const all = lines.flat();
+    const x0 = Math.min(...all.map((p) => p.x)), x1 = Math.max(...all.map((p) => p.x));
+    const y0 = Math.min(...all.map((p) => p.y)), y1 = Math.max(...all.map((p) => p.y));
+    const k = AIR_SIZE / Math.max(x1 - x0, y1 - y0, 1);
+    // the bottom of the drawing sits just above the pencil tip
+    const cx = this.x + CAST_TIP.x + 4, bottom = this.y + CAST_Y + CAST_TIP.y - 8;
+    const fit = lines.map((s) => s.map((p) => ({ x: cx + (p.x - (x0 + x1) / 2) * k, y: bottom + (p.y - y1) * k })));
+    const lengths = fit.map((s) => s.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - s[i].x, p.y - s[i].y), 0));
+    const total = lengths.reduce((a, b) => a + b, 0) || 1;
+
+    this.airGfx?.destroy();
+    const g = (this.airGfx = this.scene.add.graphics().setDepth(403));
+    const paint = (progress: number) => {
+      g.clear();
+      let budget = progress * total;
+      let head = fit[0][0];
+      // a paper-colored edge first, so the drawing reads over monsters and trails
+      for (const [width, c] of [[9, PAPER], [4.5, color]] as const) {
+        let left = budget;
+        for (let i = 0; i < fit.length && left > 0; i++) {
+          const s = fit[i];
+          g.lineStyle(width, c, 1);
+          g.beginPath();
+          g.moveTo(s[0].x, s[0].y);
+          head = s[0];
+          for (let j = 1; j < s.length && left > 0; j++) {
+            const seg = Math.hypot(s[j].x - s[j - 1].x, s[j].y - s[j - 1].y);
+            const t = seg > 0 ? Math.min(1, left / seg) : 1;
+            head = { x: s[j - 1].x + (s[j].x - s[j - 1].x) * t, y: s[j - 1].y + (s[j].y - s[j - 1].y) * t };
+            g.lineTo(head.x, head.y);
+            left -= seg;
+          }
+          g.strokePath();
+        }
+      }
+      if (progress < 1) {
+        // the point of the pencil, so to speak
+        g.fillStyle(color, 1);
+        g.fillCircle(head.x, head.y, 4.5);
+        g.fillStyle(0xffffff, 0.9);
+        g.fillCircle(head.x, head.y, 2);
+      }
+    };
+    // hold the casting pose for as long as the drawing takes
+    this.setCasting(true);
+    this.lastCast = performance.now() + AIR_DRAW_MS + 200; // a time in the future: the pose lasts until then (plus the usual linger)
+    this.scene.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: AIR_DRAW_MS,
+      ease: "Sine.easeInOut",
+      onUpdate: (tw) => g.active && paint(tw.getValue() ?? 1),
+      onComplete: () => {
+        if (!g.active) return;
+        paint(1);
+        this.scene.tweens.add({ targets: g, alpha: 0, y: -10, delay: 260, duration: 280, onComplete: () => g.destroy() });
+      },
+    });
   }
 
   castPulse(color: number) {
