@@ -53,7 +53,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 ### Screens
 
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons down the right edge: settings, accessibility, achievements, friends. Every button works with a pinch or a click.
-- **Classic:** pick a difficulty, one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese) and two spells, read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
+- **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
 - **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and the spell deck, where each player picks their own two spells.
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Accessibility:** color-blind marker colors (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
@@ -64,7 +64,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
-- **Mana and spells:** a mana bar under the wave name starts at 40 of 100. Each symbol you clear adds 6, a kill adds 8 more, and clearing a wave adds 20. You bring two spells, picked on the Classic or Duel screen: hold the horns hand (index and pinky out) to cast the first and an open palm to cast the second, or press `1` / `2`. Spells are off in ASL and math waves, where a held hand already means something.
+- **Mana and spells (Duel only; Classic is drawing only):** a mana bar under the wave name starts at 40 of 100. Each symbol you clear adds 6, a kill adds 8 more, and clearing a wave adds 20. You bring two spells, picked on the Duel screen: hold the horns hand (index and pinky out) to cast the first and an open palm to cast the second, or press `1` / `2`. Spells are off in ASL and math waves, where a held hand already means something.
 
   | Spell | Mana | What it does |
   |---|---|---|
@@ -88,7 +88,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 
   Any drawing direction works.
 - **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
-- **Spells:** mana, the two spells you picked and bosses work in a duel the same way as in Classic. Each player brings their own two.
+- **Spells:** mana and spells exist only in duels. Each player brings their own two. Bosses come every third wave, as in Classic.
 - **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
 ### ASL fingerspelling mode
@@ -129,7 +129,7 @@ Pick **Math** on the Classic or Duel screen. The camera is optional.
 
 Pick any of the three as a subject. A card is drawn stroke by stroke, and each language only reads strokes as its own marks.
 
-- **Korean:** ㅡ and ㅣ are a flat line and a stick, ㅇ is a circle, and ㄱ and ㄴ are drawn the way they are written (ㄱ across then down, ㄴ down then across). The second lesson is syllables such as 이, 기, 그 and 느.
+- **Korean:** ㅡ and ㅣ are a flat line and a stick, ㅇ is a circle, and ㄱ and ㄴ are drawn the way they are written (ㄱ across then down, ㄴ down then across). The second lesson is syllables such as 이, 기, 그 and 느. The third is the syllables for whole words (아, 시, 저, 요, 다, 마), each letter in its real stroke order, up to five strokes. The Korean boss words are 저기요 (excuse me), 아니요 (no) and 마시다 (to drink).
 - **Japanese:** ー is a flat line, の is a circle, り is two sticks, and く and し are their own strokes (く an angle pointing left, し down then a hook up to the right). The second lesson is words such as のり and くし.
 - **Chinese:** 一 人 〇 二 十, then 三 and 工, from flat lines, sticks, a peak and a circle.
 - A hint at the bottom says how to draw the nearest card, with its sound or meaning.
@@ -168,7 +168,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
-| `1` / `2` | in a round: cast your first / second spell, if you have the mana |
+| `1` / `2` | in a duel: cast your first / second spell, if you have the mana |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 

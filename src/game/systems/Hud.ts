@@ -88,6 +88,13 @@ export class Hud {
     this.waveText.setText(this.difficulty === "medium" ? `Wave ${n}` : `Wave ${n}  ·  ${DIFFICULTY[this.difficulty].label}`);
   }
 
+  /** Show or hide the mana bar and the two spells altogether (Classic has no spells). */
+  showSpells(on: boolean) {
+    this.manaBar.setVisible(on);
+    this.manaText.setVisible(on);
+    for (const t of this.slotTexts) t.setVisible(on);
+  }
+
   /** The two spells in play, and whether they can be cast in this wave's subject. */
   setSpells(slots: { name: string; glyph: string; cost: number; gesture: string }[], on: boolean) {
     this.slots = slots;
