@@ -13,5 +13,7 @@
   "minStrokeLengthEnabled": false,
   "minStrokePointsEnabled": false,
   "recognitionThreshold": 0.76,
-  "wantedRecognitionThreshold": 0.55
+  "wantedRecognitionThreshold": 0.55,
+  "thumbUpThreshold": 0.8,
+  "thumbUpHoldMs": 500
 }

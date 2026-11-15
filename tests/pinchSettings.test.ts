@@ -11,4 +11,8 @@ describe("local pinch config", () => {
       expect(() => parsePinchSettings(config)).toThrow();
     }
   });
+  it("validates adjustable line checks and hysteresis gaps",()=>{
+    expect(parsePinchSettings({on:.15,off:.18,hysteresisGap:.02,lineStraightness:.8,lineThinness:.4,lineAngleTolerance:40,lineAngleToleranceWanted:60})).toMatchObject({hysteresisGap:.02,lineStraightness:.8});
+    for(const config of [{on:.15,off:.18,hysteresisGap:.04},{hysteresisGap:0},{lineStraightness:1.1},{lineThinness:-1},{lineAngleTolerance:46},{lineAngleToleranceWanted:91}])expect(()=>parsePinchSettings(config)).toThrow();
+  });
 });

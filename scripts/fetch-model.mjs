@@ -7,9 +7,6 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const wasmSrc = join(root, "node_modules/@mediapipe/tasks-vision/wasm");
 const wasmDst = join(root, "public/mediapipe/wasm");
-const modelDst = join(root, "public/models/hand_landmarker.task");
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
 if (existsSync(wasmSrc)) {
   mkdirSync(wasmDst, { recursive: true });
@@ -19,11 +16,15 @@ if (existsSync(wasmSrc)) {
   console.warn("[fetch-model] @mediapipe/tasks-vision not installed yet; skipping wasm copy");
 }
 
-if (existsSync(modelDst) && !process.argv.includes("--force")) {
-  console.log("[fetch-model] model already present");
-} else {
+for (const name of ["hand_landmarker", "gesture_recognizer"]) {
+  const modelDst=join(root,`public/models/${name}.task`);
+  const modelUrl=`https://storage.googleapis.com/mediapipe-models/${name}/${name}/float16/1/${name}.task`;
+  if (existsSync(modelDst) && !process.argv.includes("--force")) {
+    console.log(`[fetch-model] ${name} already present`);
+    continue;
+  }
   try {
-    const res = await fetch(MODEL_URL);
+    const res = await fetch(modelUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     mkdirSync(dirname(modelDst), { recursive: true });
     writeFileSync(modelDst, Buffer.from(await res.arrayBuffer()));

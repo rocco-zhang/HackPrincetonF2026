@@ -115,6 +115,7 @@ describe("StrokeDetector", () => {
     expect(end.type).toBe("strokeEnd");
     if (end.type === "strokeEnd") {
       expect(end.points).toHaveLength(14);
+      expect(end.rawPoints).toHaveLength(20);
       expect(end.points[0].x).toBe(30);
     }
   });

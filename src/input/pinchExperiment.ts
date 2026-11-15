@@ -7,7 +7,7 @@ import type { RecogResult } from "./recognizer";
 
 import { experiment } from "./pinchConfig";
 export { experiment, type Variant } from "./pinchConfig";
-export type Observation = { t: number; landmarks: Landmark[] | null; world: Landmark[] | null; width: number; height: number };
+export type Observation = { t: number; landmarks: Landmark[] | null; world: Landmark[] | null; width: number; height: number; thumbUpScore?: number };
 
 /** Same normalized signal for live segmentation and explicit calibration. No 2D fallback in 3D mode. */
 export function calibrationRatio(o: Observation): number | null {
@@ -24,7 +24,7 @@ export function calibratePinch(closed: number[], open: number[]) {
   const c = q(closed, .9), o = q(open, .1);
   if (o - c < .18) return false;
   const on = Math.max(.12, Math.min(.45, c + (o - c) * .25));
-  const off = Math.max(on + .12, Math.min(.85, c + (o - c) * .65));
+  const off = Math.max(on + Math.max(.12,experiment.hysteresisGap), Math.min(.85, c + (o - c) * .65));
   if (c >= on || o <= off) return false;
   experiment.on = on; experiment.off = off;
   return true;
@@ -119,7 +119,7 @@ export class PinchExperiment {
       const on = experiment.on;
       // Speed in hand lengths/second, smoothed over 80 ms; fixed bounded assistance only at release.
       const adjustment=experiment.speedAssist && this.normalizedSpeed!==null ? experiment.speedAssistRange*(2*Math.min(1,this.normalizedSpeed/2)-1) : 0;
-      const off = Math.max(on+.10,Math.min(.85,experiment.off+adjustment));
+      const off = Math.max(on+experiment.hysteresisGap,Math.min(.85,experiment.off+adjustment));
       this.effectiveOff=off;
       this.effectiveTrend=Math.max(on+.1,on+.1+adjustment);
       if (gap > 200) {
@@ -162,6 +162,7 @@ export class PinchExperiment {
   }
   private finish(end: number, reason: string) {
     let samples = this.points.filter(s=>s.p.t <= end && s.p.t > this.consumed);
+    const rawPoints=samples.map(s=>s.p);
     this.components = [];
     if (experiment.variant === "F" && this.recognize && samples.length >= 8) {
       let best = -Infinity, chosen = samples;
@@ -184,6 +185,6 @@ export class PinchExperiment {
     this.decision = `${reason}; end ${Math.round(end)}ms; commit ${Math.round(this.lastT)}ms`;
     let points = samples.map(s=>s.p);
     if (experiment.variant !== "E" && experiment.variant !== "F" && points.length > INPUT.handTrimPoints*2+INPUT.minStrokePoints) points = points.slice(INPUT.handTrimPoints,-INPUT.handTrimPoints);
-    this.send({type:"strokeEnd",points});
+    this.send({type:"strokeEnd",points,rawPoints});
   }
 }

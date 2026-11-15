@@ -7,7 +7,9 @@ import { ACCENT_CSS, FONT, INK_CSS } from "../palette";
 import { sfx } from "../sfx";
 import { SUBJECT_INFO } from "../subjects";
 import { heading, Menu, screenFrame } from "../systems/Menu";
-import { cameraNeeded, difficultyRow, loadoutCaption, spellDeck, subjectChips } from "../systems/pickers";
+import { cameraNeeded, difficultyRow, spellDeck, subjectChips } from "../systems/pickers";
+import { spellRecipes } from "../spellCasting";
+import { SPELLS } from "../spells";
 
 /** Singleplayer setup: difficulty, subjects, how it works, start. */
 export class Classic extends Phaser.Scene {
@@ -56,7 +58,7 @@ export class Classic extends Phaser.Scene {
 
     this.spellNote = null;
     if (spells) {
-      heading(this, cx, 348, "Spells", "pick two · the number is the mana cost");
+      heading(this, cx, 348, "Spells", "pick two · hold 👍 to begin casting");
       this.spellNote = spellDeck(this, menu, cx, 396, 150, 62, 16, 6, 1000);
     } else heading(this, cx, 404, "How it works");
 
@@ -104,7 +106,10 @@ export class Classic extends Phaser.Scene {
     set(this.subjectNote, many ? `each wave switches to the next: ${state.subjects.map((s) => SUBJECT_INFO[s].label).join(" → ")}` : "pick one or more");
     const hows = [...new Set(state.subjects.map((s) => SUBJECT_INFO[s].how))];
     set(this.matchText, `2. A monster carries a card: ${hows.join(", or ")} to tear it up`);
-    if (this.spellNote) set(this.spellNote, loadoutCaption());
+    if (this.spellNote) {
+      const recipes=spellRecipes(state.loadout,state.subjects[0]);
+      set(this.spellNote,recipes.map(r=>`${SPELLS[r.id].name}: 👍 then ${r.steps.map(s=>s.label).join(" → ")}`).join("   ·   ")+"\nHold thumbs up to begin immediately. First character selects the spell; finish in order or lose mana.");
+    }
     set(this.warn, cameraNeeded() ? "ASL needs the camera (mouse test mode)" : "");
   }
 }

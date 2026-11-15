@@ -7,5 +7,9 @@ export const experiment = {
   releaseMs: 80, startMs: 30, lostHandMs: 300, historyMs: 750, prefixMs: 80,
   minStrokeLengthEnabled: true, minStrokePointsEnabled: true,
   recognitionThreshold: RECOG.acceptScore, wantedRecognitionThreshold: RECOG.acceptScoreWanted,
+  lineStraightness: RECOG.lineStraightness, lineThinness: RECOG.lineThinness,
+  lineAngleTolerance: RECOG.lineAngleTolerance, lineAngleToleranceWanted: RECOG.lineAngleToleranceWanted,
+  thumbUpThreshold: .8, thumbUpHoldMs: 500,
+  hysteresisGap: .10,
   on: INPUT.pinchOn, off: INPUT.pinchOff, speedAssist: false, speedAssistRange: .08, depthVeto: true, use3d: false,
 };

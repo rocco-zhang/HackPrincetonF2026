@@ -37,7 +37,10 @@ export type InputEvent =
   | { type: "cursor"; p: Pt; inking: boolean; src?: "mouse"; hand?: number }
   | { type: "strokeStart"; p: Pt; hand?: number }
   | { type: "strokePoint"; p: Pt; hand?: number }
-  | { type: "strokeEnd"; points: Pt[]; hand?: number }
+  | { type: "strokeCancel"; hand?: number }
+  | { type: "strokeEnd"; points: Pt[]; rawPoints?: Pt[]; hand?: number; rune?: "infinity" }
+  | { type: "spellRune"; name: "infinity"; points: Pt[]; hand?: number }
+  | { type: "spellGesture"; name: "thumbs_up"; score: number; hand: number }
   // recognized cast. In a language round the name can be one of that language's letter strokes.
   | { type: "symbol"; name: CastName | LangShape; score: number; points: Pt[]; hand?: number }
   | { type: "fizzle"; points: Pt[]; best?: { name: StrokeName; score: number }; hand?: number }; // drawn but not recognized

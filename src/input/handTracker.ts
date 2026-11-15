@@ -1,5 +1,5 @@
-// MediaPipe HandLandmarker loop → smoothed cursor + pinch state → input events.
-import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
+// One MediaPipe GestureRecognizer pass supplies landmarks plus the thumbs-up score.
+import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 import { ARENA, INPUT } from "../config";
 import { state, type Landmark } from "../state";
 import { video } from "./camera";
@@ -9,14 +9,19 @@ import { aslName, emit, type InputEvent } from "./events";
 import { drawingHandId } from "./hands";
 import { experiment, PinchExperiment, type Observation } from "./pinchExperiment";
 import { recognizer } from "./castPipeline";
+import { GestureGate } from "./gestureGate";
 
-const LOCAL_WASM = `${import.meta.env.BASE_URL}mediapipe/wasm`;
-const LOCAL_MODEL = `${import.meta.env.BASE_URL}models/hand_landmarker.task`;
+const gestureGates=[new GestureGate(),new GestureGate()];
+let starterHeldHand: number | null = null;
+
+const ASSET_BASE = import.meta.env.DEV ? "/" : import.meta.env.BASE_URL;
+const LOCAL_WASM = `${ASSET_BASE}mediapipe/wasm`;
+const LOCAL_MODEL = `${ASSET_BASE}models/gesture_recognizer.task`;
 const CDN_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
 const CDN_MODEL =
-  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+  "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
 
-let landmarker: HandLandmarker | null = null;
+let landmarker: GestureRecognizer | null = null;
 function withHand(hand: number, e: InputEvent): InputEvent {
   if (e.type === "cursor" || e.type === "strokeStart" || e.type === "strokePoint" || e.type === "strokeEnd") return { ...e, hand };
   return e;
@@ -26,10 +31,11 @@ const otherEngine = new PinchExperiment((e) => emit(withHand(1, e)), (p) => reco
 export let replaying = false;
 export const observationListeners = new Set<(o: Observation) => void>();
 export let inferenceMs = 0;
-export function setReplaying(value: boolean) { replaying = value; cancelHandStroke(); }
+export function setReplaying(value: boolean) { replaying = value; cancelHandStroke();gestureGates.forEach(g=>g.reset());starterHeldHand=null;state.thumbUpHolding=false; }
 export function processObservation(o: Observation) {
   state.landmarks = o.landmarks;
   state.handVisible = !!o.landmarks;
+  if(replaying && stepThumbsUp([o.thumbUpScore??0,0],o.t))return;
   pinchEngine.process(o, state.mirror, state.drawBox);
   state.pinchRatio = pinchEngine.ratio;
   state.pinchRatio3d = pinchEngine.ratio3;
@@ -42,6 +48,32 @@ let lastVideoTime = -1;
 let frames = 0;
 let fpsStart = performance.now();
 let calib: { until: number; pts: { x: number; y: number }[]; done?: (ok: boolean) => void } | null = null;
+
+/** Gesture evidence reserves input before the hold completes, so it cannot also cast an ASL letter. */
+function stepThumbsUp(scores: readonly number[], now: number): boolean {
+  const wasHolding=state.thumbUpHolding;
+  state.thumbUpScore=Math.max(...scores);
+  const enabled=state.mode==="hand" && state.spellGesturesEnabled && !calib;
+  let triggeredHand=-1;
+  gestureGates.forEach((gate,hand)=>{
+    const fired=gate.update(enabled?scores[hand]??0:0,now,experiment.thumbUpThreshold,experiment.thumbUpHoldMs);
+    if(fired && triggeredHand<0)triggeredHand=hand;
+  });
+  state.thumbUpProgress=Math.max(...gestureGates.map(g=>g.progress));
+  if(!enabled || (starterHeldHand!==null && !gestureGates[starterHeldHand].holding))starterHeldHand=null;
+  // Only the original starter hold survives into casting. After release, later gesture
+  // classifications cannot cancel the spell's strokes or be substituted for its ASL letters.
+  state.thumbUpHolding=enabled && (state.spellCastingActive?starterHeldHand!==null:gestureGates.some(g=>g.holding));
+  if(!state.thumbUpHolding)return false;
+  cancelHandStroke();resetAslHold();
+  if(!wasHolding){emit({type:"strokeCancel",hand:0});emit({type:"strokeCancel",hand:1});}
+  state.aslLetter=null;state.aslFeat=null;state.aslConfidence=0;
+  if(triggeredHand>=0 && !state.spellCastingActive){
+    starterHeldHand=triggeredHand;
+    emit({type:"spellGesture",name:"thumbs_up",score:scores[triggeredHand],hand:triggeredHand});
+  }
+  return true;
+}
 
 /** True if `url` is served as a real file (Vite's dev server answers missing files with index.html). */
 async function hasFile(url: string) {
@@ -59,13 +91,14 @@ export async function initHandTracker() {
   state.modelSource = local ? "local" : "cdn";
   const vision = await FilesetResolver.forVisionTasks(local ? LOCAL_WASM : CDN_WASM);
   const make = (delegate: "GPU" | "CPU") =>
-    HandLandmarker.createFromOptions(vision, {
+    GestureRecognizer.createFromOptions(vision, {
       baseOptions: { modelAssetPath: local ? LOCAL_MODEL : CDN_MODEL, delegate },
       runningMode: "VIDEO",
       numHands: 2,
       minHandDetectionConfidence: 0.5,
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
+      cannedGesturesClassifierOptions:{categoryAllowlist:["Thumb_Up"],scoreThreshold:0,maxResults:1},
     });
   try {
     landmarker = await make("GPU");
@@ -146,9 +179,9 @@ function loop() {
   const now = performance.now();
   let res;
   try {
-    res = landmarker.detectForVideo(v, now);
+    res = landmarker.recognizeForVideo(v, now);
   } catch (err) {
-    console.warn("detectForVideo failed", err);
+    console.warn("recognizeForVideo failed", err);
     return;
   }
   inferenceMs = performance.now() - now;
@@ -164,23 +197,25 @@ function loop() {
   const labels = ((res as { handednesses?: { categoryName?: string }[][] }).handednesses ?? []).map((h) => h[0]?.categoryName);
   const found: (Landmark[] | null)[] = [null, null];
   const foundWorld: (Landmark[] | null)[] = [null, null];
+  const thumbScores=[0,0];
   hands.forEach((lm, i) => {
     const id = drawingHandId(labels[i], i);
     if (found[id]) return;
     found[id] = lm;
     foundWorld[id] = worlds[i] ?? null;
+    thumbScores[id]=res.gestures[i]?.find(g=>g.categoryName==="Thumb_Up")?.score??0;
   });
   const lm = found[0] ?? found[1];
   state.landmarks = lm;
   state.handVisible = !!lm;
   const width = v.videoWidth, height = v.videoHeight;
-  const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height };
+  const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height, thumbUpScore:thumbScores[0] };
   for (const listener of observationListeners) listener(primary);
+  if(lm)state.lastHandSeen=now;
+  if(stepThumbsUp(thumbScores,now))return;
   const asl = state.mode === "hand" && (state.aslActive || state.aslTraining);
   if (asl) {
-    pinchEngine.reset();
-    otherEngine.reset();
-    state.inking = false;
+    pinchEngine.reset();otherEngine.reset();state.inking=false;
     stepAsl(lm ?? undefined, width / height, now);
   } else if (state.mode === "hand") {
     state.aslLetter = null;
@@ -208,4 +243,9 @@ export function cancelHandStroke() {
   pinchEngine.reset();
   otherEngine.reset();
   state.inking = false;
+}
+
+export function resetAslHold() {
+  aslCaster.reset();
+  state.aslProgress=0;
 }

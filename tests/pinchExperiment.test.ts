@@ -17,7 +17,7 @@ function setup(variant:Variant) {
   const step=(t:number,r:number|null)=>engine.process(observation(t,r,.3+t*.0001),true,INPUT.drawBox);
   return {events,engine,step};
 }
-beforeEach(()=>Object.assign(experiment,{variant:"A",timing:"time",startFrames:2,endFrames:3,calibrated:false,speedAssist:false,speedAssistRange:.08,depthVeto:true,use3d:false,anchor:"knuckle",releaseMs:80,startMs:30,lostHandMs:300,on:.28,off:.5}));
+beforeEach(()=>Object.assign(experiment,{variant:"A",hysteresisGap:.1,timing:"time",startFrames:2,endFrames:3,calibrated:false,speedAssist:false,speedAssistRange:.08,depthVeto:true,use3d:false,anchor:"knuckle",releaseMs:80,startMs:30,lostHandMs:300,on:.28,off:.5}));
 describe("pinch experiment replay",()=>{
   it("keeps A's 180ms control delay and lets B split an observed 100ms opening",()=>{
     for(const variant of ["A","B"] as const){
@@ -185,5 +185,15 @@ describe("pinch experiment replay",()=>{
     expect(calibratePinch(Array(30).fill(.15),Array(30).fill(.8))).toBe(true);
     expect(experiment.on).toBeGreaterThan(.15);expect(experiment.off).toBeGreaterThan(experiment.on+.1);
     expect(experiment.off).toBeLessThanOrEqual(.85);
+  });
+  it("uses the selected hysteresis gap as the speed-assisted release floor",()=>{
+    for(const gap of [.02,.1]){
+      const {engine}=setup("C");experiment.hysteresisGap=gap;experiment.speedAssist=true;experiment.speedAssistRange=.3;
+      for(const t of [0,40])engine.process(observation(t,.1),true,INPUT.drawBox);
+      expect(engine.effectiveOff).toBeCloseTo(.28+gap);
+      engine.process(observation(80,.34),true,INPUT.drawBox);
+      engine.process(observation(180,.34),true,INPUT.drawBox);
+      expect(engine.inking).toBe(gap===.1);
+    }
   });
 });

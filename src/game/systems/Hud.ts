@@ -11,6 +11,7 @@ export class Hud {
   private multText: Phaser.GameObjects.Text;
   private waveText: Phaser.GameObjects.Text;
   private slotTexts: Phaser.GameObjects.Text[] = [];
+  private starterTexts: Phaser.GameObjects.Text[] = [];
   private manaBar: Phaser.GameObjects.Graphics;
   private manaText: Phaser.GameObjects.Text;
   private mana = { now: 0, shown: 0, max: 1 };
@@ -42,17 +43,19 @@ export class Hud {
       .text(ARENA.width / 2, 18, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5, 0)
       .setDepth(depth);
-    // mana bar under the wave name, with the two spells you brought on either side of it
+    // Mana stays under the wave name; equipped spells form a stack below the score on the right.
     this.manaBar = scene.add.graphics().setDepth(depth);
     this.manaText = scene.add
       .text(ARENA.width / 2, MANA_Y + MANA_H / 2, "", { fontFamily: FONT, fontSize: "13px", fontStyle: "bold", color: INK_CSS })
       .setOrigin(0.5)
       .setDepth(depth);
-    for (const side of [-1, 1]) {
+    for (let slot=0;slot<2;slot++) {
+      const y=112+slot*52;
+      this.starterTexts.push(scene.add.text(ARENA.width-8,y+22,"",{fontFamily:FONT,fontSize:"15px",color:INK_CSS,stroke:"#f9f5ea",strokeThickness:4}).setOrigin(1,.5).setDepth(depth));
       this.slotTexts.push(
         scene.add
-          .text(ARENA.width / 2 + side * (MANA_W / 2 + 14), MANA_Y + MANA_H / 2, "", { fontFamily: FONT, fontSize: "18px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 })
-          .setOrigin(side < 0 ? 1 : 0, 0.5)
+          .text(ARENA.width-8, y, "", { fontFamily: FONT, fontSize: "18px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 })
+          .setOrigin(1, 0.5)
           .setDepth(depth),
       );
     }
@@ -88,11 +91,12 @@ export class Hud {
     this.waveText.setText(this.difficulty === "medium" ? `Wave ${n}` : `Wave ${n}  ·  ${DIFFICULTY[this.difficulty].label}`);
   }
 
-  /** Show or hide the mana bar and the two spells altogether (Classic has no spells). */
+  /** Show or hide the mana bar and the two equipped spells. */
   showSpells(on: boolean) {
     this.manaBar.setVisible(on);
     this.manaText.setVisible(on);
     for (const t of this.slotTexts) t.setVisible(on);
+    for (const t of this.starterTexts) t.setVisible(on);
   }
 
   /** The two spells in play, and whether they can be cast in this wave's subject. */
@@ -111,8 +115,9 @@ export class Hud {
   private paintSpells() {
     this.slots.forEach((slot, i) => {
       const ready = this.spellsOn && this.mana.now >= slot.cost;
-      const label = i === 0 ? `${slot.gesture} · ${slot.glyph} ${slot.name} ${slot.cost}` : `${slot.cost} ${slot.name} ${slot.glyph} · ${slot.gesture}`;
-      this.slotTexts[i]?.setText(label).setAlpha(ready ? 1 : 0.4);
+      const text=this.slotTexts[i];
+      text?.setText(`${slot.glyph} ${slot.name} - ${slot.cost}`).setAlpha(ready ? 1 : 0.4);
+      this.starterTexts[i]?.setText(slot.gesture).setAlpha(ready?1:.4);
     });
     this.manaText.setText(this.spellsOn ? `mana ${Math.round(this.mana.now)}` : "no spells this wave");
   }

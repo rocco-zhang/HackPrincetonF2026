@@ -4,6 +4,7 @@ import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config
 import { recognizeDigit } from "../../input/digits";
 import { castLabel, isLangShape, mathName, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
+import { resetAslHold } from "../../input/handTracker";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
 import { Monster } from "../entities/Monster";
@@ -18,6 +19,7 @@ import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
 import { cleanLoadout, MANA, readSpellPose, SLOT_GESTURES, SPELL_AFTER_INK, SPELL_HOLD, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
+import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
 const SHAPE_GLYPH: Partial<Record<CastName, string>> = { caret: "Λ", circle: "◯", zigzag: "zigzag" };
@@ -68,6 +70,12 @@ export class Arena extends Phaser.Scene implements CastHost {
   private aslCards = new Map<CastName, Phaser.GameObjects.Image>();
   private aslText: Phaser.GameObjects.Text | null = null;
   private aslBar: Phaser.GameObjects.Graphics | null = null;
+  private incantation = new SpellCasting();
+  private worldTime = 0;
+  private spellPanel: Phaser.GameObjects.Container | null = null;
+  private spellSequenceText: Phaser.GameObjects.Text | null = null;
+  private spellCharacters: Phaser.GameObjects.Container | null = null;
+  private spellVisualKey = "";
 
   constructor() {
     super("Arena");
@@ -85,16 +93,14 @@ export class Arena extends Phaser.Scene implements CastHost {
   /** This round has mana and spells: always in a duel, in Classic only when switched on there. */
   private spells = false;
 
-  /**
-   * Spells are cast with a held hand pose, so even in a round that has them they are off where a
-   * pose already means something: ASL letters are poses, and in math an open hand held still
-   * submits the number.
-   */
+  /** Classic uses the subject's alphabet; Duel keeps its existing pose controls. */
   private get spellsOn() {
-    return this.spells && this.subject !== "asl" && this.subject !== "math";
+    return this.spells && (!this.versus || (this.subject !== "asl" && this.subject !== "math"));
   }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
+    this.incantation.reset();
+    this.worldTime = 0;
     this.spells = !!data?.pvp || (state.classicSpells && !data?.demo);
     this.loadout = cleanLoadout(state.loadout);
     this.mana = MANA.start;
@@ -132,6 +138,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.casting = new Casting(this, this);
     this.hud = new Hud(this, this.hearts, this.difficulty);
     this.hud.setHearts(this.hearts);
+    const panelBackground = this.add.rectangle(0,0,600,160,0xfffefa,.94).setStrokeStyle(3,0x487ca4);
+    this.spellSequenceText = this.add.text(0,-42,"",{fontFamily:FONT,fontSize:"27px",fontStyle:"bold",color:INK_CSS,align:"center"}).setOrigin(.5);
+    this.spellCharacters = this.add.container(0,8);
+    this.spellVisualKey="";
+    this.spellPanel = this.add.container(cx,188,[panelBackground,this.spellSequenceText,this.spellCharacters]).setDepth(1050).setVisible(false);
     this.roll = this.demo ? mulberry32(DEMO_SEED) : Math.random;
     this.spawner = this.makeSpawner();
     this.themText = null;
@@ -163,15 +174,24 @@ export class Arena extends Phaser.Scene implements CastHost {
         case "cursor": return this.casting.onCursor(e.p, e.inking, e.hand);
         case "strokeStart": return this.casting.onStrokeStart(e.p, e.hand);
         case "strokePoint": return this.casting.onStrokePoint(e.p, e.hand);
+        case "strokeCancel": return this.casting.cancelStroke(e.hand);
         case "strokeEnd":
           this.casting.onStrokeEnd(e.hand);
+          if(e.rune)return;
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points, e.hand);
           return;
+        case "spellGesture":
+          if(!this.routeSpellSign("spell_thumbs_up") && this.spellsOn && !this.versus && this.phase==="play"){
+            this.fx.floatText(this.player.x,this.player.y-80,"not enough mana or spell cooling down","#8a857a",18);
+          }
+          return;
         case "symbol":
+          if (!this.math && this.routeSpellSign(e.name)) return;
           if (this.lang && this.phase === "play") { this.onLangMark(e.name, e.hand); return; }
           if (!this.math && this.phase !== "over" && !isLangShape(e.name)) this.casting.cast(e.name, e.hand);
           return;
         case "fizzle":
+          if (!this.math && this.incantation.active) { this.routeSpellSign("unrecognized"); return; }
           if (this.lang && this.phase === "play") {
             this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
             return;
@@ -181,21 +201,27 @@ export class Arena extends Phaser.Scene implements CastHost {
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.incantation.reset();
+      this.setSpellTime(false);
       off();
       state.wanted = [];
       state.langMarks = null;
       state.wantedMarks = [];
       state.inRound = false;
+      state.spellRunesEnabled=false;
+      state.spellGesturesEnabled=false;
       state.aslActive = false;
       state.mathActive = false;
       state.langActive = false;
     });
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
-      if (ev.repeat || !this.spellsOn) return;
+      if (ev.repeat || !this.spellsOn || !this.versus) return;
       if (ev.key === "1") this.castSpell(this.loadout[0]);
       if (ev.key === "2") this.castSpell(this.loadout[1]);
     });
     this.input.keyboard?.on("keydown-ESC", () => {
+      const cancelled = this.incantation.cancel(performance.now());
+      if (cancelled) { this.finishIncantation(cancelled); return; }
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
       this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
     });
@@ -241,6 +267,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     state.aslActive = this.asl;
     state.mathActive = this.math;
     state.langActive = this.lang;
+    state.spellRunesEnabled=false;
+    state.spellGesturesEnabled=false;
     state.langMarks = isScript(this.subject) ? scriptMarks(this.subject) : null;
     this.buffer = "";
     this.marks = [];
@@ -254,13 +282,67 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private showSpells() {
     this.hud.showSpells(this.spells); // no mana bar when the round has no spells
-    this.hud.setSpells(this.loadout.map((id, i) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: SLOT_GESTURES[i] })), this.spellsOn);
+    this.hud.setSpells(this.loadout.map((id, i) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: this.versus ? SLOT_GESTURES[i] : "" })), this.spellsOn);
     this.hud.setMana(this.mana, MANA.max);
   }
 
   private gainMana(n: number) {
     this.mana = Math.min(MANA.max, this.mana + n);
     this.hud.setMana(this.mana, MANA.max);
+  }
+
+  /** Only the first sign of an affordable equipped recipe can enter slow-time casting. */
+  private routeSpellSign(sign: string): boolean {
+    if (this.versus || !this.spellsOn || this.phase !== "play") return false;
+    const now = performance.now();
+    if (this.incantation.active) {
+      const result = this.incantation.input(sign,now);
+      if (result) this.finishIncantation(result);
+      return true;
+    }
+    if (!this.incantation.beginFrom(sign,this.loadout,this.subject,this.mana,now)) return false;
+    resetAslHold();
+    this.marks=[];this.buffer="";this.answerHold=0;
+    this.answerBar?.clear();this.casting.releaseHeld();
+    this.setSpellTime(true);
+    this.paintIncantation();
+    return true;
+  }
+
+  private setSpellTime(active: boolean) {
+    state.spellCastingActive=active;
+    const scale = active ? INCANTATION.timeScale : 1;
+    this.time.timeScale=scale;
+    this.tweens.timeScale=scale;
+    if (!active) {this.spellPanel?.setVisible(false);this.spellVisualKey="";}
+  }
+
+  private finishIncantation(result: SpellResult) {
+    this.setSpellTime(false);
+    this.casting.releaseHeld();
+    if (result.success && this.castSpell(result.id)) return;
+    const penalty=Math.min(this.mana,spellFailureCost(result.id));
+    this.mana-=penalty;this.hud.setMana(this.mana,MANA.max);
+    this.fx.floatText(this.player.x,this.player.y-105,`${SPELLS[result.id].name}: ${result.reason??"no valid target"} (-${penalty} mana)`,"#8a857a",22);
+    sfx.fizzle();
+    if(this.lang)this.refreshLang();else this.refreshAnswer();
+  }
+
+  private paintIncantation() {
+    const a=this.incantation.active;
+    this.spellPanel?.setVisible(!!a);
+    if(!a)return;
+    const options=this.incantation.options;
+    const key=options.map(option=>`${option.id}:${option.step}`).join("/");
+    if(key===this.spellVisualKey)return;
+    this.spellVisualKey=key;
+    this.spellSequenceText?.setText(`Casting ${options.map(option=>SPELLS[option.id].name).join(" / ")}`);
+    this.spellCharacters?.removeAll(true);
+    options.forEach((option,row)=>option.steps.forEach((step,i)=>{
+      const color=i<option.step?"#aaa69d":i===option.step?"#d7372f":"#171717";
+      const text=this.add.text((i-(option.steps.length-1)/2)*68,row*42,step.label,{fontFamily:FONT,fontSize:"34px",color}).setOrigin(.5);
+      this.spellCharacters?.add(text);
+    }));
   }
 
   private startWave(n: number) {
@@ -281,6 +363,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (this.phase === "over" || this.wave !== n) return;
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
+      state.spellGesturesEnabled=this.spells&&!this.versus;
       if (this.bossPlan) this.spawnBoss(this.bossPlan);
     });
   }
@@ -447,21 +530,25 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   update(_t: number, deltaMs: number) {
-    const dt = Math.min(0.05, deltaMs / 1000);
+    const expired=this.incantation.tick(performance.now());
+    if(expired)this.finishIncantation(expired);
+    const dt = Math.min(0.05, deltaMs / 1000)*(this.incantation.active?INCANTATION.timeScale:1);
+    this.worldTime=this.versus?this.time.now:this.worldTime+dt*1000;
+    this.paintIncantation();
     // strokes are only kept while a card or number is half drawn
-    const partDrawn = (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
+    const partDrawn = !!this.incantation.active || (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
     if (!partDrawn && this.casting.holding) this.casting.releaseHeld();
     this.casting.update(dt);
     // the figure casts while a stroke is being drawn, or (ASL) while a letter is being held
-    this.player.setCasting(this.phase !== "over" && (this.casting.drawing || (this.asl && state.aslProgress > 0)));
+    this.player.setCasting(this.phase !== "over" && (!!this.incantation.active || this.casting.drawing || (this.asl && state.aslProgress > 0)));
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
-    state.wanted = this.phase === "over" ? [] : fronts;
-    state.wantedMarks = this.lang ? nextMarks(state.wanted, this.marks) : [];
+    state.wanted = this.phase === "over" ? [] : this.incantation.active ? (this.asl || this.subject === "shapes" ? this.incantation.expectedTokens as CastName[] : []) : fronts;
+    state.wantedMarks = this.lang ? this.incantation.active ? this.incantation.expectedTokens as Mark[] : nextMarks(state.wanted, this.marks) : [];
     if (this.aslText) this.updateAsl();
-    if (this.math) this.tickAnswerHold(dt);
+    if (this.math && !this.incantation.active) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
-    if (this.spellsOn && this.phase === "play") this.tickSpells(dt);
+    if (this.versus && this.spellsOn && this.phase === "play") this.tickSpells(dt);
     this.paintShield();
     if (this.phase === "over") return;
 
@@ -470,7 +557,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     const { x: px, y: py } = this.player;
-    const frozen = this.time.now < this.slowUntil;
+    const frozen = this.worldTime < this.slowUntil;
     for (const m of [...this.monsters]) {
       if (frozen) m.sprite.setTint(0x9fd0ff);
       m.step(frozen ? dt * SPELL_POWER.freezeSpeed : dt, px, py);
@@ -478,7 +565,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (this.hearts <= 0) return;
     }
 
-    if (this.phase === "play" && this.spawner.done && this.monsters.length === 0) {
+    if (this.phase === "play" && !this.incantation.active && this.spawner.done && this.monsters.length === 0) {
       const bonus = Math.round(500 * this.wave * DIFFICULTY[this.difficulty].scoreMult);
       this.score += bonus;
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
@@ -515,11 +602,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
   }
 
-  private castSpell(id: SpellId) {
-    if (!this.spellsOn || this.phase !== "play") return;
+  private castSpell(id: SpellId): boolean {
+    if (!this.spellsOn || this.phase !== "play") return false;
     const spell = SPELLS[id];
     const { x: px, y: py } = this.player;
-    const no = (why: string) => this.fx.floatText(px, py - 80, why, "#8a857a", 18);
+    const no = (why: string) => { this.fx.floatText(px, py - 80, why, "#8a857a", 18); return false; };
     if (this.mana < spell.cost) return no(`not enough mana for ${spell.name}`);
     const live = this.monsters.filter((m) => !m.dying && m.active);
     const spend = () => {
@@ -545,16 +632,16 @@ export class Arena extends Phaser.Scene implements CastHost {
     } else if (id === "freeze") {
       if (!live.length) return no("nobody to freeze");
       spend();
-      this.slowUntil = this.time.now + SPELL_POWER.freezeSeconds * 1000;
+      this.slowUntil = this.worldTime + SPELL_POWER.freezeSeconds * 1000;
       sfx.water();
       this.cameras.main.flash(160, 150, 210, 255);
       this.time.delayedCall(SPELL_POWER.freezeSeconds * 1000 + 30, () => {
-        if (this.time.now >= this.slowUntil) for (const m of this.monsters) m.sprite.clearTint();
+        if (this.worldTime >= this.slowUntil) for (const m of this.monsters) m.sprite.clearTint();
       });
     } else if (id === "shield") {
-      if (this.time.now < this.shieldUntil) return no("the shield is already up");
+      if (this.worldTime < this.shieldUntil) return no("the shield is already up");
       spend();
-      this.shieldUntil = this.time.now + SPELL_POWER.shieldSeconds * 1000;
+      this.shieldUntil = this.worldTime + SPELL_POWER.shieldSeconds * 1000;
       sfx.wave();
     } else {
       const max = DIFFICULTY[this.difficulty].hearts;
@@ -566,6 +653,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.fx.floatText(px, py - 130, "+1 heart", ACCENT_CSS, 26);
       sfx.wave();
     }
+    return true;
   }
 
   /** A damaging spell reaches a monster: it destroys it, or tears a few symbols off a boss. */
@@ -645,10 +733,10 @@ export class Arena extends Phaser.Scene implements CastHost {
     const g = this.shieldGfx;
     if (!g) return;
     g.clear();
-    const left = this.shieldUntil - this.time.now;
+    const left = this.shieldUntil - this.worldTime;
     if (left <= 0) return;
     const { x, y } = this.player;
-    const pulse = 0.6 + 0.25 * Math.sin(this.time.now / 180);
+    const pulse = 0.6 + 0.25 * Math.sin(this.worldTime / 180);
     // fades out over its last two seconds
     const a = Math.min(1, left / 2000);
     g.fillStyle(0x2f9e58, 0.1 * a);
@@ -818,6 +906,8 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private onDrawnDigit(points: { x: number; y: number }[], hand = 0) {
     const hit = recognizeDigit(points);
+    if (hit && this.routeSpellSign(`digit_${hit.digit}`)) return;
+    if (!hit && this.incantation.active) { this.routeSpellSign("unrecognized"); return; }
     if (!hit) {
       this.fx.floatText(this.player.x, this.player.y - 80, "draw a digit", "#8a857a", 22);
       sfx.fizzle();
@@ -832,7 +922,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private onAnswerKey(ev: KeyboardEvent) {
-    if (!this.math || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (!this.math || this.incantation.active || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key >= "0" && ev.key <= "9") {
       ev.preventDefault();
       if (this.buffer.length >= 4) return;
@@ -921,7 +1011,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private contact(m: Monster) {
     this.removeMonster(m);
-    if (this.time.now < this.shieldUntil) {
+    if (this.worldTime < this.shieldUntil) {
       // the shield takes this one, and is used up
       this.shieldUntil = 0;
       this.fx.burst(m.x, m.y, 0x2f9e58, 30);
@@ -951,6 +1041,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private gameOver() {
+    state.spellRunesEnabled=false;
+    state.spellGesturesEnabled=false;
+    this.incantation.reset();this.setSpellTime(false);
     if (this.versus) {
       pvp.send({ t: "dead", score: this.score });
       return this.endVersus(false);
