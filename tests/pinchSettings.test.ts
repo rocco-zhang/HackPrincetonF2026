@@ -5,6 +5,14 @@ import defaults from "../config/pinch.defaults.json";
 import { pinchDefaults, experiment } from "../src/input/pinchConfig";
 
 describe("local pinch config", () => {
+  it("migrates legacy variants into buffering without retaining algorithm selection", () => {
+    for (const variant of ["A", "B", "C", "D", "E", "F"]) {
+      expect(parsePinchSettings({ variant })).toEqual({ buffered: variant === "E" || variant === "F" });
+    }
+    expect(parsePinchSettings({ variant: "E", buffered: false })).toEqual({ buffered: false });
+    expect(() => parsePinchSettings({ variant: "G" })).toThrow();
+    expect(() => parsePinchSettings({ buffered: "false" })).toThrow();
+  });
   it("uses the saved settings as a validated, shared baseline", () => {
     expect(parsePinchSettings(defaults)).toEqual(defaults);
     expect(personal).toEqual(defaults);
@@ -12,7 +20,7 @@ describe("local pinch config", () => {
     expect(experiment).toMatchObject(defaults);
   });
   it("accepts the requested personal settings", () => {
-    expect(parsePinchSettings(personal)).toMatchObject({on:.15,off:.25,anchor:"thumb",timing:"frames",startFrames:2,endFrames:2,use3d:false,depthVeto:false,speedAssist:true,speedAssistRange:.1,variant:"C"});
+    expect(parsePinchSettings(personal)).toMatchObject({on:.15,off:.25,anchor:"thumb",timing:"frames",startFrames:2,endFrames:2,use3d:false,depthVeto:false,speedAssist:true,speedAssistRange:.1,buffered:false});
   });
   it("rejects misspelled fields and invalid timing or ratio values", () => {
     for (const config of [{startFrame:1},{startFrames:0},{speedAssistRange:.5},{on:.4,off:.45},{speedAssist:"true"}]) {

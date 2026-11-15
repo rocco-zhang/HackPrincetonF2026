@@ -100,10 +100,10 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
     const game = getGame();
     const r = state.lastRecog;
     const lines = [
-      `pinch experiment: ${experiment.version} / ${experiment.variant} / ${experiment.anchor} / release ${experiment.variant === "A" ? INPUT.releaseMs : experiment.releaseMs}ms`,
+      `pinch experiment: ${experiment.version} / ${experiment.buffered?"buffered":"unbuffered"} / ${experiment.anchor} / release ${experiment.releaseMs}ms`,
       `mode: ${state.mode}   camera: ${state.cameraOn ? "on" : "off"}   tracker: ${state.trackerReady ? `${state.delegate} / model ${state.modelSource}` : "not loaded"}`,
       `tracker fps: ${state.trackerFps.toFixed(0)}   game fps: ${game ? game.loop.actualFps.toFixed(0) : "-"}`,
-      `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${INPUT.pinchOn}, off > ${INPUT.pinchOff})   3D: ${state.pinchRatio3d?.toFixed(2) ?? "-"} (veto > ${INPUT.pinch3dMax})   inking: ${state.inking}`,
+      `hand: ${state.handVisible ? "yes" : "no"}   pinch: ${state.pinchRatio?.toFixed(2) ?? "-"} (on < ${experiment.on}, off > ${experiment.off})   3D: ${state.pinchRatio3d?.toFixed(2) ?? "-"} (veto > ${INPUT.pinch3dMax})   inking: ${state.inking}`,
       `ASL: ${state.aslActive || state.aslTraining ? `reading ${state.aslLetter ?? "-"} (${state.aslSource ?? "-"} ${(state.aslConfidence * 100).toFixed(0)}%)  hold ${(state.aslProgress * 100).toFixed(0)}%` : "off (pick ASL as a subject)"}`,
       r
         ? `last: ${r.name ?? "FIZZLE"}  score ${r.score.toFixed(2)} (accept ≥ ${experiment.recognitionThreshold}, ≥ ${experiment.wantedRecognitionThreshold} if needed: ${state.wanted.join(",") || "-"})  via ${r.method}${r.best && !r.accepted ? `  best guess ${r.best.name} ${r.best.score.toFixed(2)}` : ""}`

@@ -28,11 +28,26 @@ function withHand(hand: number, e: InputEvent): InputEvent {
 }
 export const pinchEngine = new PinchExperiment((e) => emit(withHand(0, e)), (p) => recognizer.recognize(p));
 const otherEngine = new PinchExperiment((e) => emit(withHand(1, e)), (p) => recognizer.recognize(p));
+let diagnosticHand: 0 | 1 = 0;
+export function pinchDiagnostics() { return {hand:diagnosticHand,engine:diagnosticHand === 0 ? pinchEngine : otherEngine}; }
+/** The lab preview, sampling and metrics must refer to the same visible hand. */
+export function observeHands(primary: Observation, secondary: Observation) {
+  diagnosticHand = primary.landmarks ? 0 : secondary.landmarks ? 1 : diagnosticHand;
+  pinchEngine.observe(primary); otherEngine.observe(secondary);
+  const selected = diagnosticHand === 0 ? primary : secondary;
+  state.landmarks = selected.landmarks;
+  state.handVisible = !!selected.landmarks;
+  state.pinchRatio = pinchDiagnostics().engine.ratio;
+  state.pinchRatio3d = pinchDiagnostics().engine.ratio3;
+  for (const listener of observationListeners) listener(selected);
+}
 export let replaying = false;
 export const observationListeners = new Set<(o: Observation) => void>();
 export let inferenceMs = 0;
 export function setReplaying(value: boolean) { replaying = value; cancelHandStroke();gestureGates.forEach(g=>g.reset());starterHeldHand=null;state.thumbUpHolding=false; }
 export function processObservation(o: Observation) {
+  diagnosticHand = 0;
+  pinchEngine.observe(o);
   state.landmarks = o.landmarks;
   state.handVisible = !!o.landmarks;
   if(replaying && stepThumbsUp([o.thumbUpScore??0,0],o.t))return;
@@ -210,7 +225,8 @@ function loop() {
   state.handVisible = !!lm;
   const width = v.videoWidth, height = v.videoHeight;
   const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height, thumbUpScore:thumbScores[0] };
-  for (const listener of observationListeners) listener(primary);
+  const secondary: Observation = {t:now,landmarks:found[1],world:foundWorld[1],width,height,thumbUpScore:thumbScores[1]};
+  observeHands(primary, secondary);
   if(lm)state.lastHandSeen=now;
   if(stepThumbsUp(thumbScores,now))return;
   const asl = state.mode === "hand" && (state.aslActive || state.aslTraining);
@@ -222,8 +238,8 @@ function loop() {
     state.aslFeat = null;
     state.aslProgress = 0;
     if (!calib) {
-      processObservation(primary);
-      otherEngine.process({ t: now, landmarks: found[1], world: foundWorld[1], width, height }, state.mirror, state.drawBox);
+      pinchEngine.process(primary, state.mirror, state.drawBox);
+      otherEngine.process(secondary, state.mirror, state.drawBox);
       state.landmarks = found[0] ?? found[1];
       state.handVisible = !!(found[0] || found[1]);
       state.inking = pinchEngine.inking || otherEngine.inking;

@@ -4,7 +4,7 @@ import { DIFFICULTIES, DIFFICULTY, type Difficulty } from "../../config";
 import { pvp } from "../../net/pvp";
 import { saveDifficulty, saveLoadout, saveSubjects, state } from "../../state";
 import { FONT, MUTED_CSS } from "../palette";
-import { pickSpell, SLOT_GESTURES, SPELL_IDS, SPELLS } from "../spells";
+import { pickSpell, SPELL_IDS, SPELLS } from "../spells";
 import { SUBJECT_INFO, SUBJECTS, toggleSubject, type Subject } from "../subjects";
 import type { Menu } from "./Menu";
 
@@ -91,7 +91,3 @@ export function spellDeck(scene: Phaser.Scene, menu: Menu, cx: number, y: number
     .text(cx, y + (rows - 1) * (h + gap) + h / 2 + 12, "", { fontFamily: FONT, fontSize: "17px", color: MUTED_CSS, align: "center", wordWrap: { width: captionWidth } })
     .setOrigin(0.5, 0);
 }
-
-/** How the two picked spells are cast and what they do. */
-export const loadoutCaption = (sep = "   ·   ") =>
-  state.loadout.map((id, i) => `${SLOT_GESTURES[i]}: ${SPELLS[id].name} ${SPELLS[id].blurb}`).join(sep);

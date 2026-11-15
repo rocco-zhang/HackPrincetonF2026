@@ -22,7 +22,7 @@ function observation(t:number,score:number):Observation{
   return {t,landmarks,world:null,width:640,height:480,thumbUpScore:score};
 }
 function setup(casting:boolean){
-  Object.assign(experiment,{variant:"C",timing:"frames",startFrames:1,endFrames:1,on:.28,off:.5,thumbUpThreshold:.8,thumbUpHoldMs:500});
+  Object.assign(experiment,{buffered:false,timing:"frames",startFrames:1,endFrames:1,on:.28,off:.5,thumbUpThreshold:.8,thumbUpHoldMs:500});
   state.mode="hand";state.spellGesturesEnabled=true;state.spellCastingActive=casting;
   setReplaying(true);
 }

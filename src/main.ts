@@ -25,7 +25,7 @@ import { audio, toggleMute, unlockAudio } from "./game/sfx";
 import { initLobby, lobbyOpen } from "./net/lobby";
 import { pvp } from "./net/pvp";
 import { state } from "./state";
-import { experiment, type Variant } from "./input/pinchExperiment";
+import { experiment } from "./input/pinchExperiment";
 
 if (import.meta.env.DEV) {
   Object.assign(experiment, __PINCH_LOCAL_CONFIG__);
@@ -36,8 +36,10 @@ if (import.meta.env.DEV) {
   } catch(err) {console.warn("Using startup pinch defaults",err);}
   const params = new URLSearchParams(location.search);
   if (params.get("drawbox") === "wide") state.drawBox={x0:.14,y0:.125,x1:.86,y1:.665};
-  const variant = params.get("pinch");
-  if (variant && /^[A-F]$/.test(variant)) experiment.variant = variant as Variant;
+  // Old lab links migrate to the buffering toggle; they no longer select alternate algorithms.
+  const legacy = params.get("pinch");
+  if (legacy && /^[A-F]$/.test(legacy)) experiment.buffered = legacy === "E" || legacy === "F";
+  if (params.has("buffered")) experiment.buffered = params.get("buffered") === "true";
   const anchor = params.get("anchor");
   if (anchor === "knuckle" || anchor === "tip" || anchor === "thumb" || anchor === "pinch") experiment.anchor = anchor;
   const release = Number(params.get("release"));

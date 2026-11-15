@@ -3,21 +3,8 @@
 export const ARENA = { width: 1280, height: 720 } as const;
 
 export const INPUT = {
-  // pinch = dist(thumb tip, index tip) / dist(wrist, middle-finger base), measured in the image (2D).
-  pinchOn: 0.28,
-  pinchOff: 0.5,
-  // The same ratio from MediaPipe's 3D world landmarks is only a veto: above this, the tips are
-  // apart in depth and merely line up from the camera's point of view, so it is not a pinch.
+  // Optional world-space depth veto; user-editable pinch settings live in config/pinch.defaults.json.
   pinch3dMax: 0.5,
-  framesToStart: 2,
-  framesToStop: 3,
-  // A release must also last this long before the stroke ends, so blurred or dropped
-  // frames mid-stroke don't cut it. The stroke is cut back to where the release began.
-  releaseMs: 180,
-  lostHandMs: 300,
-  // What the cursor follows. "knuckle" (index-finger base) stays put while the fingers
-  // pinch and open; "pinch" (thumb/index-tip midpoint) is closer to the fingertip but hooks strokes.
-  cursorAnchor: "knuckle" as "knuckle" | "pinch",
   // One Euro filter on the cursor (game pixels, seconds)
   euroMinCutoff: 1.0,
   euroBeta: 0.01,
@@ -35,16 +22,8 @@ export const INPUT = {
 };
 
 export const RECOG = {
-  acceptScore: 0.76,
-  // lower bar when matching only against symbols a monster currently needs
-  acceptScoreWanted: 0.55,
-  // ...but only if it scores within this much of the best match overall, so a clear ring stays a ring
+  // Expected symbols may score slightly below the best overall match.
   wantedMargin: 0.08,
-  // straight-line special case
-  lineStraightness: 0.86, // chord / path length
-  lineThinness: 0.28, // minor / major spread (PCA)
-  lineAngleTolerance: 35, // degrees from horizontal / vertical
-  lineAngleToleranceWanted: 55, // when only one of dash / pillar is needed
   // small rotation tolerance for $1 (orientation-sensitive otherwise)
   rotationTolerance: 25, // degrees
 };

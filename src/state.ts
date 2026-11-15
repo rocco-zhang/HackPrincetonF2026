@@ -95,8 +95,7 @@ export const state = {
   mode: "mouse" as "mouse" | "hand",
   /** A round is running. The mouse works in menus but not here (unless ?mouse). */
   inRound: false,
-  /** The lab retains the legacy infinity rune; Classic uses the held thumbs-up gesture. */
-  spellRunesEnabled: false,
+  /** Held thumbs up starts the shared spell-casting flow. */
   spellGesturesEnabled: false,
   spellCastingActive: false,
   thumbUpScore: 0,

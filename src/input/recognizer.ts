@@ -198,7 +198,7 @@ export class Recognizer {
 
   /**
    * `wanted` = symbols that would hit something right now. They are tried first with a
-   * lower bar (RECOG.acceptScoreWanted); if none fits, the stroke is matched against everything.
+   * lower bar (experiment.wantedRecognitionThreshold); if none fits, the stroke is matched against everything.
    * `only` = the strokes that can be the answer at all: the six spell symbols by default, or the
    * marks one language uses, so a letter is never mistaken for a shape that language doesn't have.
    */

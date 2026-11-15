@@ -1,46 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { bossCards, isBossWave } from "../src/game/bosses";
 import { castMarks, scriptMarks } from "../src/game/languages";
-import { cleanLoadout, damageSpellTarget, spellMovementScale, SPELL_POWER, MANA, pickSpell, readSpellPose, SPELL_IDS, SPELLS } from "../src/game/spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, SPELL_POWER, MANA, pickSpell, SPELL_IDS, SPELLS } from "../src/game/spells";
 import { aslPool } from "../src/game/systems/Spawner";
-import type { Landmark } from "../src/state";
-
-type Fingers = { thumb: boolean; index: boolean; middle: boolean; ring: boolean; pinky: boolean };
-
-function hand(open: Fingers): Landmark[] {
-  const lm: Landmark[] = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }));
-  const fingers: [keyof Fingers, number, number, number, number][] = [
-    ["thumb", 4, 3, 2, 1],
-    ["index", 8, 7, 6, 5],
-    ["middle", 12, 11, 10, 9],
-    ["ring", 16, 15, 14, 13],
-    ["pinky", 20, 19, 18, 17],
-  ];
-  fingers.forEach(([name, tip, dip, pip, mcp], i) => {
-    const ang = -2.4 + i * 0.45;
-    const at = (t: number) => ({ x: Math.cos(ang) * t, y: Math.sin(ang) * t, z: 0 });
-    lm[mcp] = at(0.35);
-    lm[pip] = at(0.6);
-    lm[dip] = open[name] ? at(0.85) : at(0.4);
-    lm[tip] = open[name] ? at(1.15) : at(0.28);
-  });
-  return lm;
-}
-
-const shut = { thumb: false, index: false, middle: false, ring: false, pinky: false };
-
-describe("spell gestures", () => {
-  it("reads horns and an open palm, and ignores a fist or a pinch", () => {
-    expect(readSpellPose(hand({ ...shut, index: true, pinky: true }))).toBe(0); // horns: slot 1
-    expect(readSpellPose(hand({ thumb: true, index: true, middle: true, ring: true, pinky: true }))).toBe(1); // open palm: slot 2
-    expect(readSpellPose(hand(shut))).toBeNull();
-    const pinched = hand({ thumb: true, index: true, middle: true, ring: true, pinky: true });
-    pinched[4] = { ...pinched[8] };
-    expect(readSpellPose(pinched)).toBeNull();
-  });
-
-});
-
 describe("spell deck", () => {
   it("has at least six spells, each with a cost the mana bar can pay", () => {
     expect(SPELL_IDS.length).toBeGreaterThanOrEqual(6);

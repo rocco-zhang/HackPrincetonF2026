@@ -15,9 +15,9 @@ import { DIFFICULTY, type Difficulty } from "../config";
 import { cleanSubjects, type Subject } from "../game/subjects";
 
 export type PvpMessage =
-  | { t: "hello"; subjects: Subject[]; difficulty: Difficulty } // host → guest: which subjects and difficulty we're playing
-  | { t: "ready"; v: boolean }
-  | { t: "start" } // host → guest: both are ready, go
+  | { t: "hello"; subjects: Subject[]; difficulty: Difficulty; revision: number } // host → guest: which subjects and difficulty we're playing
+  | { t: "ready"; v: boolean; revision: number }
+  | { t: "start"; revision: number } // host → guest: both are ready, go
   | { t: "attack"; n: number } // "I'm sending n monsters at you"
   | { t: "status"; hearts: number; score: number; wave: number }
   | { t: "dead"; score: number; forfeit?: boolean }
@@ -58,6 +58,7 @@ let lastHeard = 0;
 let timer = 0;
 let everConnected = false;
 let lastRetry = 0;
+let announcedMode = "";
 const listeners = new Set<(e: PvpEvent) => void>();
 
 export const pvp = {
@@ -80,6 +81,7 @@ export const pvp = {
   error: "",
   myReady: false,
   theirReady: false,
+  modeRevision: 0,
   /** Latest hearts / score / wave the opponent reported. */
   them: { hearts: 3, score: 0, wave: 1 },
   /** Guest: the subjects and difficulty the host last announced. */
@@ -194,14 +196,22 @@ export const pvp = {
 
   setReady(v: boolean) {
     this.myReady = v;
-    this.send({ t: "ready", v });
+    this.send({ t: "ready", v, revision: this.modeRevision });
     emit({ type: "state" });
     maybeStart();
   },
 
   /** Tell the guest which mode and difficulty the host picked. */
   sendMode() {
-    if (this.isHost) this.send({ t: "hello", ...currentMode() });
+    if (!this.isHost) return;
+    const mode = currentMode(), key = JSON.stringify(mode);
+    if (key !== announcedMode) {
+      announcedMode = key;
+      this.modeRevision++;
+      this.myReady = this.theirReady = false;
+      emit({ type: "state" });
+    }
+    this.send({ t: "hello", ...mode, revision: this.modeRevision });
   },
 
   leave() {
@@ -220,6 +230,8 @@ export const pvp = {
     session++;
     everConnected = false;
     this.myReady = this.theirReady = false;
+    this.modeRevision = 0;
+    announcedMode = "";
     this.error = "";
     this.graceLeft = 0;
     this.hostMode = null;
@@ -263,7 +275,7 @@ function adopt(c: DataConnection) {
     pvp.error = "";
     setStatus("connected");
     if (pvp.isHost) pvp.sendMode();
-    pvp.send({ t: "ready", v: pvp.myReady }); // after a reconnect, say where we stand
+    pvp.send({ t: "ready", v: pvp.myReady, revision: pvp.modeRevision }); // after a reconnect, say where we stand
     if (!timer) timer = window.setInterval(tick, 250);
   });
   c.on("data", (data) => {
@@ -272,13 +284,25 @@ function adopt(c: DataConnection) {
     const msg = data as PvpMessage;
     if (msg.t === "ping") return;
     if (msg.t === "ready") {
+      if (msg.revision !== pvp.modeRevision) return;
       pvp.theirReady = msg.v;
       emit({ type: "state" });
       maybeStart();
       return;
     }
-    if (msg.t === "start") return begin();
-    if (msg.t === "hello") pvp.hostMode = { subjects: cleanSubjects(msg.subjects), difficulty: DIFFICULTY[msg.difficulty] ? msg.difficulty : "medium" };
+    if (msg.t === "start") {
+      if (!pvp.isHost && pvp.myReady && msg.revision === pvp.modeRevision) begin();
+      return;
+    }
+    if (msg.t === "hello") {
+      if (pvp.isHost || !Number.isInteger(msg.revision) || msg.revision < pvp.modeRevision) return;
+      if (msg.revision !== pvp.modeRevision) {
+        pvp.modeRevision = msg.revision;
+        pvp.myReady = pvp.theirReady = false;
+        pvp.send({ t: "ready", v: false, revision: pvp.modeRevision });
+      }
+      pvp.hostMode = { subjects: cleanSubjects(msg.subjects), difficulty: DIFFICULTY[msg.difficulty] ? msg.difficulty : "medium" };
+    }
     if (msg.t === "full") {
       if (pvp.quick) return void pvp.quickMatch(); // beaten to it: look again
       return fail("Someone else just joined that game. Pick another, or try quick match.");
@@ -291,7 +315,7 @@ function adopt(c: DataConnection) {
 /** Host: once both players are ready, start both games. */
 function maybeStart() {
   if (!pvp.isHost || !pvp.myReady || !pvp.theirReady || pvp.status !== "connected") return;
-  pvp.send({ t: "start" });
+  pvp.send({ t: "start", revision: pvp.modeRevision });
   begin();
 }
 

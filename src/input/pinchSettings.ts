@@ -1,6 +1,5 @@
 import defaults from "../../config/pinch.defaults.json" with { type: "json" };
-type Settings = Omit<typeof defaults, "variant" | "anchor" | "timing"> & {
-  variant: "C" | "E";
+type Settings = Omit<typeof defaults, "anchor" | "timing"> & {
   anchor: "knuckle" | "tip" | "thumb" | "pinch";
   timing: "time" | "frames";
 };
@@ -8,9 +7,14 @@ type Settings = Omit<typeof defaults, "variant" | "anchor" | "timing"> & {
 /** Local dev defaults only; reject invalid files rather than silently mixing settings. */
 export function parsePinchSettings(value: unknown): Partial<Settings> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("Pinch config must be an object");
-  const v = value as Record<string, unknown>;
+  const { variant, ...v } = value as Record<string, unknown>;
+  // Migrate old saved configs once; all settings now feed the same detector.
+  if (variant !== undefined) {
+    if (typeof variant !== "string" || !/^[A-F]$/.test(variant)) throw Error("Invalid pinch config setting: variant");
+    if (v.buffered === undefined) v.buffered = variant === "E" || variant === "F";
+  }
   const rules: Record<string, (x: unknown) => boolean> = {
-    variant: x => x === "C" || x === "E",
+    buffered: x => typeof x === "boolean",
     anchor: x => ["knuckle", "tip", "thumb", "pinch"].includes(String(x)),
     timing: x => x === "time" || x === "frames",
     on: x => typeof x === "number" && Number.isFinite(x) && x >= .05 && x <= .7,

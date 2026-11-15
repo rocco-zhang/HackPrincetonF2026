@@ -170,7 +170,6 @@ export class Arena extends Phaser.Scene implements CastHost {
         case "strokeCancel": return this.casting.cancelStroke(e.hand);
         case "strokeEnd":
           this.casting.onStrokeEnd(e.hand);
-          if(e.rune)return;
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points, e.hand);
           return;
         case "spellGesture":
@@ -202,7 +201,6 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.langMarks = null;
       state.wantedMarks = [];
       state.inRound = false;
-      state.spellRunesEnabled=false;
       state.spellGesturesEnabled=false;
       state.aslActive = false;
       state.mathActive = false;
@@ -256,7 +254,6 @@ export class Arena extends Phaser.Scene implements CastHost {
     state.aslActive = this.asl;
     state.mathActive = this.math;
     state.langActive = this.lang;
-    state.spellRunesEnabled=false;
     state.spellGesturesEnabled=false;
     state.langMarks = isScript(this.subject) ? scriptMarks(this.subject) : null;
     this.buffer = "";
@@ -467,6 +464,11 @@ export class Arena extends Phaser.Scene implements CastHost {
   private endVersus(won: boolean, note?: string) {
     if (this.phase === "over") return;
     this.phase = "over";
+    this.incantation.reset();
+    this.setSpellTime(false);
+    state.spellGesturesEnabled = false;
+    state.wanted = [];
+    state.wantedMarks = [];
     if (won) sfx.wave();
     else sfx.gameOver();
     for (const m of this.monsters) this.tweens.add({ targets: m, alpha: 0.3, duration: 400 });
@@ -994,7 +996,6 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private gameOver() {
-    state.spellRunesEnabled=false;
     state.spellGesturesEnabled=false;
     this.incantation.reset();this.setSpellTime(false);
     if (this.versus) {

@@ -1,6 +1,4 @@
-import type { Landmark } from "../state";
-
-/** The spells in the deck. Two go into a round: slot 1 is cast with horns, slot 2 with an open palm. */
+/** The spells in the deck. Two go into a round, cast through the shared thumbs-up and sign-sequence system. */
 export type SpellId = "fire" | "water" | "bomb" | "freeze" | "shield" | "heal";
 
 export const SPELL_IDS: SpellId[] = ["fire", "water", "bomb", "freeze", "shield", "heal"];
@@ -44,8 +42,6 @@ export function spellMovementScale(now: number, freezeUntil: number, slowUntil: 
 
 export type Loadout = [SpellId, SpellId];
 export const DEFAULT_LOADOUT: Loadout = ["fire", "water"];
-/** How each slot is cast, in slot order. */
-export const SLOT_GESTURES = ["horns", "open palm"] as const;
 
 /** Two different, valid spells. */
 export function cleanLoadout(raw: unknown): Loadout {
@@ -57,34 +53,4 @@ export function cleanLoadout(raw: unknown): Loadout {
 /** Pick a spell for battle: it takes the place of the one picked longest ago. Picking one that's already in changes nothing. */
 export function pickSpell(loadout: Loadout, id: SpellId): Loadout {
   return loadout.includes(id) ? loadout : [loadout[1], id];
-}
-
-export const SPELL_HOLD = 0.45;
-/** Ignore a pose that is just the hand opening at the end of a stroke. */
-export const SPELL_AFTER_INK = 0.65;
-
-const TIP = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
-const PIP = { thumb: 3, index: 6, middle: 10, ring: 14, pinky: 18 };
-
-function dist(a: Landmark, b: Landmark) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function extended(lm: Landmark[], tip: number, pip: number) {
-  const palm = dist(lm[0], lm[9]) || 1;
-  return dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.15 && dist(lm[tip], lm[0]) > palm * 0.9;
-}
-
-/** Which spell slot the hand is asking for: 0 for horns (index and pinky out), 1 for an open palm. A pinch is neither. */
-export function readSpellPose(lm: Landmark[] | null): 0 | 1 | null {
-  if (!lm || lm.length < 21) return null;
-  const palm = dist(lm[0], lm[9]) || 1;
-  if (dist(lm[TIP.thumb], lm[TIP.index]) / palm < 0.55) return null;
-  const index = extended(lm, TIP.index, PIP.index);
-  const middle = extended(lm, TIP.middle, PIP.middle);
-  const ring = extended(lm, TIP.ring, PIP.ring);
-  const pinky = extended(lm, TIP.pinky, PIP.pinky);
-  if (index && middle && ring && pinky) return 1;
-  if (index && pinky && !middle && !ring) return 0;
-  return null;
 }

@@ -6,8 +6,8 @@ html,
 body {
   margin: 0;
   height: 100%;
-  /* the desk the sheet of paper is lying on */
-  background: #6f8f86;
+  /* Match the paper when a screen has extra room around the 16:9 game. */
+  background: #f9f5ea;
   color: #33312e;
   font-family: "Chalkboard SE", "Chalkboard", "Patrick Hand", "Comic Sans MS", cursive;
   overflow: hidden;
