@@ -10,6 +10,8 @@ import { sfx } from "../sfx";
 import type { Fx } from "./Fx";
 
 type FadingTrail = { pts: Pt[]; color: number; age: number };
+/** Kept strokes are fainter than the one being drawn, so the new stroke reads clearly on top. */
+const HELD_ALPHA = 0.5;
 
 export interface CastHost {
   player: Player;
@@ -28,6 +30,8 @@ export class Casting {
   private cursorAt = new Map<number, number>();
   private currents = new Map<number, Pt[]>();
   private fading: FadingTrail[] = [];
+  /** Strokes kept on screen because they are part of a card or number that isn't finished yet. */
+  private held: FadingTrail[] = [];
   private lastByHand = new Map<number, FadingTrail>();
 
   constructor(
@@ -75,6 +79,29 @@ export class Casting {
       this.fading.push(trail);
       this.lastByHand.set(hand, trail);
     }
+  }
+
+  /** Keep the stroke that was just drawn visible (dimmed) while the card or number it belongs to is unfinished. */
+  holdLast(hand = 0) {
+    const trail = this.lastByHand.get(hand);
+    if (!trail || this.held.includes(trail)) return;
+    this.fading = this.fading.filter((f) => f !== trail);
+    trail.color = INK;
+    this.held.push(trail);
+  }
+
+  /** Let the kept strokes go. They fade out together, in `color` when the card they made was cast. */
+  releaseHeld(color?: number) {
+    for (const trail of this.held) {
+      trail.age = color === undefined ? 0 : -0.1;
+      if (color !== undefined) trail.color = color;
+      this.fading.push(trail);
+    }
+    this.held = [];
+  }
+
+  get holding() {
+    return this.held.length > 0;
   }
 
   onFizzle(points: Pt[], hand = 0) {
@@ -150,6 +177,7 @@ export class Casting {
       const a = 1 - Math.max(0, f.age) / 0.45;
       this.drawTrail(f.pts, f.color, a);
     }
+    for (const h of this.held) this.drawTrail(h.pts, h.color, HELD_ALPHA);
     for (const pts of this.currents.values()) {
       if (pts.length > 1) this.drawTrail(pts, INK, 1);
     }

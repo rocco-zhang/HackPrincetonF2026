@@ -146,10 +146,10 @@ export class Arena extends Phaser.Scene implements CastHost {
         case "strokePoint": return this.casting.onStrokePoint(e.p, e.hand);
         case "strokeEnd":
           this.casting.onStrokeEnd(e.hand);
-          if (this.math && this.phase === "play") this.onDrawnDigit(e.points);
+          if (this.math && this.phase === "play") this.onDrawnDigit(e.points, e.hand);
           return;
         case "symbol":
-          if (this.lang && this.phase === "play") { this.onLangMark(e.name); return; }
+          if (this.lang && this.phase === "play") { this.onLangMark(e.name, e.hand); return; }
           if (!this.math && this.phase !== "over" && !isLangShape(e.name)) this.casting.cast(e.name, e.hand);
           return;
         case "fizzle":
@@ -401,6 +401,9 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   update(_t: number, deltaMs: number) {
     const dt = Math.min(0.05, deltaMs / 1000);
+    // strokes are only kept while a card or number is half drawn
+    const partDrawn = (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
+    if (!partDrawn && this.casting.holding) this.casting.releaseHeld();
     this.casting.update(dt);
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
@@ -606,8 +609,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
   }
 
-  /** A finished stroke casts immediately. A short word keeps the marks until the sequence matches. */
-  private onLangMark(name: string) {
+  /**
+   * A finished stroke casts immediately. A longer card keeps the marks until the sequence matches,
+   * and the strokes drawn so far stay on screen until it is cast or abandoned.
+   */
+  private onLangMark(name: string, hand = 0) {
     if (!isMark(name)) {
       this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
       return;
@@ -618,29 +624,34 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (fronts.includes(cast)) {
       this.marks = [];
       this.refreshLang();
-      this.casting.cast(cast);
+      this.casting.releaseHeld(castColor(cast)); // the earlier strokes light up with the last one
+      this.casting.cast(cast, hand);
       return;
     }
     if (next.length < 3 && fronts.some((front) => front.startsWith(`${cast}-`))) {
       this.marks = next;
       this.refreshLang();
+      this.casting.holdLast(hand);
       return;
     }
+    // this stroke doesn't continue what was being drawn: let those strokes go
+    this.casting.releaseHeld();
     const alone = langCast([name]);
     if (fronts.includes(alone)) {
       this.marks = [];
       this.refreshLang();
-      this.casting.cast(alone);
+      this.casting.cast(alone, hand);
       return;
     }
     if (fronts.some((front) => front.startsWith(`${alone}-`))) {
       this.marks = [name];
       this.refreshLang();
+      this.casting.holdLast(hand);
       return;
     }
     this.marks = [];
     this.refreshLang();
-    this.casting.cast(alone);
+    this.casting.cast(alone, hand);
   }
 
   private refreshLang() {
@@ -652,7 +663,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     else this.answerText.setText(help || "draw the mark");
   }
 
-  private onDrawnDigit(points: { x: number; y: number }[]) {
+  private onDrawnDigit(points: { x: number; y: number }[], hand = 0) {
     const hit = recognizeDigit(points);
     if (!hit) {
       this.fx.floatText(this.player.x, this.player.y - 80, "draw a digit", "#8a857a", 22);
@@ -664,6 +675,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.buffer += hit.digit;
     this.answerHold = 0;
     this.refreshAnswer();
+    this.casting.holdLast(hand); // the digits drawn so far stay up until the number is cast
   }
 
   private onAnswerKey(ev: KeyboardEvent) {
@@ -736,6 +748,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.miss();
       return;
     }
+    this.casting.releaseHeld(castColor(name));
     this.casting.cast(name);
   }
 
