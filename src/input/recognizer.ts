@@ -5,7 +5,7 @@
 //     scale-to-square blows up the noise of a 1D stroke.
 import { RECOG } from "../config";
 import { experiment } from "./pinchConfig";
-import { SYMBOLS, type SymbolName } from "./events";
+import { STROKES, SYMBOLS, type StrokeName } from "./events";
 import { syntheticTemplates, type XY } from "./shapes";
 import { isStrokeTooSmall, pathLength } from "./strokeDetector";
 
@@ -16,11 +16,11 @@ const PHI = 0.5 * (-1 + Math.sqrt(5));
 const MIN_ASPECT = 0.25;
 
 export type RecogResult = {
-  name: SymbolName | null;
+  name: StrokeName | null;
   score: number;
   accepted: boolean;
   method: "tooSmall" | "line" | "diagonal" | "dollar";
-  best?: { name: SymbolName; score: number };
+  best?: { name: StrokeName; score: number };
   resampled: XY[]; // normalized candidate (for the debug overlay)
 };
 
@@ -127,7 +127,7 @@ export function distanceAtBestAngle(pts: XY[], tmpl: XY[], tolDeg: number) {
 /** Straight-line check: high chord/path ratio and a thin principal-axis spread. */
 export function lineCheck(
   pts: XY[],
-  wanted: readonly SymbolName[] = [],
+  wanted: readonly StrokeName[] = [],
 ): { kind: "hline" | "vline" | "diagonal"; straightness: number } | null {
   // coarse resample so per-frame jitter doesn't inflate the path length
   const L = pathLength(resample(pts, 12));
@@ -165,32 +165,34 @@ export function lineCheck(
   return { kind, straightness };
 }
 
-type Template = { name: SymbolName; points: XY[]; source: "synthetic" | "recorded" };
+type Template = { name: StrokeName; points: XY[]; source: "synthetic" | "recorded" };
 
 export class Recognizer {
   templates: Template[] = [];
 
-  addTemplate(name: SymbolName, raw: XY[], source: Template["source"] = "recorded") {
+  addTemplate(name: StrokeName, raw: XY[], source: Template["source"] = "recorded") {
     if (raw.length < 2) return;
     this.templates.push({ name, points: normalize(raw), source });
   }
 
   addMany(set: Partial<Record<string, XY[][]>>, source: Template["source"] = "recorded") {
     for (const [name, strokes] of Object.entries(set)) {
-      if (!SYMBOLS.includes(name as SymbolName) || !strokes) continue;
-      for (const s of strokes) this.addTemplate(name as SymbolName, s, source);
+      if (!STROKES.includes(name as StrokeName) || !strokes) continue;
+      for (const s of strokes) this.addTemplate(name as StrokeName, s, source);
     }
   }
 
-  count(name: SymbolName, source?: Template["source"]) {
+  count(name: StrokeName, source?: Template["source"]) {
     return this.templates.filter((t) => t.name === name && (!source || t.source === source)).length;
   }
 
   /**
    * `wanted` = symbols that would hit something right now. They are tried first with a
    * lower bar (RECOG.acceptScoreWanted); if none fits, the stroke is matched against everything.
+   * `only` = the strokes that can be the answer at all: the six spell symbols by default, or the
+   * marks one language uses, so a letter is never mistaken for a shape that language doesn't have.
    */
-  recognize(raw: XY[], wanted: readonly SymbolName[] = [], accept = experiment.recognitionThreshold): RecogResult {
+  recognize(raw: XY[], wanted: readonly StrokeName[] = [], accept = experiment.recognitionThreshold, only: readonly StrokeName[] = SYMBOLS): RecogResult {
     if (raw.length < 2 || isStrokeTooSmall(raw)) {
       return { name: null, score: 0, accepted: false, method: "tooSmall", resampled: [] };
     }
@@ -200,18 +202,20 @@ export class Recognizer {
       if (line.kind === "diagonal") {
         return { name: null, score: 0, accepted: false, method: "diagonal", resampled };
       }
+      if (!only.includes(line.kind)) return { name: null, score: 0, accepted: false, method: "line", resampled };
       const score = Math.min(1, 0.5 + line.straightness / 2);
       return { name: line.kind, score, accepted: true, method: "line", best: { name: line.kind, score }, resampled };
     }
 
     const cand = normalize(raw);
-    const bestD = new Map<SymbolName, number>();
+    const bestD = new Map<StrokeName, number>();
     for (const t of this.templates) {
+      if (!only.includes(t.name)) continue;
       const d = distanceAtBestAngle(cand, t.points, RECOG.rotationTolerance);
       if (d < (bestD.get(t.name) ?? Infinity)) bestD.set(t.name, d);
     }
-    const pick = (names: Iterable<SymbolName>) => {
-      let name: SymbolName | null = null;
+    const pick = (names: Iterable<StrokeName>) => {
+      let name: StrokeName | null = null;
       let d = Infinity;
       for (const n of names) {
         const dn = bestD.get(n);

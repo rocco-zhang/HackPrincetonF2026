@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { CHINESE, JAPANESE, KOREAN, KOREAN_SYLLABLES, hintFor, langCast, langPool, pickLang } from "../src/game/languages";
+import { CHINESE, JAPANESE, KOREAN, KOREAN_SYLLABLES, hintFor, langCast, langPool, nextMarks, pickLang, scriptMarks } from "../src/game/languages";
+import { createDefaultRecognizer } from "../src/input/recognizer";
+import { jitteredStroke, LANG_BASE_SHAPES, BASE_SHAPES, mulberry32 } from "../src/input/shapes";
 import { bestKey, cleanSubjects, toggleSubject, waveSubject } from "../src/game/subjects";
 
 function rng(seed = 2) {
@@ -33,7 +35,7 @@ describe("language bag", () => {
   it("names a prompt by its marks, so the same shape is the same cast", () => {
     expect(langCast(KOREAN[0].strokes)).toBe(langCast(JAPANESE[0].strokes));
     expect(langCast(KOREAN[0].strokes)).toBe(langCast(CHINESE[0].strokes));
-    expect(langCast(["v", "circle"])).toBe("lang_v-circle");
+    expect(langCast(["giyeok", "vline"])).toBe("lang_giyeok-vline");
     const rand = rng();
     for (let level = 1; level <= 4; level++) {
       const item = pickLang("chinese", level, rand);
@@ -63,5 +65,61 @@ describe("subject selection", () => {
     expect(bestKey(["shapes"], "medium")).toBe("spellcam.best");
     expect(bestKey(["asl"], "hard")).toBe("spellcam.best.asl.hard");
     expect(bestKey(["math", "shapes"], "easy")).toBe("spellcam.best.mix.shapes+math.easy");
+  });
+});
+
+describe("letter strokes", () => {
+  const rec = createDefaultRecognizer();
+  const rand = mulberry32(99);
+  // a wobbly hand-drawn version of a shape, placed somewhere in the arena
+  const draw = (base: [number, number][], rot = 8) =>
+    jitteredStroke(base, rand, { size: 180, rotJitterDeg: rot, vertexJitter: 0.07, pointNoise: 0.015 }).map((p, i) => ({ x: p.x + 300, y: p.y + 200, t: i * 16 }));
+  const read = (base: [number, number][], script: "korean" | "japanese" | "chinese") => rec.recognize(draw(base), [], undefined, scriptMarks(script)).name;
+
+  it("Korean no longer uses the V or the peak: ㄱ and ㄴ are their own strokes", () => {
+    expect(scriptMarks("korean").sort()).toEqual(["circle", "giyeok", "hline", "nieun", "vline"]);
+    expect(KOREAN.find((k) => k.label === "ㄱ")!.strokes).toEqual(["giyeok"]);
+    expect(KOREAN.find((k) => k.label === "ㄴ")!.strokes).toEqual(["nieun"]);
+  });
+
+  it("reads ㄱ and ㄴ drawn the way they are written, and tells them apart", () => {
+    let ok = 0;
+    const n = 60;
+    for (let i = 0; i < n; i++) {
+      if (read(LANG_BASE_SHAPES.giyeok[i % 2 ? 2 : 0], "korean") === "giyeok") ok++; // square and slanted
+      if (read(LANG_BASE_SHAPES.nieun[0], "korean") === "nieun") ok++;
+    }
+    expect(ok / (2 * n)).toBeGreaterThan(0.95);
+  });
+
+  it("does not take a circle or a line for ㄱ or ㄴ in a Korean round", () => {
+    for (let i = 0; i < 20; i++) {
+      expect(read(BASE_SHAPES.circle[i % BASE_SHAPES.circle.length], "korean")).toBe("circle");
+      expect(read(BASE_SHAPES.hline[0], "korean")).toBe("hline");
+      expect(read(BASE_SHAPES.vline[0], "korean")).toBe("vline");
+    }
+  });
+
+  it("reads Japanese く and し", () => {
+    let ok = 0;
+    const n = 60;
+    for (let i = 0; i < n; i++) {
+      if (read(LANG_BASE_SHAPES.ku[0], "japanese") === "ku") ok++;
+      if (read(LANG_BASE_SHAPES.shi[0], "japanese") === "shi") ok++;
+    }
+    expect(ok / (2 * n)).toBeGreaterThan(0.95);
+  });
+
+  it("keeps letter strokes out of ordinary spell rounds", () => {
+    for (let i = 0; i < 20; i++) {
+      const r = rec.recognize(draw(LANG_BASE_SHAPES.giyeok[0]));
+      expect(["giyeok", "nieun", "ku", "shi"]).not.toContain(r.name);
+    }
+  });
+
+  it("knows which mark continues a card", () => {
+    expect(nextMarks(["lang_giyeok-vline"], []).sort()).toEqual(["giyeok"]);
+    expect(nextMarks(["lang_giyeok-vline"], ["giyeok"]).sort()).toEqual(["giyeok", "vline"]);
+    expect(nextMarks(["lang_circle", "lang_nieun-hline"], ["nieun"]).sort()).toEqual(["circle", "hline", "nieun"]);
   });
 });

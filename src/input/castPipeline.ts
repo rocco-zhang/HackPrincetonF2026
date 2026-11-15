@@ -45,7 +45,10 @@ export function initCastPipeline() {
       return;
     }
 
-    const r = recognizer.recognize(pts, state.wanted.filter(isSymbol));
+    // a language round reads the stroke as one of that language's marks; otherwise as a spell symbol
+    const r = state.langMarks
+      ? recognizer.recognize(pts, state.wantedMarks, undefined, state.langMarks)
+      : recognizer.recognize(pts, state.wanted.filter(isSymbol));
     state.lastRecog = r;
     // after every listener has seen this strokeEnd
     queueMicrotask(() => {

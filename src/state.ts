@@ -1,7 +1,7 @@
 import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
 import { cleanSubjects, type Subject } from "./game/subjects";
-import type { CastName, SymbolName } from "./input/events";
+import type { CastName, StrokeName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
 export type Landmark = { x: number; y: number; z: number };
@@ -75,6 +75,10 @@ export const state = {
   lastRecog: null as RecogResult | null,
   /** Symbols a monster currently needs; the recognizer favours these. Empty outside the arena. */
   wanted: [] as CastName[],
+  /** A language round is running: the marks that language uses (the only things a stroke can be read as)… */
+  langMarks: null as StrokeName[] | null,
+  /** …and the marks that would continue a monster's card right now, which the recognizer favours. */
+  wantedMarks: [] as StrokeName[],
   /** Setup-screen choice (in a duel, the host's): what the monsters carry. Each wave uses the next one. */
   subjects: loadSubjects(),
   /** Setup-screen choice (in a duel, the host's). */

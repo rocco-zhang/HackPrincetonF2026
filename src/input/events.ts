@@ -6,6 +6,13 @@ export type SymbolName = "hline" | "vline" | "v" | "caret" | "circle" | "zigzag"
 
 export const SYMBOLS: SymbolName[] = ["hline", "vline", "v", "caret", "circle", "zigzag"];
 
+/** Strokes that only the language subjects use: real letter shapes, drawn the way the letter is written. */
+export type LangShape = "giyeok" | "nieun" | "ku" | "shi";
+export const LANG_SHAPES: LangShape[] = ["giyeok", "nieun", "ku", "shi"];
+/** Anything a single drawn stroke can be recognised as. */
+export type StrokeName = SymbolName | LangShape;
+export const STROKES: StrokeName[] = [...SYMBOLS, ...LANG_SHAPES];
+
 // What a monster can carry and a player can cast: a drawn symbol, or (ASL mode) a fingerspelled letter.
 export type AslName = `asl_${AslLetter}`;
 /** The answer to a math problem. The prompt ("3 + 4") is drawn separately. */
@@ -17,6 +24,7 @@ export const aslName = (l: AslLetter) => `asl_${l}` as AslName;
 export const mathName = (answer: number) => `math_${answer}` as MathName;
 export const mathAnswer = (n: MathName) => Number(n.slice(5));
 export const ASL_NAMES: AslName[] = ASL_LETTERS.map(aslName);
+export const isLangShape = (n: string): n is LangShape => (LANG_SHAPES as string[]).includes(n);
 export const isSymbol = (n: CastName): n is SymbolName => (SYMBOLS as string[]).includes(n);
 export const isMath = (n: CastName): n is MathName => n.startsWith("math_");
 export const isLang = (n: CastName): n is LangName => n.startsWith("lang_");
@@ -30,8 +38,9 @@ export type InputEvent =
   | { type: "strokeStart"; p: Pt; hand?: number }
   | { type: "strokePoint"; p: Pt; hand?: number }
   | { type: "strokeEnd"; points: Pt[]; hand?: number }
-  | { type: "symbol"; name: CastName; score: number; points: Pt[]; hand?: number } // recognized cast
-  | { type: "fizzle"; points: Pt[]; best?: { name: SymbolName; score: number }; hand?: number }; // drawn but not recognized
+  // recognized cast. In a language round the name can be one of that language's letter strokes.
+  | { type: "symbol"; name: CastName | LangShape; score: number; points: Pt[]; hand?: number }
+  | { type: "fizzle"; points: Pt[]; best?: { name: StrokeName; score: number }; hand?: number }; // drawn but not recognized
 
 // tiny event bus: input → game
 export const bus = new EventTarget();

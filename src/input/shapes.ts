@@ -1,7 +1,7 @@
 // Ideal symbol shapes (unit square, y pointing down) and a jittered generator.
 // Used to seed the recognizer so it works before anyone records real templates,
 // and by the tests to synthesize strokes.
-import type { SymbolName } from "./events";
+import type { LangShape, StrokeName, SymbolName } from "./events";
 
 export type XY = { x: number; y: number };
 type V = [number, number];
@@ -34,6 +34,21 @@ export const BASE_SHAPES: Record<SymbolName, V[][]> = {
   caret: [CARET, rev(CARET)],
   zigzag: [ZIG_M, rev(ZIG_M), ZIG_W, rev(ZIG_W), ZIG_N, rev(ZIG_N), ZIG_U, rev(ZIG_U)],
   circle: circleVariants(),
+};
+
+// Letter strokes for the language subjects, in the direction they are written (and reversed, for
+// anyone who draws them the other way round).
+const GIYEOK: V[] = [[0, 0], [1, 0], [1, 1]]; // ㄱ: across, then down
+const GIYEOK_SLANT: V[] = [[0, 0], [1, 0], [0.7, 1]]; // …with the downstroke leaning in, as in 가
+const NIEUN: V[] = [[0, 0], [0, 1], [1, 1]]; // ㄴ: down, then across
+const KU: V[] = [[1, 0], [0, 0.5], [1, 1]]; // く: an angle pointing left
+const SHI: V[] = [[0.15, 0], [0.15, 0.62], [0.24, 0.88], [0.5, 1], [0.8, 0.93], [1, 0.7]]; // し: down, then a hook up to the right
+
+export const LANG_BASE_SHAPES: Record<LangShape, V[][]> = {
+  giyeok: [GIYEOK, rev(GIYEOK), GIYEOK_SLANT, rev(GIYEOK_SLANT)],
+  nieun: [NIEUN, rev(NIEUN)],
+  ku: [KU, rev(KU)],
+  shi: [SHI, rev(SHI)],
 };
 
 function circleVariants(): V[][] {
@@ -110,14 +125,15 @@ export function jitteredStroke(base: V[], rand: () => number, o: JitterOpts = {}
 }
 
 /** Synthetic seed templates: `perShape` jittered copies of every base shape (lines excluded). */
-export function syntheticTemplates(seed = 1337, perShape = 3): Partial<Record<SymbolName, XY[][]>> {
+export function syntheticTemplates(seed = 1337, perShape = 3): Partial<Record<StrokeName, XY[][]>> {
   const rand = mulberry32(seed);
-  const out: Partial<Record<SymbolName, XY[][]>> = {};
-  for (const name of Object.keys(BASE_SHAPES) as SymbolName[]) {
+  const out: Partial<Record<StrokeName, XY[][]>> = {};
+  const all: Record<StrokeName, V[][]> = { ...BASE_SHAPES, ...LANG_BASE_SHAPES };
+  for (const name of Object.keys(all) as StrokeName[]) {
     if (name === "hline" || name === "vline") continue;
     const list: XY[][] = [];
     const per = name === "circle" ? 1 : perShape;
-    for (const base of BASE_SHAPES[name]) {
+    for (const base of all[name]) {
       list.push(densify(base.map(([x, y]) => ({ x: x * 200, y: y * 200 })), 48));
       for (let i = 0; i < per; i++) list.push(jitteredStroke(base, rand));
     }

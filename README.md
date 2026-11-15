@@ -117,11 +117,14 @@ Pick **Math** on the Classic or Duel screen. The camera is optional.
 
 ### Korean, Japanese and Chinese
 
-Pick any of the three as a subject. Everything is drawn with the same five marks: a flat line, a stick, a V, a peak, or a circle.
+Pick any of the three as a subject. A card is drawn stroke by stroke, and each language only reads strokes as its own marks.
 
-- The first time a language comes up, monsters carry letters or characters that are one or two marks (Korean ㅡ ㅣ ㄴ ㄱ ㅇ, Japanese ー り し く の, Chinese 一 人 〇 二 十).
-- The second time, they carry longer ones drawn mark by mark (Korean syllables such as 이 and 기, Japanese words such as のり, Chinese 三 and 工). After that, both.
-- A hint at the bottom says which marks the nearest prompt takes, and for Chinese and the Japanese words, what it means.
+- **Korean:** ㅡ and ㅣ are a flat line and a stick, ㅇ is a circle, and ㄱ and ㄴ are drawn the way they are written (ㄱ across then down, ㄴ down then across). The second lesson is syllables such as 이, 기, 그 and 느.
+- **Japanese:** ー is a flat line, の is a circle, り is two sticks, and く and し are their own strokes (く an angle pointing left, し down then a hook up to the right). The second lesson is words such as のり and くし.
+- **Chinese:** 一 人 〇 二 十, then 三 and 工, from flat lines, sticks, a peak and a circle.
+- A hint at the bottom says how to draw the nearest card, with its sound or meaning.
+
+The game checks the strokes and their order, not where they sit relative to each other, and ㅇ, の and 人 are still simplified to a circle or a peak.
 
 ### Versus mode (two computers)
 

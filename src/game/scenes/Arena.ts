@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { calmCamera } from "../../a11y";
 import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
 import { recognizeDigit } from "../../input/digits";
-import { castLabel, mathName, onInput, type CastName } from "../../input/events";
+import { castLabel, isLangShape, mathName, onInput, type CastName } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
@@ -13,7 +13,7 @@ import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
-import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, pickLang, type Mark } from "../languages";
+import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { emptySpells, readSpellPose, rollSpell, SPELL_AFTER_INK, SPELL_HOLD, type SpellBag, type SpellId } from "../spells";
@@ -150,11 +150,11 @@ export class Arena extends Phaser.Scene implements CastHost {
           return;
         case "symbol":
           if (this.lang && this.phase === "play") { this.onLangMark(e.name); return; }
-          if (!this.math && this.phase !== "over") this.casting.cast(e.name, e.hand);
+          if (!this.math && this.phase !== "over" && !isLangShape(e.name)) this.casting.cast(e.name, e.hand);
           return;
         case "fizzle":
           if (this.lang && this.phase === "play") {
-            this.fx.floatText(this.player.x, this.player.y - 80, "line, stick, V, peak, or circle", "#8a857a", 18);
+            this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
             return;
           }
           if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points, e.hand);
@@ -164,6 +164,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       off();
       state.wanted = [];
+      state.langMarks = null;
+      state.wantedMarks = [];
       state.inRound = false;
       state.aslActive = false;
       state.mathActive = false;
@@ -220,6 +222,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     state.aslActive = this.asl;
     state.mathActive = this.math;
     state.langActive = this.lang;
+    state.langMarks = isScript(this.subject) ? scriptMarks(this.subject) : null;
     this.buffer = "";
     this.marks = [];
     this.answerHold = 0;
@@ -402,6 +405,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
+    state.wantedMarks = this.lang ? nextMarks(state.wanted, this.marks) : [];
     if (this.aslText) this.updateAsl();
     if (this.math) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
@@ -603,9 +607,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   /** A finished stroke casts immediately. A short word keeps the marks until the sequence matches. */
-  private onLangMark(name: CastName) {
+  private onLangMark(name: string) {
     if (!isMark(name)) {
-      this.fx.floatText(this.player.x, this.player.y - 80, "line, stick, V, peak, or circle", "#8a857a", 18);
+      this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
       return;
     }
     const next = [...this.marks, name];
