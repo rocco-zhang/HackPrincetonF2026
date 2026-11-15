@@ -5,8 +5,8 @@ import { StrokeDetector } from "../src/input/strokeDetector";
 
 describe("two-hand drawing", () => {
   it("keeps the left and right hands on their own strokes", () => {
-    expect(drawingHandId("Left", 1)).toBe(0);
-    expect(drawingHandId("Right", 0)).toBe(1);
+    expect(drawingHandId("Left", 0)).toBe(1);
+    expect(drawingHandId("Right", 1)).toBe(0);
     const events: InputEvent[] = [];
     const left = new StrokeDetector(0, (e) => events.push({ ...e, hand: 0 }));
     const right = new StrokeDetector(0, (e) => events.push({ ...e, hand: 1 }));
