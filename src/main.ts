@@ -86,18 +86,46 @@ initMouseAdapter();
 initDebugOverlay(() => game);
 initLobby(() => game);
 
+/**
+ * The game's world is 1280×720, stretched to the window. On a high-density (Retina) screen each
+ * of those pixels covers several real ones, which makes text and lines look soft. So the canvas
+ * is given `density` times as many pixels, every scene's camera zooms in by the same amount (the
+ * world stays 1280×720 to all the game code), and text is rendered at that density too.
+ */
+function renderDensity() {
+  const fit = Math.min(window.innerWidth / ARENA.width, window.innerHeight / ARENA.height);
+  return Math.min(2, Math.max(1, Math.ceil(fit * (window.devicePixelRatio || 1) - 0.15))); // 1 or 2: beyond that costs more than it shows
+}
+
 function startGame() {
   if (game) return;
+  const density = renderDensity();
+  const factory = Phaser.GameObjects.GameObjectFactory.prototype;
+  const makeText = factory.text;
+  factory.text = function (x, y, text, style) {
+    return makeText.call(this, x, y, text, { resolution: density, ...style });
+  };
   game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
-    width: ARENA.width,
-    height: ARENA.height,
+    width: ARENA.width * density,
+    height: ARENA.height * density,
     transparent: true,
     audio: { noAudio: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [Boot, Title, Classic, Duel, Panel, Arena, GameOver, AslTrainer],
   });
+  if (density !== 1) {
+    const g = game;
+    g.events.once(Phaser.Core.Events.READY, () => {
+      // a scene gets a fresh camera every time it starts
+      for (const scene of g.scene.scenes) {
+        const zoom = () => scene.cameras.main.setOrigin(0, 0).setZoom(density);
+        scene.events.on(Phaser.Scenes.Events.START, zoom);
+        if (scene.cameras?.main) zoom();
+      }
+    });
+  }
   (window as unknown as { __spellcam: unknown }).__spellcam = { game, state, emit, bus, startArena, initHandTracker, pvp, audio };
 }
 

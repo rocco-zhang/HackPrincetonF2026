@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { cardScale } from "../../a11y";
-import { GAME } from "../../config";
+import { ARENA, GAME } from "../../config";
 import type { CastName } from "../../input/events";
 import { SymbolBubble } from "./SymbolBubble";
 
@@ -33,7 +33,7 @@ export class Monster extends Phaser.GameObjects.Container {
     scene.add.existing(this);
 
     // face the center
-    this.sprite.setFlipX(x > scene.scale.width / 2);
+    this.sprite.setFlipX(x > ARENA.width / 2);
     scene.tweens.add({
       targets: this.sprite,
       y: -8,

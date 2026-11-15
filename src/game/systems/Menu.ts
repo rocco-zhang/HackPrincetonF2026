@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { ARENA } from "../../config";
 import { onInput } from "../../input/events";
 import { lobbyOpen } from "../../net/lobby";
 import { FONT, HIGHLIGHTER, INK, INK_CSS, MUTED_CSS, PAPER } from "../palette";
@@ -232,7 +233,7 @@ export function heading(scene: Phaser.Scene, x: number, y: number, text: string,
 
 /** The floor, the screen's name with a swipe of highlighter, and a Back button (also Esc). */
 export function screenFrame(scene: Phaser.Scene, menu: Menu, name: string, back: () => void) {
-  const W = scene.scale.width, H = scene.scale.height;
+  const W = ARENA.width, H = ARENA.height;
   scene.add.image(W / 2, H / 2, "floor");
   const title = scene.add.text(W / 2, 58, name, { fontFamily: '"Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive', fontSize: "62px", color: INK_CSS }).setOrigin(0.5).setPadding(16).setAngle(-1.2);
   const hl = scene.add.graphics({ x: W / 2, y: 64 }).setAngle(-1.2);
