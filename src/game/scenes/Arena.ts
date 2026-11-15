@@ -82,16 +82,20 @@ export class Arena extends Phaser.Scene implements CastHost {
   private get lang() {
     return isScript(this.subject);
   }
+  /** This round has mana and spells: always in a duel, in Classic only when switched on there. */
+  private spells = false;
+
   /**
-   * Spells are a Duel thing: Classic is drawing only. They are cast with a held hand pose, so even
-   * in a duel they are off where a pose already means something: ASL letters are poses, and in
-   * math an open hand held still submits the number.
+   * Spells are cast with a held hand pose, so even in a round that has them they are off where a
+   * pose already means something: ASL letters are poses, and in math an open hand held still
+   * submits the number.
    */
   private get spellsOn() {
-    return this.versus && this.subject !== "asl" && this.subject !== "math";
+    return this.spells && this.subject !== "asl" && this.subject !== "math";
   }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
+    this.spells = !!data?.pvp || (state.classicSpells && !data?.demo);
     this.loadout = cleanLoadout(state.loadout);
     this.mana = MANA.start;
     this.slowUntil = this.shieldUntil = 0;
@@ -249,7 +253,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private showSpells() {
-    this.hud.showSpells(this.versus); // no mana bar in Classic
+    this.hud.showSpells(this.spells); // no mana bar when the round has no spells
     this.hud.setSpells(this.loadout.map((id, i) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: SLOT_GESTURES[i] })), this.spellsOn);
     this.hud.setMana(this.mana, MANA.max);
   }

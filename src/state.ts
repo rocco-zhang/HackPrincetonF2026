@@ -69,6 +69,26 @@ export function saveLoadout(l: Loadout) {
   }
 }
 
+const CLASSIC_SPELLS_KEY = "spellcam.classicSpells";
+
+/** Remember whether spells are switched on for Classic. */
+export function saveClassicSpells(on: boolean) {
+  state.classicSpells = on;
+  try {
+    localStorage.setItem(CLASSIC_SPELLS_KEY, on ? "1" : "0");
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
+
+function loadClassicSpells(): boolean {
+  try {
+    return localStorage.getItem(CLASSIC_SPELLS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Shared app state read by the debug overlay, HUD and input adapters. */
 export const state = {
   /** "hand" in normal play. "mouse" only with the ?mouse URL (testing without a camera): the mouse then draws too. */
@@ -106,6 +126,8 @@ export const state = {
   difficulty: loadDifficulty(),
   /** Setup-screen choice: the two spells taken into a round. Each player's own, also in a duel. */
   loadout: loadLoadout(),
+  /** Classic-screen switch: play Classic with mana and spells. Off unless turned on. */
+  classicSpells: loadClassicSpells(),
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
   /** An arithmetic round is running. */

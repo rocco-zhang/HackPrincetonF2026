@@ -64,7 +64,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
-- **Mana and spells (Duel only; Classic is drawing only):** a mana bar under the wave name starts at 40 of 100. Each symbol you clear adds 6, a kill adds 8 more, and clearing a wave adds 20. You bring two spells, picked on the Duel screen: hold the horns hand (index and pinky out) to cast the first and an open palm to cast the second, or press `1` / `2`. Spells are off in ASL and math waves, where a held hand already means something.
+- **Mana and spells (always in Duel; in Classic only if you turn on the Spells toggle in the top right of the Classic screen, which is off by default and adds the spell row when on):** a mana bar under the wave name starts at 40 of 100. Each symbol you clear adds 6, a kill adds 8 more, and clearing a wave adds 20. You bring two spells, picked on the Duel screen (or the Classic screen once the switch is on): hold the horns hand (index and pinky out) to cast the first and an open palm to cast the second, or press `1` / `2`. Spells are off in ASL and math waves, where a held hand already means something.
 
   | Spell | Mana | What it does |
   |---|---|---|
@@ -88,7 +88,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 
   Any drawing direction works.
 - **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
-- **Spells:** mana and spells exist only in duels. Each player brings their own two. Bosses come every third wave, as in Classic.
+- **Spells:** duels always have mana and spells. Each player brings their own two. Bosses come every third wave, as in Classic.
 - **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
 ### ASL fingerspelling mode
@@ -168,7 +168,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
-| `1` / `2` | in a duel: cast your first / second spell, if you have the mana |
+| `1` / `2` | in a round with spells: cast your first / second spell, if you have the mana |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 
