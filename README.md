@@ -185,7 +185,7 @@ The recognizer tests draw 12 jittered strokes per base shape and direction (rand
 
 ## Deploy
 
-`npm run build` produces a static `dist/`. `.github/workflows/pages.yml` tests, builds and publishes it to GitHub Pages on every push to `main`; turn it on once under repo Settings → Pages → Source: "GitHub Actions". Vercel or Netlify also work. Camera access needs **HTTPS** when deployed, which all three provide. For the live demo, run from `localhost` with the local model file.
+`npm run build` produces a static `dist/` that any static host (GitHub Pages, Vercel, Netlify) can serve; there is no automatic deploy. Camera access needs **HTTPS** when deployed, which all three provide. For the live demo, run from `localhost` with the local model file.
 
 ## Code map
 
