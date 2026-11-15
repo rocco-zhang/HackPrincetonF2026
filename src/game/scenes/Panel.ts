@@ -5,6 +5,7 @@ import { ARENA, DIFFICULTIES, DIFFICULTY } from "../../config";
 import { state } from "../../state";
 import { SYMBOLS } from "../../input/events";
 import { Monster } from "../entities/Monster";
+import { Duel } from "./Duel";
 import { FONT, INK_CSS, MUTED_CSS } from "../palette";
 import { audio, setAudio, sfx } from "../sfx";
 import { bestScore, SUBJECT_INFO, SUBJECTS } from "../subjects";
@@ -39,7 +40,7 @@ export class Panel extends Phaser.Scene {
   private friends() {
     this.say(190, "There's no friends list yet.");
     this.say(240, "For now you can play anyone on another computer with a room code: one of you hosts, the other joins.", 21, MUTED_CSS);
-    this.menu.add({ x: ARENA.width / 2, y: 370, w: 360, h: 68, label: "Play a friend by code", fontSize: 28, primary: true, angle: -0.8, onClick: () => this.scene.start("Duel") });
+    this.menu.add({ x: ARENA.width / 2, y: 370, w: 360, h: 68, label: "Play a friend by code", fontSize: 28, primary: true, angle: -0.8, onClick: () => ((Duel.joinByCode = true), this.scene.start("Duel")) });
   }
 
   /** No badges exist yet, so this shows the one record the game does keep: best scores. */

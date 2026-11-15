@@ -20,12 +20,14 @@ let shownList = ""; // what the room list currently shows, so a refresh with no 
 
 export const lobbyOpen = () => !$("lobby").hidden;
 
-export function openLobby() {
+/** Open the panel. `forCode` puts the cursor in the join-code box (shown with the red dashed outline). */
+export function openLobby(forCode = false) {
   $("lobby").hidden = false;
   // typing a name or code must not trigger the game's hotkeys
   const kb = getGame()?.input.keyboard;
   if (kb) kb.enabled = false;
   render();
+  if (forCode && pvp.status === "off") $<HTMLInputElement>("lobbyCode").focus();
   clearInterval(refreshTimer);
   if (pvp.status === "off") void refresh();
   refreshTimer = window.setInterval(() => {

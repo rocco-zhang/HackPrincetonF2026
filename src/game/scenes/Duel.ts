@@ -27,6 +27,9 @@ export class Duel extends Phaser.Scene {
     super("Duel");
   }
 
+  /** Set just before opening this screen to land on the join-code box. Used once, then cleared. */
+  static joinByCode = false;
+
   create() {
     const W = ARENA.width;
     const menu = (this.menu = new Menu(this));
@@ -123,6 +126,10 @@ export class Duel extends Phaser.Scene {
       if (pvp.active && pvp.myReady) pvp.setReady(false); // leaving this screen means not ready
     });
     pvp.sendMode(); // host: make sure the guest has the current picks
+    // arriving from "Play a friend by code": go straight to the join-code box
+    // (a one-shot flag, not scene data: Phaser keeps a scene's last data for later visits)
+    if (Duel.joinByCode && pvp.status === "off") openLobby(true);
+    Duel.joinByCode = false;
   }
 
   /** Guest: play what the host picked (not saved as our own choice). */
