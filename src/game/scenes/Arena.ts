@@ -13,7 +13,7 @@ import { sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
-import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
+import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, MAX_MARKS, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
@@ -775,7 +775,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.casting.cast(cast, hand);
       return;
     }
-    if (next.length < 3 && fronts.some((front) => front.startsWith(`${cast}-`))) {
+    if (next.length < MAX_MARKS && fronts.some((front) => front.startsWith(`${cast}-`))) {
       this.marks = next;
       this.refreshLang();
       this.casting.holdLast(hand);

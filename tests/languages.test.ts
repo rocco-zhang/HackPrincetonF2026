@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CHINESE, JAPANESE, KOREAN, KOREAN_SYLLABLES, hintFor, langCast, langPool, nextMarks, pickLang, scriptMarks } from "../src/game/languages";
+import { CHINESE, JAPANESE, KOREAN, KOREAN_SYLLABLES, KOREAN_WORD_SYLLABLES, MAX_MARKS, hintFor, langCast, langPool, nextMarks, pickLang, scriptMarks } from "../src/game/languages";
+import { bossCards } from "../src/game/bosses";
 import { createDefaultRecognizer } from "../src/input/recognizer";
 import { jitteredStroke, LANG_BASE_SHAPES, BASE_SHAPES, mulberry32 } from "../src/input/shapes";
 import { bestKey, cleanSubjects, toggleSubject, waveSubject } from "../src/game/subjects";
@@ -17,16 +18,19 @@ describe("language bag", () => {
     for (const script of ["korean", "japanese", "chinese"] as const) {
       expect(langPool(script, 1).every((item) => item.script === script)).toBe(true);
       expect(langPool(script, 2).every((item) => item.script === script && item.strokes.length >= 2)).toBe(true);
-      expect(langPool(script, 3)).toHaveLength(langPool(script, 1).length + langPool(script, 2).length);
     }
+    // after the last lesson, everything together
+    expect(langPool("japanese", 3)).toHaveLength(langPool("japanese", 1).length + langPool("japanese", 2).length);
+    expect(langPool("korean", 3)).toEqual(KOREAN_WORD_SYLLABLES);
+    expect(langPool("korean", 4)).toHaveLength(KOREAN.length + KOREAN_SYLLABLES.length + KOREAN_WORD_SYLLABLES.length);
     expect(KOREAN.every((item) => item.strokes.length === 1)).toBe(true);
     expect(langPool("korean", 2)).toEqual(KOREAN_SYLLABLES);
   });
 
-  it("never needs more than three marks, and every prompt has a hint", () => {
+  it("never needs more marks than the game keeps track of, and every prompt has a hint", () => {
     for (const script of ["korean", "japanese", "chinese"] as const) {
-      for (const item of langPool(script, 3)) {
-        expect(item.strokes.length).toBeLessThanOrEqual(3);
+      for (const item of langPool(script, 9)) {
+        expect(item.strokes.length).toBeLessThanOrEqual(MAX_MARKS);
         expect(hintFor(item.label)).toBe(item.hint);
       }
     }
@@ -77,7 +81,7 @@ describe("letter strokes", () => {
   const read = (base: [number, number][], script: "korean" | "japanese" | "chinese") => rec.recognize(draw(base), [], undefined, scriptMarks(script)).name;
 
   it("Korean no longer uses the V or the peak: ㄱ and ㄴ are their own strokes", () => {
-    expect(scriptMarks("korean").sort()).toEqual(["circle", "giyeok", "hline", "nieun", "vline"]);
+    expect(scriptMarks("korean").sort()).toEqual(["caret", "circle", "giyeok", "hline", "nieun", "vline"]); // the peak is ㅅ, and part of ㅈ
     expect(KOREAN.find((k) => k.label === "ㄱ")!.strokes).toEqual(["giyeok"]);
     expect(KOREAN.find((k) => k.label === "ㄴ")!.strokes).toEqual(["nieun"]);
   });
@@ -121,5 +125,23 @@ describe("letter strokes", () => {
     expect(nextMarks(["lang_giyeok-vline"], []).sort()).toEqual(["giyeok"]);
     expect(nextMarks(["lang_giyeok-vline"], ["giyeok"]).sort()).toEqual(["giyeok", "vline"]);
     expect(nextMarks(["lang_circle", "lang_nieun-hline"], ["nieun"]).sort()).toEqual(["circle", "hline", "nieun"]);
+  });
+});
+
+describe("Korean words", () => {
+  it("has 저기요, 아니요 and 마시다 as boss words, built from syllables the lessons teach", () => {
+    let seed = 3;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    const taught = new Map(langPool("korean", 9).map((item) => [item.label, langCast(item.strokes)]));
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      const boss = bossCards("korean", 1, rand);
+      seen.add(boss.labels!.join(""));
+      boss.labels!.forEach((syllable, j) => expect(boss.symbols[j], syllable).toBe(taught.get(syllable))); // same strokes as the lesson card, so the hint is right
+    }
+    expect([...seen].sort()).toEqual(["마시다", "아니요", "저기요"]);
   });
 });

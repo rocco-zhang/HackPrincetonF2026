@@ -37,6 +37,23 @@ export const KOREAN_SYLLABLES: LangPrompt[] = [
   line("느", "korean", "neu: ㄴ (down, across), then a flat line", ["nieun", "hline"]),
 ];
 
+/**
+ * Syllables for whole words (저기요, 아니요, 마시다). Their letters are drawn in the real stroke
+ * order: ㅈ a flat line then a peak, ㅅ a peak, ㅁ a stick, ㄱ, then a flat line, ㄷ a flat line
+ * then ㄴ, ㅏ a stick then a flat line, ㅓ a flat line then a stick, ㅛ two sticks then a flat line.
+ */
+export const KOREAN_WORD_SYLLABLES: LangPrompt[] = [
+  line("아", "korean", "a: a circle, then ㅏ (stick, flat line)", ["circle", "vline", "hline"]),
+  line("시", "korean", "si: ㅅ (a peak), then a stick", ["caret", "vline"]),
+  line("저", "korean", "jeo: ㅈ (flat line, peak), then ㅓ (flat line, stick)", ["hline", "caret", "hline", "vline"]),
+  line("요", "korean", "yo: a circle, then ㅛ (two sticks, flat line)", ["circle", "vline", "vline", "hline"]),
+  line("다", "korean", "da: ㄷ (flat line, ㄴ), then ㅏ (stick, flat line)", ["hline", "nieun", "vline", "hline"]),
+  line("마", "korean", "ma: ㅁ (stick, ㄱ, flat line), then ㅏ (stick, flat line)", ["vline", "giyeok", "hline", "vline", "hline"]),
+];
+
+/** The most marks any card takes. */
+export const MAX_MARKS = 5;
+
 export const JAPANESE: LangPrompt[] = [
   line("ー", "japanese", "long-vowel mark: a flat line", ["hline"]),
   line("り", "japanese", "ri: two sticks, short then long", ["vline", "vline"]),
@@ -64,20 +81,18 @@ export const CHINESE_MORE: LangPrompt[] = [
   line("工", "chinese", "work: a flat line, a stick, a flat line", ["hline", "vline", "hline"]),
 ];
 
-const LESSONS: Record<Script, [LangPrompt[], LangPrompt[]]> = {
-  korean: [KOREAN, KOREAN_SYLLABLES],
+const LESSONS: Record<Script, LangPrompt[][]> = {
+  korean: [KOREAN, KOREAN_SYLLABLES, KOREAN_WORD_SYLLABLES],
   japanese: [JAPANESE, JAPANESE_WORDS],
   chinese: [CHINESE, CHINESE_MORE],
 };
 
 const NAMES: Record<Script, string> = { korean: "Korean", japanese: "Japanese", chinese: "Chinese" };
 
-/** Level 1 is the single letters, level 2 the longer ones, then both together. */
+/** Each level teaches the next lesson (single letters, then longer ones…); after the last, everything together. */
 export function langPool(script: Script, level: number): LangPrompt[] {
-  const [first, second] = LESSONS[script];
-  if (level <= 1) return first;
-  if (level === 2) return second;
-  return [...first, ...second];
+  const lessons = LESSONS[script];
+  return lessons[Math.max(1, level) - 1] ?? lessons.flat();
 }
 
 export function pickLang(script: Script, level: number, rand: () => number): LangPrompt {
@@ -88,6 +103,7 @@ export function pickLang(script: Script, level: number, rand: () => number): Lan
 export function langWaveBlurb(script: Script, level: number): string {
   if (level <= 1) return `${NAMES[script]}. Draw the marks you see`;
   if (level === 2) return `${NAMES[script]}. Longer ones: draw the marks in order`;
+  if (level === 3 && LESSONS[script].length >= 3) return `${NAMES[script]}. Syllables for whole words: follow the hint`;
   return `${NAMES[script]}. Everything so far`;
 }
 

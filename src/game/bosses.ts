@@ -30,9 +30,9 @@ const m = (...marks: Mark[]) => marks;
 /** Words written with the characters each language's lessons teach: [character, its strokes] pairs. */
 const WORDS: Record<"korean" | "japanese" | "chinese", { word: [string, Mark[]][]; meaning: string }[]> = {
   korean: [
-    { word: [["그", m("giyeok", "hline")], ["이", m("circle", "vline")]], meaning: "그이 (that person)" },
-    { word: [["이", m("circle", "vline")], ["기", m("giyeok", "vline")]], meaning: "이기 (self-interest)" },
-    { word: [["기", m("giyeok", "vline")], ["니", m("nieun", "vline")]], meaning: "기니 (Guinea)" },
+    { word: [["저", m("hline", "caret", "hline", "vline")], ["기", m("giyeok", "vline")], ["요", m("circle", "vline", "vline", "hline")]], meaning: "저기요 (excuse me)" },
+    { word: [["아", m("circle", "vline", "hline")], ["니", m("nieun", "vline")], ["요", m("circle", "vline", "vline", "hline")]], meaning: "아니요 (no)" },
+    { word: [["마", m("vline", "giyeok", "hline", "vline", "hline")], ["시", m("caret", "vline")], ["다", m("hline", "nieun", "vline", "hline")]], meaning: "마시다 (to drink)" },
   ],
   japanese: [
     { word: [["し", m("shi")], ["く", m("ku")], ["し", m("shi")], ["く", m("ku")]], meaning: "しくしく (sobbing)" },
