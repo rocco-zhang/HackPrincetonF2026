@@ -6,7 +6,7 @@ import type { RecogResult } from "./recognizer";
 
 import { experiment } from "./pinchConfig";
 export { experiment } from "./pinchConfig";
-export type Observation = { t: number; landmarks: Landmark[] | null; world: Landmark[] | null; width: number; height: number; thumbUpScore?: number };
+export type Observation = { t: number; landmarks: Landmark[] | null; world: Landmark[] | null; width: number; height: number; thumbUpScore?: number; loveScore?: number };
 
 /** Same normalized signal for live segmentation and explicit calibration. No 2D fallback in 3D mode. */
 export function calibrationRatio(o: Observation): number | null {
@@ -153,6 +153,11 @@ export class PinchExperiment {
     this.gateReason=this.ratio===null?(experiment.use3d && lm ? "3D landmarks unavailable: closing evidence unavailable (no 2D fallback)" : "No tracked hand: closing evidence unavailable"):this.inking?this.evidence==="open"?"Opening detected: waiting for End confirmation":"Pinch confirmed: drawing":!experiment.use3d && experiment.depthVeto && this.rawRatio!==null && this.rawRatio<on && this.ratio>=on?`3D depth veto: raw 2D is closed, effective ratio ${this.ratio.toFixed(3)} is not below ${on.toFixed(3)}`:this.ratio<on?`Start pending: ${progress} of consecutive closing evidence`:`Waiting: effective ratio ${this.ratio.toFixed(3)} must be strictly below ${on.toFixed(3)} (noise above it resets confirmation)`;
 
   }
+  /** A submit pose closes existing ink before gesture handling reserves the hand. */
+  finishForSubmission() {
+    if (this.inking) this.finish(this.evidence === "open" && this.since !== null ? this.since : this.lastP?.t ?? this.lastT, "character submission");
+  }
+
   private finish(end: number, reason: string) {
     const samples = this.points.filter(s=>s.p.t <= end && s.p.t > this.consumed);
     const rawPoints=samples.map(s=>s.p);

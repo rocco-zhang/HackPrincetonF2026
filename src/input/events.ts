@@ -7,8 +7,8 @@ export type SymbolName = "hline" | "vline" | "v" | "caret" | "circle" | "zigzag"
 export const SYMBOLS: SymbolName[] = ["hline", "vline", "v", "caret", "circle", "zigzag"];
 
 /** Strokes that only the language subjects use: real letter shapes, drawn the way the letter is written. */
-export type LangShape = "giyeok" | "nieun" | "ku" | "shi";
-export const LANG_SHAPES: LangShape[] = ["giyeok", "nieun", "ku", "shi"];
+export type LangShape = "giyeok" | "nieun" | "ku" | "shi" | "no" | "he" | "tsu" | "so" | "te" | "hi" | "ro" | "ru" | "n";
+export const LANG_SHAPES: LangShape[] = ["giyeok", "nieun", "ku", "shi", "no", "he", "tsu", "so", "te", "hi", "ro", "ru", "n"];
 /** Anything a single drawn stroke can be recognised as. */
 export type StrokeName = SymbolName | LangShape;
 export const STROKES: StrokeName[] = [...SYMBOLS, ...LANG_SHAPES];
@@ -39,6 +39,7 @@ export type InputEvent =
   | { type: "strokePoint"; p: Pt; hand?: number }
   | { type: "strokeCancel"; hand?: number }
   | { type: "strokeEnd"; points: Pt[]; rawPoints?: Pt[]; hand?: number }
+  | { type: "languageSubmit"; hand: number }
   | { type: "spellGesture"; name: "thumbs_up"; score: number; hand: number }
   // recognized cast. In a language round the name can be one of that language's letter strokes.
   | { type: "symbol"; name: CastName | LangShape; score: number; points: Pt[]; hand?: number }

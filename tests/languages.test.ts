@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHINESE, JAPANESE, KOREAN, KOREAN_SYLLABLES, KOREAN_WORD_SYLLABLES, MAX_MARKS, hintFor, langCast, langPool, nextMarks, pickLang, scriptMarks } from "../src/game/languages";
+import { CHINESE, JAPANESE, JAPANESE_MORE, JAPANESE_ADVANCED, KOREAN, KOREAN_SYLLABLES, KOREAN_WORD_SYLLABLES, MAX_MARKS, hintFor, langCast, langPool, nextMarks, pickLang, scriptMarks } from "../src/game/languages";
 import { bossCards } from "../src/game/bosses";
 import { createDefaultRecognizer } from "../src/input/recognizer";
 import { jitteredStroke, LANG_BASE_SHAPES, BASE_SHAPES, mulberry32 } from "../src/input/shapes";
@@ -17,10 +17,14 @@ describe("language bag", () => {
   it("teaches each language's single marks first, then longer ones, then both", () => {
     for (const script of ["korean", "japanese", "chinese"] as const) {
       expect(langPool(script, 1).every((item) => item.script === script)).toBe(true);
-      expect(langPool(script, 2).every((item) => item.script === script && item.strokes.length >= 2)).toBe(true);
+      if (script !== "japanese") expect(langPool(script, 2).every((item) => item.script === script && item.strokes.length >= 2)).toBe(true);
     }
     // after the last lesson, everything together
-    expect(langPool("japanese", 3)).toHaveLength(langPool("japanese", 1).length + langPool("japanese", 2).length);
+    expect(langPool("japanese", 1)).toEqual(JAPANESE);
+    expect(langPool("japanese", 2)).toEqual([...JAPANESE, ...JAPANESE_MORE]);
+    expect(langPool("japanese", 3)).toEqual([...JAPANESE, ...JAPANESE_MORE, ...JAPANESE_ADVANCED]);
+    expect(langPool("japanese", 9)).toHaveLength(12);
+    expect(langPool("japanese", 9).every(item => [...item.label].length === 1)).toBe(true);
     expect(langPool("korean", 3)).toEqual(KOREAN_WORD_SYLLABLES);
     expect(langPool("korean", 4)).toHaveLength(KOREAN.length + KOREAN_SYLLABLES.length + KOREAN_WORD_SYLLABLES.length);
     expect(KOREAN.every((item) => item.strokes.length === 1)).toBe(true);
@@ -37,7 +41,11 @@ describe("language bag", () => {
   });
 
   it("names a prompt by its marks, so the same shape is the same cast", () => {
-    expect(langCast(KOREAN[0].strokes)).toBe(langCast(JAPANESE[0].strokes));
+    expect(JAPANESE.map(item => item.label).sort()).toEqual(["り", "し", "く", "の"].sort());
+    expect(scriptMarks("japanese")).not.toContain("circle");
+    expect(scriptMarks("chinese")).not.toContain("circle");
+    expect(langPool("chinese", 9).map(item => item.label)).not.toContain("〇");
+    expect(scriptMarks("japanese")).not.toContain("hline");
     expect(langCast(KOREAN[0].strokes)).toBe(langCast(CHINESE[0].strokes));
     expect(langCast(["giyeok", "vline"])).toBe("lang_giyeok-vline");
     const rand = rng();
@@ -112,6 +120,20 @@ describe("letter strokes", () => {
       if (read(LANG_BASE_SHAPES.shi[0], "japanese") === "shi") ok++;
     }
     expect(ok / (2 * n)).toBeGreaterThan(0.95);
+  });
+
+  it("recognises hiragana no as its own stroke", () => {
+    let ok = 0;
+    for (let i = 0; i < 60; i++) if (read(LANG_BASE_SHAPES.no[0], "japanese") === "no") ok++;
+    expect(ok / 60).toBeGreaterThan(0.95);
+  });
+
+  it("recognises the added hiragana strokes", () => {
+    for (const name of ["he", "tsu", "so", "te", "hi", "ro", "ru", "n"] as const) {
+      let correct = 0;
+      for (let i = 0; i < 60; i++) if (read(LANG_BASE_SHAPES[name][0], "japanese") === name) correct++;
+      expect(correct / 60, name).toBeGreaterThan(0.85);
+    }
   });
 
   it("keeps letter strokes out of ordinary spell rounds", () => {

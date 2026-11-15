@@ -3,7 +3,7 @@ import { ASL_LETTERS } from "../src/asl/hand";
 import { INCANTATION, SpellCasting, spellFailureCost, spellRecipes } from "../src/game/spellCasting";
 import { SPELL_IDS, SPELLS, type Loadout } from "../src/game/spells";
 import { SUBJECTS } from "../src/game/subjects";
-import { scriptMarks } from "../src/game/languages";
+import { CHINESE, CHINESE_MORE, langCast, scriptMarks } from "../src/game/languages";
 
 const deck:Loadout=["fire","water"];
 function startFire(caster:SpellCasting){
@@ -19,7 +19,9 @@ describe("spell incantations",()=>{
       expect(spellRecipes([SPELL_IDS[i],SPELL_IDS[j]],subject)).toEqual(recipes);
       for(const r of recipes)for(const step of r.steps){
         if(subject==="asl")expect(ASL_LETTERS).toContain(step.token.slice(4));
-        if(subject==="korean"||subject==="japanese"||subject==="chinese")expect(scriptMarks(subject)).toContain(step.token);
+        if(subject==="japanese") expect(step.token).toMatch(/^lang_(shi|ku|no|vline-vline)$/);
+        if(subject==="chinese") expect([...CHINESE, ...CHINESE_MORE].map(item => langCast(item.strokes))).toContain(step.token);
+        if(subject==="korean")expect(scriptMarks(subject)).toContain(step.token);
       }
     }
   });

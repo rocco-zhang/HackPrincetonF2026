@@ -7,7 +7,7 @@ import type { Script } from "./subjects";
  */
 export type Mark = Extract<SymbolName, "hline" | "vline" | "caret" | "circle"> | LangShape;
 
-export const MARKS: Mark[] = ["hline", "vline", "caret", "circle", "giyeok", "nieun", "ku", "shi"];
+export const MARKS: Mark[] = ["hline", "vline", "caret", "circle", "giyeok", "nieun", "ku", "shi", "no", "he", "tsu", "so", "te", "hi", "ro", "ru", "n"];
 
 export type LangPrompt = {
   label: string;
@@ -55,23 +55,35 @@ export const KOREAN_WORD_SYLLABLES: LangPrompt[] = [
 export const MAX_MARKS = 5;
 
 export const JAPANESE: LangPrompt[] = [
-  line("ー", "japanese", "long-vowel mark: a flat line", ["hline"]),
   line("り", "japanese", "ri: two sticks, short then long", ["vline", "vline"]),
   line("し", "japanese", "shi: down, then hook up to the right", ["shi"]),
   line("く", "japanese", "ku: an angle pointing left", ["ku"]),
-  line("の", "japanese", "no: a circle", ["circle"]),
+  line("の", "japanese", "no: sweep down-left, loop around, finish at the bottom", ["no"]),
+];
+
+export const JAPANESE_MORE: LangPrompt[] = [
+  line("へ", "japanese", "he: rise diagonally, then sweep down-right", ["he"]),
+  line("つ", "japanese", "tsu: sweep right, curve down and back left", ["tsu"]),
+  line("そ", "japanese", "so: zig across the top, then curve down-right", ["so"]),
+  line("て", "japanese", "te: across, then curve down and right", ["te"]),
+];
+
+export const JAPANESE_ADVANCED: LangPrompt[] = [
+  line("ひ", "japanese", "hi: down into a deep curve, rise and flick right", ["hi"]),
+  line("ろ", "japanese", "ro: across, down-left, then a broad curve", ["ro"]),
+  line("る", "japanese", "ru: like ro, with a small loop at the bottom", ["ru"]),
+  line("ん", "japanese", "n: down-left, rise into a hump, finish up-right", ["n"]),
 ];
 
 export const JAPANESE_WORDS: LangPrompt[] = [
-  line("のり", "japanese", "nori (seaweed): a circle, then two sticks", ["circle", "vline", "vline"]),
+  line("のり", "japanese", "nori (seaweed): no, then ri", ["no", "vline", "vline"]),
   line("くし", "japanese", "kushi (comb): く, then し", ["ku", "shi"]),
-  line("しの", "japanese", "shino (bamboo grass): し, then a circle", ["shi", "circle"]),
+  line("しの", "japanese", "shino (bamboo grass): shi, then no", ["shi", "no"]),
 ];
 
 export const CHINESE: LangPrompt[] = [
   line("一", "chinese", "one: a flat line", ["hline"]),
   line("人", "chinese", "person: a peak", ["caret"]),
-  line("〇", "chinese", "zero: a circle", ["circle"]),
   line("二", "chinese", "two: two flat lines", ["hline", "hline"]),
   line("十", "chinese", "ten: a flat line, then a stick", ["hline", "vline"]),
 ];
@@ -83,7 +95,7 @@ export const CHINESE_MORE: LangPrompt[] = [
 
 const LESSONS: Record<Script, LangPrompt[][]> = {
   korean: [KOREAN, KOREAN_SYLLABLES, KOREAN_WORD_SYLLABLES],
-  japanese: [JAPANESE, JAPANESE_WORDS],
+  japanese: [JAPANESE, JAPANESE_MORE, JAPANESE_ADVANCED],
   chinese: [CHINESE, CHINESE_MORE],
 };
 
@@ -92,6 +104,7 @@ const NAMES: Record<Script, string> = { korean: "Korean", japanese: "Japanese", 
 /** Each level teaches the next lesson (single letters, then longer ones…); after the last, everything together. */
 export function langPool(script: Script, level: number): LangPrompt[] {
   const lessons = LESSONS[script];
+  if (script === "japanese") return lessons.slice(0, Math.max(1, level)).flat();
   return lessons[Math.max(1, level) - 1] ?? lessons.flat();
 }
 
@@ -111,13 +124,14 @@ export function pickLang(script: Script, level: number, rand: () => number): Lan
 }
 
 export function langWaveBlurb(script: Script, level: number): string {
-  if (level <= 1) return `${NAMES[script]}. Draw the marks you see`;
-  if (level === 2) return `${NAMES[script]}. Longer ones: draw the marks in order`;
+  if (script === "japanese") return `Japanese. ${langPool(script, level).map(item => item.label).join(" ")} / draw one hiragana, then hold 🤟`;
+  if (level <= 1) return `${NAMES[script]}. Draw the marks, then hold 🤟 to submit`;
+  if (level === 2) return `${NAMES[script]}. Longer ones: draw the marks in order, then hold 🤟`;
   if (level === 3 && LESSONS[script].length >= 3) return `${NAMES[script]}. Syllables for whole words: follow the hint`;
   return `${NAMES[script]}. Everything so far`;
 }
 
-export function langCast(strokes: Mark[]): LangName {
+export function langCast(strokes: readonly string[]): LangName {
   return `lang_${strokes.join("-")}`;
 }
 
@@ -130,7 +144,7 @@ export function scriptMarks(script: Script): Mark[] {
 }
 
 /** The marks that would continue a card right now, given what has been drawn so far. */
-export function nextMarks(cards: readonly string[], drawn: readonly Mark[]): Mark[] {
+export function nextMarks(cards: readonly string[], drawn: readonly string[]): Mark[] {
   const out = new Set<Mark>();
   for (const card of cards) {
     const marks = castMarks(card);
@@ -161,4 +175,7 @@ export const MARK_GLYPH: Record<Mark, string> = {
   nieun: "ㄴ",
   ku: "く",
   shi: "し",
+  no: "の",
+  he: "へ", tsu: "つ", so: "そ", te: "て",
+  hi: "ひ", ro: "ろ", ru: "る", n: "ん",
 };

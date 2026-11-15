@@ -11,6 +11,7 @@ import { experiment, PinchExperiment, type Observation } from "./pinchExperiment
 import { recognizer } from "./castPipeline";
 import { GestureGate } from "./gestureGate";
 
+const submitGates = [new GestureGate(), new GestureGate()];
 const gestureGates=[new GestureGate(),new GestureGate()];
 let starterHeldHand: number | null = null;
 
@@ -44,12 +45,13 @@ export function observeHands(primary: Observation, secondary: Observation) {
 export let replaying = false;
 export const observationListeners = new Set<(o: Observation) => void>();
 export let inferenceMs = 0;
-export function setReplaying(value: boolean) { replaying = value; cancelHandStroke();gestureGates.forEach(g=>g.reset());starterHeldHand=null;state.thumbUpHolding=false; }
+export function setReplaying(value: boolean) { replaying = value; cancelHandStroke();submitGates.forEach(g=>g.reset());gestureGates.forEach(g=>g.reset());starterHeldHand=null;state.thumbUpHolding=false; }
 export function processObservation(o: Observation) {
   diagnosticHand = 0;
   pinchEngine.observe(o);
   state.landmarks = o.landmarks;
   state.handVisible = !!o.landmarks;
+  if(replaying && stepLanguageSubmit([o.loveScore??0,0],o.t))return;
   if(replaying && stepThumbsUp([o.thumbUpScore??0,0],o.t))return;
   pinchEngine.process(o, state.mirror, state.drawBox);
   state.pinchRatio = pinchEngine.ratio;
@@ -90,6 +92,27 @@ function stepThumbsUp(scores: readonly number[], now: number): boolean {
   return true;
 }
 
+/** Reserve the submit pose so it cannot also become a drawn stroke. */
+function stepLanguageSubmit(scores: readonly number[], now: number): boolean {
+  const enabled = state.mode === "hand" && state.langActive && !calib;
+  let held = false;
+  let triggeredHand = -1;
+  submitGates.forEach((gate, hand) => {
+    const fired = gate.update(enabled ? scores[hand] ?? 0 : 0, now, experiment.thumbUpThreshold, experiment.thumbUpHoldMs);
+    if (gate.holding) held = true;
+    if (fired && triggeredHand < 0) triggeredHand = hand;
+  });
+  if (held) {
+    pinchEngine.finishForSubmission();
+    otherEngine.finishForSubmission();
+    cancelHandStroke();
+    emit({ type: "strokeCancel", hand: 0 });
+    emit({ type: "strokeCancel", hand: 1 });
+  }
+  if (triggeredHand >= 0) emit({ type: "languageSubmit", hand: triggeredHand });
+  return held;
+}
+
 /** True if `url` is served as a real file (Vite's dev server answers missing files with index.html). */
 async function hasFile(url: string) {
   try {
@@ -113,7 +136,7 @@ export async function initHandTracker() {
       minHandDetectionConfidence: 0.5,
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
-      cannedGesturesClassifierOptions:{categoryAllowlist:["Thumb_Up"],scoreThreshold:0,maxResults:1},
+      cannedGesturesClassifierOptions:{categoryAllowlist:["Thumb_Up", "ILoveYou"],scoreThreshold:0,maxResults:2},
     });
   try {
     landmarker = await make("GPU");
@@ -213,21 +236,24 @@ function loop() {
   const found: (Landmark[] | null)[] = [null, null];
   const foundWorld: (Landmark[] | null)[] = [null, null];
   const thumbScores=[0,0];
+  const loveScores=[0,0];
   hands.forEach((lm, i) => {
     const id = drawingHandId(labels[i], i);
     if (found[id]) return;
     found[id] = lm;
     foundWorld[id] = worlds[i] ?? null;
+    loveScores[id]=res.gestures[i]?.find(g=>g.categoryName==="ILoveYou")?.score??0;
     thumbScores[id]=res.gestures[i]?.find(g=>g.categoryName==="Thumb_Up")?.score??0;
   });
   const lm = found[0] ?? found[1];
   state.landmarks = lm;
   state.handVisible = !!lm;
   const width = v.videoWidth, height = v.videoHeight;
-  const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height, thumbUpScore:thumbScores[0] };
-  const secondary: Observation = {t:now,landmarks:found[1],world:foundWorld[1],width,height,thumbUpScore:thumbScores[1]};
+  const primary: Observation = { t: now, landmarks: found[0], world: foundWorld[0], width, height, thumbUpScore:thumbScores[0], loveScore:loveScores[0] };
+  const secondary: Observation = {t:now,landmarks:found[1],world:foundWorld[1],width,height,thumbUpScore:thumbScores[1], loveScore:loveScores[1]};
   observeHands(primary, secondary);
   if(lm)state.lastHandSeen=now;
+  if(stepLanguageSubmit(loveScores, now))return;
   if(stepThumbsUp(thumbScores,now))return;
   const asl = state.mode === "hand" && (state.aslActive || state.aslTraining);
   if (asl) {

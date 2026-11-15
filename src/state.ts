@@ -1,7 +1,7 @@
 import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
 import { cleanLoadout, type Loadout } from "./game/spells";
-import { cleanSubjects, type Subject } from "./game/subjects";
+import { cleanSubjects, type Subject, type Script } from "./game/subjects";
 import type { CastName, StrokeName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
 
@@ -140,6 +140,8 @@ export const state = {
   mathActive: false,
   /** A languages round is running. Each mark is drawn and casts on its own. */
   langActive: false,
+  /** Current writing script, used to route character submission and spell input. */
+  langScript: null as Script | null,
   /** Handshape read this frame, and how far through the hold-to-cast it is (0–1). */
   aslLetter: null as AslLetter | null,
   aslProgress: 0,

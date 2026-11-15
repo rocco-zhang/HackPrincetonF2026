@@ -1,4 +1,4 @@
-import { scriptMarks, MARK_GLYPH } from "./languages";
+import { CHINESE, CHINESE_MORE, JAPANESE, langCast, scriptMarks, MARK_GLYPH } from "./languages";
 import { SPELL_IDS, SPELLS, type Loadout, type SpellId } from "./spells";
 import { isScript, type Subject } from "./subjects";
 
@@ -17,6 +17,16 @@ export function spellRecipes(loadout: Loadout, subject: Subject): {id:SpellId;st
   const used=new Set<string>();
   return loadout.map(id=>{
     if(subject==="asl")return {id,steps:[...WORDS[id]].map(letter=>({label:letter,token:`asl_${letter}`,hint:`Hold the ASL handshape for ${letter}`}))};
+    if (subject === "japanese" || subject === "chinese") {
+      const characters = subject === "japanese" ? JAPANESE : [...CHINESE, ...CHINESE_MORE];
+      const index = SPELL_IDS.indexOf(id);
+      let first = index % characters.length;
+      while (used.has(langCast(characters[first].strokes))) first = (first + 1) % characters.length;
+      used.add(langCast(characters[first].strokes));
+      return { id, steps: [first, (first + 1) % characters.length, (first + 2) % characters.length].map(i => ({
+        label: characters[i].label, token: langCast(characters[i].strokes), hint: `Draw ${characters[i].label}, then hold 🤟`
+      })) };
+    }
     const alphabet=subject==="korean"?KOREAN:isScript(subject)?scriptMarks(subject):subject==="math"?["1","2","3","4","5","6"]:SHAPES;
     const index=SPELL_IDS.indexOf(id);
     let first=index%alphabet.length;

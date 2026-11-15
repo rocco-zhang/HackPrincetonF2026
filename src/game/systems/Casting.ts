@@ -134,7 +134,7 @@ export class Casting {
     sfx.fizzle();
   }
 
-  cast(name: CastName, hand = 0) {
+  cast(name: CastName, hand = 0, spawnedTarget?: Monster) {
     const color = castColor(name);
     const trail = this.lastByHand.get(hand);
     if (trail) {
@@ -146,7 +146,8 @@ export class Casting {
     player.castPulse(color);
 
     const targets = this.host.monsters.filter(
-      (m) => !m.dying && m.front === name && m.x > -20 && m.x < ARENA.width + 20 && m.y > -20 && m.y < ARENA.height + 20,
+      // ASL holds can finish while a monster is still in the spawn margin.
+      (m) => !m.dying && m.front === name && (spawnedTarget ? m === spawnedTarget : name.startsWith("asl_") || (m.x > -20 && m.x < ARENA.width + 20 && m.y > -20 && m.y < ARENA.height + 20)),
     );
     for (const m of targets) {
       m.queue.shift();

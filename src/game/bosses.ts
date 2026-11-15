@@ -45,7 +45,7 @@ const WORDS: Record<"korean" | "japanese" | "chinese", { word: [string, Mark[]][
   ],
   japanese: [
     { word: [["し", m("shi")], ["く", m("ku")], ["し", m("shi")], ["く", m("ku")]], meaning: "しくしく (sobbing)" },
-    { word: [["の", m("circle")], ["り", m("vline", "vline")], ["の", m("circle")], ["り", m("vline", "vline")]], meaning: "のりのり (in high spirits)" },
+    { word: [["の", m("no")], ["り", m("vline", "vline")], ["の", m("no")], ["り", m("vline", "vline")]], meaning: "のりのり (in high spirits)" },
     { word: [["く", m("ku")], ["り", m("vline", "vline")], ["く", m("ku")], ["り", m("vline", "vline")]], meaning: "くりくり (big and round)" },
   ],
   chinese: [

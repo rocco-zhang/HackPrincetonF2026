@@ -160,7 +160,7 @@ export class Hud {
     }
     const hand = state.mode === "hand";
     this.hint.setText(
-      (state.langActive ? "draw the mark on the monster" : state.mathActive ? "draw each digit, then hold still" : state.aslActive ? "🤟 hold a letter's handshape" : hand ? "✋ pinch thumb + index to draw" : "drag to draw (mouse test mode)") + "   ·   D debug",
+      (state.langActive ? "draw a character / hold 🤟 or Space to submit / Backspace clears" : state.mathActive ? "draw each digit, then hold still" : state.aslActive ? "🤟 hold a letter's handshape" : hand ? "✋ pinch thumb + index to draw" : "drag to draw (mouse test mode)") + "   ·   D debug",
     );
     const lost = hand && performance.now() - state.lastHandSeen > 1000;
     this.warn.setVisible(lost).setY(state.aslActive ? ARENA.height - 160 : ARENA.height - 40); // clear of the ASL cards

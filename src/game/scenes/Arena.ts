@@ -1,8 +1,10 @@
 import Phaser from "phaser";
 import { calmCamera } from "../../a11y";
 import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
+import { recognizer } from "../../input/castPipeline";
+import { experiment } from "../../input/pinchExperiment";
 import { recognizeDigit } from "../../input/digits";
-import { castLabel, isLangShape, mathName, onInput, type CastName } from "../../input/events";
+import { castLabel, isLangShape, mathName, onInput, type CastName, type Pt } from "../../input/events";
 import { mulberry32 } from "../../input/shapes";
 import { resetAslHold } from "../../input/handTracker";
 import { pvp } from "../../net/pvp";
@@ -14,7 +16,7 @@ import { setMusicFast, sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
-import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, MAX_MARKS, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
+import { hintFor, langCast, langWaveBlurb, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
@@ -55,7 +57,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   private shieldGfx: Phaser.GameObjects.Graphics | null = null;
   /** What this wave's boss will carry, on a boss wave. */
   private bossPlan: BossCards | null = null;
-  private marks: Mark[] = [];
+  private languageStrokes: Pt[][] = [];
   private buffer = "";
   private answerHold = 0;
   private answerText: Phaser.GameObjects.Text | null = null;
@@ -111,7 +113,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.level = 1;
     this.charge = 0;
     this.buffer = "";
-    this.marks = [];
+    this.languageStrokes = [];
     // the demo run is scripted against the standard tuning
     this.difficulty = this.demo ? "medium" : state.difficulty;
     this.monsters = [];
@@ -162,6 +164,12 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => this.onAnswerKey(ev));
     }
 
+    this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
+      if (!this.lang || this.phase !== "play" || ev.repeat) return;
+      if (ev.code === "Space") { ev.preventDefault(); this.submitLanguage(); }
+      if (ev.key === "Backspace") { ev.preventDefault(); this.clearLanguage(); }
+    });
+
     const off = onInput((e) => {
       switch (e.type) {
         case "cursor": return this.casting.onCursor(e.p, e.inking, e.hand);
@@ -171,6 +179,10 @@ export class Arena extends Phaser.Scene implements CastHost {
         case "strokeEnd":
           this.casting.onStrokeEnd(e.hand);
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points, e.hand);
+          if (this.lang && this.phase === "play" && (!this.incantation.active || this.subject !== "korean")) this.onLanguageStroke(e.points, e.hand);
+          return;
+        case "languageSubmit":
+          this.submitLanguage(e.hand);
           return;
         case "spellGesture":
           if(!this.routeSpellSign("spell_thumbs_up") && this.spellsOn && this.phase==="play"){
@@ -178,16 +190,16 @@ export class Arena extends Phaser.Scene implements CastHost {
           }
           return;
         case "symbol":
-          if (!this.math && this.routeSpellSign(e.name)) return;
-          if (this.lang && this.phase === "play") { this.onLangMark(e.name, e.hand); return; }
+          if (!this.math && this.subject !== "japanese" && this.subject !== "chinese" && this.routeSpellSign(e.name)) return;
+          if (this.lang && this.phase === "play") return;
           if (!this.math && this.phase !== "over" && !isLangShape(e.name)) this.casting.cast(e.name, e.hand);
           return;
         case "fizzle":
-          if (!this.math && this.incantation.active) { this.routeSpellSign("unrecognized"); return; }
-          if (this.lang && this.phase === "play") {
-            this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
+          if (this.lang && this.phase === "play" && (!this.incantation.active || this.subject === "japanese" || this.subject === "chinese")) {
+            // Language strokes are evaluated together only on submission.
             return;
           }
+          if (!this.math && this.incantation.active) { this.routeSpellSign("unrecognized"); return; }
           if (!this.math && this.phase !== "over") this.casting.onFizzle(e.points, e.hand);
           return;
       }
@@ -205,6 +217,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.aslActive = false;
       state.mathActive = false;
       state.langActive = false;
+      state.langScript = null;
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       const cancelled = this.incantation.cancel(performance.now());
@@ -254,10 +267,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     state.aslActive = this.asl;
     state.mathActive = this.math;
     state.langActive = this.lang;
+    state.langScript = isScript(this.subject) ? this.subject : null;
     state.spellGesturesEnabled=false;
     state.langMarks = isScript(this.subject) ? scriptMarks(this.subject) : null;
     this.buffer = "";
-    this.marks = [];
+    this.languageStrokes = [];
     this.answerHold = 0;
     this.answerBar?.clear();
     this.answerText?.setVisible(this.math || this.lang).setFontSize(this.math ? 36 : 28);
@@ -288,7 +302,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
     if (!this.incantation.beginFrom(sign,this.loadout,this.subject,this.mana,now)) return false;
     resetAslHold();
-    this.marks=[];this.buffer="";this.answerHold=0;
+    this.languageStrokes=[];this.buffer="";this.answerHold=0;
     this.answerBar?.clear();this.casting.releaseHeld();
     this.setSpellTime(true);
     this.paintIncantation();
@@ -305,6 +319,8 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private finishIncantation(result: SpellResult) {
     this.setSpellTime(false);
+    this.languageStrokes = [];
+    this.refreshLang();
     this.casting.releaseHeld();
     if (result.success && this.castSpell(result.id)) return;
     const penalty=Math.min(this.mana,spellFailureCost(result.id));
@@ -504,7 +520,12 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private spawn(o: SpawnOrder) {
     const p = edgePoint(o.angle);
-    this.monsters.push(new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels, o.boss));
+    const monster = new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels, o.boss);
+    this.monsters.push(monster);
+    if (this.asl && this.phase === "play" && !this.incantation.active && state.aslLetter && state.aslProgress === 1) {
+      const name: CastName = `asl_${state.aslLetter}`;
+      if (monster.front === name) this.casting.cast(name, 0, monster);
+    }
   }
 
   /** One big, slow monster with a long row of cards. The wave isn't over until it is gone. */
@@ -527,7 +548,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.worldTime+=dt*1000;
     this.paintIncantation();
     // strokes are only kept while a card or number is half drawn
-    const partDrawn = !!this.incantation.active || (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
+    const partDrawn = !!this.incantation.active || (this.lang && this.languageStrokes.length > 0) || (this.math && this.buffer.length > 0);
     if (!partDrawn && this.casting.holding) this.casting.releaseHeld();
     this.casting.update(dt);
     // the figure casts while a stroke is being drawn, or (ASL) while a letter is being held
@@ -535,7 +556,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : this.incantation.active ? (this.asl || this.subject === "shapes" ? this.incantation.expectedTokens as CastName[] : []) : fronts;
-    state.wantedMarks = this.lang ? this.incantation.active ? this.incantation.expectedTokens as Mark[] : nextMarks(state.wanted, this.marks) : [];
+    state.wantedMarks = this.lang ? this.incantation.active ? ((this.subject === "japanese" || this.subject === "chinese") ? nextMarks(this.incantation.expectedTokens, []) : this.incantation.expectedTokens as Mark[]) : nextMarks(state.wanted, []) : [];
     if (this.aslText) this.updateAsl();
     if (this.math && !this.incantation.active) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
@@ -805,58 +826,49 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
   }
 
-  /**
-   * A finished stroke casts immediately. A longer card keeps the marks until the sequence matches,
-   * and the strokes drawn so far stay on screen until it is cast or abandoned.
-   */
-  private onLangMark(name: string, hand = 0) {
-    if (!isMark(name)) {
-      this.fx.floatText(this.player.x, this.player.y - 80, "not one of this language's marks: see the hint below", "#8a857a", 18);
-      return;
-    }
-    const next = [...this.marks, name];
-    const cast = langCast(next);
-    const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!);
-    if (fronts.includes(cast)) {
-      this.marks = [];
-      this.refreshLang();
-      this.casting.releaseHeld(castColor(cast)); // the earlier strokes light up with the last one
-      this.casting.cast(cast, hand);
-      return;
-    }
-    if (next.length < MAX_MARKS && fronts.some((front) => front.startsWith(`${cast}-`))) {
-      this.marks = next;
-      this.refreshLang();
-      this.casting.holdLast(hand);
-      return;
-    }
-    // this stroke doesn't continue what was being drawn: let those strokes go
-    this.casting.releaseHeld();
-    const alone = langCast([name]);
-    if (fronts.includes(alone)) {
-      this.marks = [];
-      this.refreshLang();
-      this.casting.cast(alone, hand);
-      return;
-    }
-    if (fronts.some((front) => front.startsWith(`${alone}-`))) {
-      this.marks = [name];
-      this.refreshLang();
-      this.casting.holdLast(hand);
-      return;
-    }
-    this.marks = [];
+  /** Keep raw ink, including small or unfamiliar strokes, until explicit submission. */
+  private onLanguageStroke(points: Pt[], hand = 0) {
+    if (!points.length) return;
+    this.languageStrokes.push(points.map(point => ({ ...point })));
+    this.casting.holdLast(hand);
     this.refreshLang();
-    this.casting.cast(alone, hand);
+  }
+
+  private clearLanguage() {
+    this.languageStrokes = [];
+    this.casting.releaseHeld();
+    this.refreshLang();
+  }
+
+  private submitLanguage(hand = 0) {
+    if (!this.lang || this.phase !== "play" || !this.languageStrokes.length || !isScript(this.subject)) return;
+    const cards = this.incantation.active ? this.incantation.expectedTokens : this.monsters.filter(m => !m.dying && m.front).map(m => m.front!);
+    const marks: string[] = [];
+    for (const points of this.languageStrokes) {
+      const result = recognizer.recognize(points, nextMarks(cards, marks), undefined, scriptMarks(this.subject),
+        Math.max(0, experiment.wantedRecognitionThreshold - (this.subject === "japanese" ? 0.04 : 0)));
+      state.lastRecog = result;
+      marks.push(result.accepted && result.name ? result.name : "unrecognized");
+    }
+    const name = langCast(marks);
+    this.languageStrokes = [];
+    if ((this.subject === "japanese" || this.subject === "chinese") && this.incantation.active) {
+      this.casting.releaseHeld(castColor(name));
+      this.routeSpellSign(name);
+    } else {
+      this.casting.releaseHeld(castColor(name));
+      this.casting.cast(name, hand);
+    }
+    this.refreshLang();
   }
 
   private refreshLang() {
     if (!this.answerText || !this.lang) return;
-    const drawn = this.marks.map((mark) => MARK_GLYPH[mark]).join(" ");
+    const drawn = this.languageStrokes.length ? `${this.languageStrokes.length} stroke${this.languageStrokes.length === 1 ? "" : "s"}` : "";
     const hint = this.monsters.find((m) => !m.dying && m.prompts[0])?.prompts[0];
     const help = hint ? hintFor(hint) : "";
-    if (drawn) this.answerText.setText(`${drawn}  ·  ${help || "draw the next mark"}`);
-    else this.answerText.setText(help || "draw the mark");
+    if (drawn) this.answerText.setText(`${drawn}  ·  🤟 to submit / Backspace to clear`);
+    else this.answerText.setText(`${help || "draw the character"} / 🤟 to submit`);
   }
 
   private onDrawnDigit(points: { x: number; y: number }[], hand = 0) {
@@ -953,7 +965,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   private miss() {
     this.buffer = "";
     this.answerHold = 0;
-    this.marks = [];
+    this.languageStrokes = [];
     if (this.lang) this.refreshLang();
     else this.refreshAnswer();
     this.paintHold();

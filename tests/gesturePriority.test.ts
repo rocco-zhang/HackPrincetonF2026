@@ -12,6 +12,7 @@ const original={...experiment};
 beforeAll(()=>initCastPipeline());
 afterEach(()=>{
   setReplaying(false);Object.assign(experiment,original);
+  state.langActive=false;
   state.spellCastingActive=false;state.spellGesturesEnabled=false;state.thumbUpHolding=false;state.mode="mouse";
 });
 function observation(t:number,score:number):Observation{
@@ -59,5 +60,41 @@ describe("gesture priority during spell input",()=>{
       expect(events.filter(e=>e.type==="strokeCancel")).toHaveLength(cancellations);
       expect(events.filter(e=>e.type==="spellGesture")).toHaveLength(1);
     }finally{off();}
+  });
+});
+
+
+describe("language submit gesture", () => {
+  it("finishes pending ink before reserving the submit pose", () => {
+    setup(false);
+    state.langActive = true;
+    const events: InputEvent[] = [];
+    const off = onInput(e => events.push(e));
+    try {
+      for (let t = 0; t <= 200; t += 100) processObservation({ ...observation(t, 0), loveScore: 0 });
+      expect(state.inking).toBe(true);
+      for (let t = 300; t <= 900; t += 100) processObservation({ ...observation(t, 0), loveScore: .95 });
+      const completed = events.filter(e => e.type === "strokeEnd");
+      expect(completed).toHaveLength(1);
+      expect(completed[0].type === "strokeEnd" && completed[0].points.length).toBeGreaterThan(1);
+      expect(events.findIndex(e => e.type === "strokeEnd")).toBeLessThan(events.findIndex(e => e.type === "languageSubmit"));
+    } finally { off(); }
+  });
+
+  it("submits once per hold, reserves drawing, and rearms after release", () => {
+    setup(false);
+    state.langActive = true;
+    const events: InputEvent[] = [];
+    const off = onInput(e => events.push(e));
+    const frame = (t: number, loveScore: number) => processObservation({ ...observation(t, 0), loveScore });
+    try {
+      for (let t = 0; t <= 1000; t += 100) frame(t, .95);
+      expect(events.filter(e => e.type === "languageSubmit")).toHaveLength(1);
+      expect(events.some(e => e.type === "strokeStart" || e.type === "spellGesture")).toBe(false);
+      frame(1100, 0);
+      frame(1250, 0);
+      for (let t = 1300; t <= 1900; t += 100) frame(t, .95);
+      expect(events.filter(e => e.type === "languageSubmit")).toHaveLength(2);
+    } finally { off(); }
   });
 });

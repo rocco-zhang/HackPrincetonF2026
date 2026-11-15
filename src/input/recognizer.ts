@@ -202,7 +202,7 @@ export class Recognizer {
    * `only` = the strokes that can be the answer at all: the six spell symbols by default, or the
    * marks one language uses, so a letter is never mistaken for a shape that language doesn't have.
    */
-  recognize(raw: XY[], wanted: readonly StrokeName[] = [], accept = experiment.recognitionThreshold, only: readonly StrokeName[] = SYMBOLS): RecogResult {
+  recognize(raw: XY[], wanted: readonly StrokeName[] = [], accept = experiment.recognitionThreshold, only: readonly StrokeName[] = SYMBOLS, wantedAccept = experiment.wantedRecognitionThreshold): RecogResult {
     if (raw.length < 2 || isStrokeTooSmall(raw)) {
       return { name: null, score: 0, accepted: false, method: "tooSmall", resampled: [] };
     }
@@ -235,7 +235,7 @@ export class Recognizer {
     };
     const w = pick(wanted);
     const overall = pick(bestD.keys());
-    if (w.name && w.score >= experiment.wantedRecognitionThreshold && w.score >= overall.score - RECOG.wantedMargin) {
+    if (w.name && w.score >= wantedAccept && w.score >= overall.score - RECOG.wantedMargin) {
       return { name: w.name, score: w.score, accepted: true, method: "dollar", best: { name: w.name, score: w.score }, resampled: cand };
     }
     const { name: bestName, score } = overall;

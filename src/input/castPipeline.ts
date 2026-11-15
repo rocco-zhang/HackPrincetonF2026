@@ -3,6 +3,7 @@ import { state } from "../state";
 import { emit, isSymbol, onInput, type SymbolName } from "./events";
 import { createDefaultRecognizer, type Recognizer } from "./recognizer";
 import type { XY } from "./shapes";
+import { experiment } from "./pinchExperiment";
 import { isStrokeTooSmall } from "./strokeDetector";
 import bundled from "./templates.json";
 
@@ -30,6 +31,8 @@ export function initCastPipeline() {
     const pts = e.points;
     if(state.aslActive)return;
     state.lastStroke = pts;
+    // The arena buffers raw language strokes and recognizes them on explicit submission.
+    if (state.langActive && (!state.spellCastingActive || state.langScript !== "korean")) return;
     if (isStrokeTooSmall(pts)) {
       state.lastRecog = recognizer.recognize(pts);
       return; // too small to be intentional: ignore silently
@@ -48,7 +51,7 @@ export function initCastPipeline() {
 
     // a language round reads the stroke as one of that language's marks; otherwise as a spell symbol
     const r = state.langMarks
-      ? recognizer.recognize(pts, state.wantedMarks, undefined, state.langMarks)
+      ? recognizer.recognize(pts, state.wantedMarks, undefined, state.langMarks, Math.max(0, experiment.wantedRecognitionThreshold - (state.langMarks.includes("no") ? 0.04 : 0)))
       : recognizer.recognize(pts, state.wanted.filter(isSymbol));
     state.lastRecog = r;
     // after every listener has seen this strokeEnd
