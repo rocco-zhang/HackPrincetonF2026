@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { CAST_HEADROOM, CAST_TIP } from "../scenes/Boot";
+import { CAST_HEADROOM, CAST_SHOULDER, CAST_TIP, PENCIL } from "../scenes/Boot";
 import { HIGHLIGHTER, INK, PAPER, SYMBOL_COLOR } from "../palette";
 
 const CORE_Y = -10;
@@ -10,6 +10,8 @@ const CAST_LINGER_MS = 280;
 /** The air drawing after a spell lands: how big, and how long it takes to trace. */
 const AIR_SIZE = 46;
 const AIR_DRAW_MS = 460;
+/** Where the raised pencil's tip rests, measured from the figure's own position. */
+const REST_TIP = { x: CAST_TIP.x, y: CAST_Y + CAST_TIP.y };
 
 /** You: a stick figure in the middle of the page. */
 export class Player extends Phaser.GameObjects.Container {
@@ -20,6 +22,11 @@ export class Player extends Phaser.GameObjects.Container {
   private casting = false;
   private lastCast = -Infinity;
   private airGfx: Phaser.GameObjects.Graphics | null = null;
+  /** The casting pose's pencil and the arm holding it, drawn live so the pencil can follow a line. */
+  private arm: Phaser.GameObjects.Graphics;
+  private pencil: Phaser.GameObjects.Image;
+  /** The pencil is busy writing a spell in the air: it follows that line, not its idle wiggle. */
+  private writing = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -27,7 +34,9 @@ export class Player extends Phaser.GameObjects.Container {
     this.ring = scene.add.graphics();
     this.drawRing();
     this.core = scene.add.image(0, CORE_Y, "player");
-    this.add([this.shadow, this.ring, this.core]);
+    this.arm = scene.add.graphics().setVisible(false);
+    this.pencil = scene.add.image(0, 0, "pencil").setOrigin(PENCIL.originX, PENCIL.originY).setRotation(PENCIL.angle).setVisible(false);
+    this.add([this.shadow, this.ring, this.core, this.arm, this.pencil]);
     scene.add.existing(this);
     this.setDepth(400);
     scene.tweens.add({ targets: this.ring, angle: 360, duration: 40000, repeat: -1 });
@@ -59,14 +68,33 @@ export class Player extends Phaser.GameObjects.Container {
     const now = performance.now();
     if (on) this.lastCast = now;
     const active = now - this.lastCast < CAST_LINGER_MS;
+    // while the stroke is being drawn, the raised pencil scribbles a little in the air
+    if (active && !this.writing) this.pointPencil(REST_TIP.x + Math.sin(now / 95) * 3.5, REST_TIP.y + Math.cos(now / 140) * 2.5);
     if (active === this.casting) return;
     this.casting = active;
     this.core.setTexture(active ? "player_cast" : "player").setY(active ? CAST_Y : CORE_Y);
+    this.arm.setVisible(active);
+    this.pencil.setVisible(active);
     if (active) {
       // a little hop as the arm goes up
       this.scene.tweens.add({ targets: this.core, y: CAST_Y - 7, duration: 90, yoyo: true, ease: "Quad.easeOut" });
       this.sparkles.start();
     } else this.sparkles.stop();
+  }
+
+  /** Put the pencil's tip at a point (measured from the figure's own position) and draw the arm out to the hand holding it. */
+  private pointPencil(tx: number, ty: number) {
+    this.pencil.setPosition(tx, ty);
+    const hx = tx - Math.sin(PENCIL.angle) * PENCIL.grip, hy = ty + Math.cos(PENCIL.angle) * PENCIL.grip;
+    const sx = CAST_SHOULDER.x, sy = CAST_Y + CAST_SHOULDER.y;
+    const g = this.arm;
+    g.clear();
+    g.lineStyle(4.4, INK, 1);
+    g.lineBetween(sx, sy, hx, hy);
+    g.fillStyle(INK, 1);
+    g.fillCircle(sx, sy, 2.2);
+    g.fillCircle(hx, hy, 2.6);
+    this.sparkles.setPosition(this.x + tx, this.y + ty);
   }
 
   /** Dashed pencil circle: a monster that gets inside it costs a heart. */
@@ -132,6 +160,12 @@ export class Player extends Phaser.GameObjects.Container {
         g.fillStyle(0xffffff, 0.9);
         g.fillCircle(head.x, head.y, 2);
       }
+      // the pencil's tip rides the end of the line
+      this.pointPencil(head.x - this.x, head.y - this.y);
+    };
+    this.writing = true;
+    const done = () => {
+      if (this.airGfx === g) this.writing = false; // unless a newer spell has taken the pencil over
     };
     // hold the casting pose for as long as the drawing takes
     this.setCasting(true);
@@ -143,8 +177,10 @@ export class Player extends Phaser.GameObjects.Container {
       ease: "Sine.easeInOut",
       onUpdate: (tw) => g.active && paint(tw.getValue() ?? 1),
       onComplete: () => {
+        done();
         if (!g.active) return;
         paint(1);
+        this.writing = false;
         this.scene.tweens.add({ targets: g, alpha: 0, y: -10, delay: 260, duration: 280, onComplete: () => g.destroy() });
       },
     });
