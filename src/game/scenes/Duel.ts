@@ -3,23 +3,23 @@ import { ARENA, DIFFICULTY } from "../../config";
 import { openLobby } from "../../net/lobby";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
-import { FONT, INK, INK_CSS, MUTED_CSS, PAPER } from "../palette";
+import { FONT, INK_CSS } from "../palette";
 import { sfx } from "../sfx";
 import { heading, Menu, screenFrame } from "../systems/Menu";
-import { cameraNeeded, difficultyRow, guestLocked, subjectChips } from "../systems/pickers";
+import { cameraNeeded, difficultyRow, guestLocked, loadoutCaption, spellDeck, subjectChips } from "../systems/pickers";
 
 const MODES = [
   { id: "ranked", label: "Ranked", sub: "coming soon" },
   { id: "casual", label: "Casual", sub: "open games or a code" },
 ] as const;
 
-const DECK_SLOTS = 6;
 
 /** Multiplayer setup: subjects, match type (casual: open games or a join code), the spell deck, and getting ready. */
 export class Duel extends Phaser.Scene {
   private menu!: Menu;
   private blurb!: Phaser.GameObjects.Text;
   private status!: Phaser.GameObjects.Text;
+  private spellNote!: Phaser.GameObjects.Text;
   /** Host a game was pressed: the bottom row shows Public / Private instead. */
   private choosingHost = false;
 
@@ -59,21 +59,10 @@ export class Duel extends Phaser.Scene {
       });
     });
 
-    // right: the spell deck. Fire and water are earned during a shapes wave, not chosen here.
+    // right: the spell deck. Each player picks their own two.
     const rx = 1020;
-    heading(this, rx, 124, "Spell deck");
-    const g = this.add.graphics();
-    for (let i = 0; i < DECK_SLOTS; i++) {
-      const x = rx + ((i % 3) - 1) * 122, y = 216 + Math.floor(i / 3) * 156;
-      g.fillStyle(PAPER, 0.6);
-      g.fillRoundedRect(x - 52, y - 70, 104, 140, 10);
-      g.lineStyle(2, INK, 0.35);
-      g.strokeRoundedRect(x - 52, y - 70, 104, 140, 10);
-      this.add.text(x, y, "?", { fontFamily: FONT, fontSize: "54px", color: MUTED_CSS }).setOrigin(0.5).setAlpha(0.6).setAngle(i % 2 ? 5 : -5);
-    }
-    this.add
-      .text(rx, 468, "Fire and water are earned\nin a shapes wave.", { fontFamily: FONT, fontSize: "18px", color: MUTED_CSS, align: "center" })
-      .setOrigin(0.5, 0);
+    heading(this, rx, 124, "Spell deck", "pick two");
+    this.spellNote = spellDeck(this, menu, rx, 208, 112, 112, 12, 3, 380);
 
     // bottom: finding an opponent
     this.status = this.add
@@ -172,5 +161,6 @@ export class Duel extends Phaser.Scene {
     const set = (t: Phaser.GameObjects.Text, s: string) => t.text !== s && t.setText(s);
     set(this.blurb, DIFFICULTY[state.difficulty].blurb);
     set(this.status, this.statusLine());
+    set(this.spellNote, loadoutCaption("\n"));
   }
 }

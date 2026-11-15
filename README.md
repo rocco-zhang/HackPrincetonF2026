@@ -53,8 +53,8 @@ These are experimental parameters, not measured improvements. The lab displays d
 ### Screens
 
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons down the right edge: settings, accessibility, achievements, friends. Every button works with a pinch or a click.
-- **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
-- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and a spell deck that is still empty before a match. Fire and water are earned during a shapes wave. See [Versus mode](#versus-mode-two-computers).
+- **Classic:** pick a difficulty, one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese) and two spells, read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
+- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and the spell deck, where each player picks their own two spells.
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Accessibility:** color-blind marker colors (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
@@ -64,7 +64,17 @@ These are experimental parameters, not measured improvements. The lab displays d
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
-- **Spells:** clearing a shapes wave awards a random stack, such as 3 fire or 1 water. Horns (index and pinky out) casts fire, and an open palm casts water. The spell hits the nearest monster. With `?mouse`, `1` is fire and `2` is water.
+- **Mana and spells:** a mana bar under the wave name starts at 40 of 100. Each symbol you clear adds 6, a kill adds 8 more, and clearing a wave adds 20. You bring two spells, picked on the Classic or Duel screen: hold the horns hand (index and pinky out) to cast the first and an open palm to cast the second, or press `1` / `2`. Spells are off in ASL and math waves, where a held hand already means something.
+
+  | Spell | Mana | What it does |
+  |---|---|---|
+  | Fire | 30 | burns the nearest monster |
+  | Wave | 35 | washes every monster back toward the edge |
+  | Freeze | 40 | slows every monster to about a third of its speed for 7 seconds |
+  | Shield | 45 | blocks the next monster that reaches you (lasts 15 seconds) |
+  | Bomb | 60 | destroys every monster near you |
+  | Heal | 70 | gives one heart back |
+- **Bosses:** every third wave a boss comes with the wave: a bigger, slower monster carrying a long row. In shapes it is 6 to 8 symbols, in math four problems, in ASL a word to fingerspell (CLAY, WORLD, MONSTER…), and in Korean, Japanese and Chinese a word to write (그이, のりのり, 工人…). Fire and Bomb tear three cards off a boss instead of destroying it. A boss is worth four times the kill score.
 - **Symbols:**
 
   | Name | Symbol |
@@ -78,7 +88,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 
   Any drawing direction works.
 - **Waves:** wave 1 uses three symbols, wave 2 adds Λ and ◯, and wave 3 adds the zigzag and multi-symbol monsters.
-- **Spells:** clearing a wave in drawing mode, solo or versus, awards a random stack such as 3 fire or 1 water. Hold the horns hand (index and pinky out, like spiderman) to cast fire, or an open palm to cast water. The spell hits the nearest monster. With the mouse, `1` is fire and `2` is water. Hold the pose after you finish a stroke, so opening your hand to stop drawing does not cast.
+- **Spells:** mana, the two spells you picked and bosses work in a duel the same way as in Classic. Each player brings their own two.
 - **Score:** +100 per symbol removed, +250 per kill. One cast hitting 2 monsters scores ×2, and 3 or more scores ×3. A streak multiplier (+0.5× every 5 hitting casts, up to ×3) resets when you take damage. You get 3 hearts.
 
 ### ASL fingerspelling mode
@@ -158,7 +168,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
-| `1` / `2` | during a shapes wave: cast a fire or water spell, if you have one |
+| `1` / `2` | in a round: cast your first / second spell, if you have the mana |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 
@@ -224,7 +234,8 @@ src/
     icons.ts              pencil-drawn button icons
     entities/             Player, Monster, SymbolBubble
     systems/              Spawner, Casting (trail + spells), Hud, Fx, HoldToStart, Menu (pinch-or-click buttons), pickers (difficulty + subjects)
-    spells.ts             fire and water: wave rewards and the horns / open-palm gestures
+    spells.ts             the six spells, their mana costs, the two-spell loadout, and the horns / open-palm gestures
+    bosses.ts             the boss that comes every third wave, and the words it carries
     sfx.ts                procedural Web Audio sound effects, the looping background music (public/audio/bg_music.mp3), and their volume settings
 ```
 
@@ -237,4 +248,4 @@ src/
 - **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colors live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
 - **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
 - **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
-- **Out of scope for now:** mana, pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).
+- **Out of scope for now:** pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).

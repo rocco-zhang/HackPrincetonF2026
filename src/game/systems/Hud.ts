@@ -1,15 +1,21 @@
 import Phaser from "phaser";
 import { ARENA, DIFFICULTY, type Difficulty } from "../../config";
 import { state } from "../../state";
-import { FONT, INK_CSS, MUTED_CSS, ORANGE_CSS } from "../palette";
+import { FONT, INK, INK_CSS, MUTED_CSS, ORANGE_CSS } from "../palette";
+
+const MANA_W = 210, MANA_H = 18, MANA_Y = 50;
 
 export class Hud {
   private hearts: Phaser.GameObjects.Image[] = [];
   private scoreText: Phaser.GameObjects.Text;
   private multText: Phaser.GameObjects.Text;
   private waveText: Phaser.GameObjects.Text;
-  private fireText: Phaser.GameObjects.Text;
-  private waterText: Phaser.GameObjects.Text;
+  private slotTexts: Phaser.GameObjects.Text[] = [];
+  private manaBar: Phaser.GameObjects.Graphics;
+  private manaText: Phaser.GameObjects.Text;
+  private mana = { now: 0, shown: 0, max: 1 };
+  private slots: { name: string; glyph: string; cost: number; gesture: string }[] = [];
+  private spellsOn = false;
   private hint: Phaser.GameObjects.Text;
   private warn: Phaser.GameObjects.Text;
   private shownScore = 0;
@@ -36,16 +42,20 @@ export class Hud {
       .text(ARENA.width / 2, 18, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
       .setOrigin(0.5, 0)
       .setDepth(depth);
-    this.fireText = scene.add
-      .text(ARENA.width / 2 - 16, 46, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: "#e25b2a", stroke: "#f9f5ea", strokeThickness: 5 })
-      .setOrigin(1, 0)
-      .setDepth(depth)
-      .setVisible(false);
-    this.waterText = scene.add
-      .text(ARENA.width / 2 + 16, 46, "", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: "#2f7dff", stroke: "#f9f5ea", strokeThickness: 5 })
-      .setOrigin(0, 0)
-      .setDepth(depth)
-      .setVisible(false);
+    // mana bar under the wave name, with the two spells you brought on either side of it
+    this.manaBar = scene.add.graphics().setDepth(depth);
+    this.manaText = scene.add
+      .text(ARENA.width / 2, MANA_Y + MANA_H / 2, "", { fontFamily: FONT, fontSize: "13px", fontStyle: "bold", color: INK_CSS })
+      .setOrigin(0.5)
+      .setDepth(depth);
+    for (const side of [-1, 1]) {
+      this.slotTexts.push(
+        scene.add
+          .text(ARENA.width / 2 + side * (MANA_W / 2 + 14), MANA_Y + MANA_H / 2, "", { fontFamily: FONT, fontSize: "18px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 5 })
+          .setOrigin(side < 0 ? 1 : 0, 0.5)
+          .setDepth(depth),
+      );
+    }
     this.hint = scene.add
       .text(18, ARENA.height - 14, "", { fontFamily: FONT, fontSize: "16px", color: MUTED_CSS })
       .setOrigin(0, 1)
@@ -78,9 +88,45 @@ export class Hud {
     this.waveText.setText(this.difficulty === "medium" ? `Wave ${n}` : `Wave ${n}  ·  ${DIFFICULTY[this.difficulty].label}`);
   }
 
-  setSpells(fire: number, water: number, on: boolean) {
-    this.fireText.setVisible(on).setText(`fire ${fire} · horns`);
-    this.waterText.setVisible(on).setText(`palm · water ${water}`);
+  /** The two spells in play, and whether they can be cast in this wave's subject. */
+  setSpells(slots: { name: string; glyph: string; cost: number; gesture: string }[], on: boolean) {
+    this.slots = slots;
+    this.spellsOn = on;
+    this.paintSpells();
+  }
+
+  setMana(now: number, max: number) {
+    this.mana.now = now;
+    this.mana.max = max;
+    this.paintSpells();
+  }
+
+  private paintSpells() {
+    this.slots.forEach((slot, i) => {
+      const ready = this.spellsOn && this.mana.now >= slot.cost;
+      const label = i === 0 ? `${slot.gesture} · ${slot.glyph} ${slot.name} ${slot.cost}` : `${slot.cost} ${slot.name} ${slot.glyph} · ${slot.gesture}`;
+      this.slotTexts[i]?.setText(label).setAlpha(ready ? 1 : 0.4);
+    });
+    this.manaText.setText(this.spellsOn ? `mana ${Math.round(this.mana.now)}` : "no spells this wave");
+  }
+
+  private paintMana() {
+    const g = this.manaBar;
+    const x = ARENA.width / 2 - MANA_W / 2;
+    g.clear();
+    g.fillStyle(0xfffefa, 0.9);
+    g.fillRoundedRect(x, MANA_Y, MANA_W, MANA_H, 6);
+    g.fillStyle(this.spellsOn ? 0x7fc4f5 : 0xcfcabd, 1);
+    const w = (MANA_W * Math.max(0, Math.min(1, this.mana.shown / this.mana.max)));
+    if (w > 2) g.fillRoundedRect(x, MANA_Y, w, MANA_H, Math.min(6, w / 2));
+    // a tick where each spell becomes affordable
+    g.lineStyle(2, INK, 0.45);
+    for (const slot of this.slots) {
+      const tx = x + (MANA_W * slot.cost) / this.mana.max;
+      g.lineBetween(tx, MANA_Y + 2, tx, MANA_Y + MANA_H - 2);
+    }
+    g.lineStyle(2.5, INK, 0.85);
+    g.strokeRoundedRect(x, MANA_Y, MANA_W, MANA_H, 6);
   }
 
   setMultiplier(m: number) {
@@ -88,6 +134,11 @@ export class Hud {
   }
 
   update(score: number) {
+    // the bar slides to its new level
+    const m = this.mana;
+    if (Math.abs(m.shown - m.now) > 0.2) m.shown += (m.now - m.shown) * 0.2;
+    else m.shown = m.now;
+    this.paintMana();
     if (this.shownScore !== score) {
       this.shownScore += Math.ceil((score - this.shownScore) * 0.2);
       if (Math.abs(score - this.shownScore) < 2) this.shownScore = score;

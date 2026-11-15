@@ -33,7 +33,7 @@ export function edgePoint(angle: number, margin = 50) {
   return { x: cx + dx * t, y: cy + dy * t };
 }
 
-export type SpawnOrder = { angle: number; symbols: CastName[]; labels?: string[]; speed: number; palette: number };
+export type SpawnOrder = { angle: number; symbols: CastName[]; labels?: string[]; speed: number; palette: number; boss?: boolean };
 
 export type CardSource = {
   make: (wave: number, prefer?: number) => { name: CastName; label: string };

@@ -39,10 +39,14 @@ export class SymbolBubble extends Phaser.GameObjects.Container {
     return chip instanceof Phaser.GameObjects.Text ? chip.width + 18 : GAME.iconSize;
   }
 
+  /** How wide the row of cards is right now (before the bubble's own scale). */
+  rowWidth = 0;
+
   private layout(animate: boolean) {
     const n = this.icons.length;
     const widths = this.icons.map((chip) => this.chipWidth(chip));
     const w = Math.max(GAME.iconSize, widths.reduce((sum, width) => sum + width, 0) + GAP * Math.max(0, n - 1)) + 16;
+    this.rowWidth = w;
     this.bg.clear();
     this.tape.setVisible(n > 0);
     if (n > 0) {

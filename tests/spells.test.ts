@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readSpellPose, rollSpell } from "../src/game/spells";
+import { bossCards, isBossWave } from "../src/game/bosses";
+import { castMarks, scriptMarks } from "../src/game/languages";
+import { cleanLoadout, MANA, pickSpell, readSpellPose, SPELL_IDS, SPELLS } from "../src/game/spells";
+import { aslPool } from "../src/game/systems/Spawner";
 import type { Landmark } from "../src/state";
 
 type Fingers = { thumb: boolean; index: boolean; middle: boolean; ring: boolean; pinky: boolean };
@@ -28,23 +31,80 @@ const shut = { thumb: false, index: false, middle: false, ring: false, pinky: fa
 
 describe("spell gestures", () => {
   it("reads horns and an open palm, and ignores a fist or a pinch", () => {
-    expect(readSpellPose(hand({ ...shut, index: true, pinky: true }))).toBe("fire");
-    expect(readSpellPose(hand({ thumb: true, index: true, middle: true, ring: true, pinky: true }))).toBe("water");
+    expect(readSpellPose(hand({ ...shut, index: true, pinky: true }))).toBe(0); // horns: slot 1
+    expect(readSpellPose(hand({ thumb: true, index: true, middle: true, ring: true, pinky: true }))).toBe(1); // open palm: slot 2
     expect(readSpellPose(hand(shut))).toBeNull();
     const pinched = hand({ thumb: true, index: true, middle: true, ring: true, pinky: true });
     pinched[4] = { ...pinched[8] };
     expect(readSpellPose(pinched)).toBeNull();
   });
 
-  it("pays 1 to 3 charges of either spell", () => {
-    let s = 4;
-    const rand = () => {
-      s = (s * 1664525 + 1013904223) % 4294967296;
-      return s / 4294967296;
-    };
-    const drops = Array.from({ length: 40 }, () => rollSpell(rand));
-    expect(drops.every((d) => (d.id === "fire" || d.id === "water") && d.count >= 1 && d.count <= 3)).toBe(true);
-    expect(drops.some((d) => d.id === "fire" && d.count === 3)).toBe(true);
-    expect(drops.some((d) => d.id === "water" && d.count === 1)).toBe(true);
+});
+
+describe("spell deck", () => {
+  it("has at least six spells, each with a cost the mana bar can pay", () => {
+    expect(SPELL_IDS.length).toBeGreaterThanOrEqual(6);
+    for (const id of SPELL_IDS) {
+      expect(SPELLS[id].cost).toBeGreaterThan(0);
+      expect(SPELLS[id].cost).toBeLessThanOrEqual(MANA.max);
+    }
+    expect(MANA.start).toBeGreaterThanOrEqual(Math.min(...SPELL_IDS.map((id) => SPELLS[id].cost))); // one cheap spell from the start
+  });
+
+  it("always takes exactly two different spells into a round", () => {
+    expect(cleanLoadout(null)).toEqual(["fire", "water"]);
+    expect(cleanLoadout(["bomb", "bomb", "nonsense"])).toEqual(["bomb", "fire"]);
+    expect(cleanLoadout(["heal", "shield", "bomb"])).toEqual(["heal", "shield"]);
+  });
+
+  it("swaps out the spell picked longest ago", () => {
+    expect(pickSpell(["fire", "water"], "bomb")).toEqual(["water", "bomb"]);
+    expect(pickSpell(["water", "bomb"], "heal")).toEqual(["bomb", "heal"]);
+    expect(pickSpell(["bomb", "heal"], "heal")).toEqual(["bomb", "heal"]);
+  });
+});
+
+describe("bosses", () => {
+  let seed = 7;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+
+  it("come every third wave", () => {
+    expect([1, 2, 3, 4, 5, 6, 9].map(isBossWave)).toEqual([false, false, true, false, false, true, true]);
+  });
+
+  it("carry a long row for shapes and math", () => {
+    expect(bossCards("shapes", 1, rand).symbols.length).toBeGreaterThanOrEqual(5);
+    const math = bossCards("math", 2, rand);
+    expect(math.symbols).toHaveLength(4);
+    expect(math.labels).toHaveLength(4);
+  });
+
+  it("spell ASL words with letters taught by that lesson, never the same letter twice running", () => {
+    for (let level = 1; level <= 5; level++) {
+      const known = aslPool(level);
+      for (let i = 0; i < 20; i++) {
+        const { symbols } = bossCards("asl", level, rand);
+        expect(symbols.length).toBeGreaterThanOrEqual(3);
+        symbols.forEach((s, j) => {
+          expect(known).toContain(s);
+          if (j > 0) expect(s).not.toBe(symbols[j - 1]);
+        });
+      }
+    }
+  });
+
+  it("write words in each language using only that language's marks", () => {
+    for (const script of ["korean", "japanese", "chinese"] as const) {
+      const marks = scriptMarks(script) as string[];
+      for (let i = 0; i < 20; i++) {
+        const boss = bossCards(script, 1, rand);
+        expect(boss.symbols.length).toBeGreaterThanOrEqual(2);
+        expect(boss.labels).toHaveLength(boss.symbols.length);
+        for (const card of boss.symbols) for (const mark of castMarks(card)) expect(marks).toContain(mark);
+      }
+    }
   });
 });

@@ -16,7 +16,8 @@ import { Hud } from "../systems/Hud";
 import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
-import { emptySpells, readSpellPose, rollSpell, SPELL_AFTER_INK, SPELL_HOLD, type SpellBag, type SpellId } from "../spells";
+import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
+import { cleanLoadout, MANA, readSpellPose, SLOT_GESTURES, SPELL_AFTER_INK, SPELL_HOLD, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
 const SHAPE_GLYPH: Partial<Record<CastName, string>> = { caret: "Λ", circle: "◯", zigzag: "zigzag" };
@@ -43,8 +44,15 @@ export class Arena extends Phaser.Scene implements CastHost {
   private subject: Subject = "shapes";
   private level = 1;
   private roll: () => number = Math.random;
-  private bag: SpellBag = emptySpells();
-  private pose: SpellId | null = null;
+  /** The two spells brought into this round, the mana to cast them, and spell effects still running. */
+  private loadout: Loadout = ["fire", "water"];
+  private mana = MANA.start;
+  private slowUntil = 0;
+  private shieldUntil = 0;
+  private shieldGfx: Phaser.GameObjects.Graphics | null = null;
+  /** What this wave's boss will carry, on a boss wave. */
+  private bossPlan: BossCards | null = null;
+  private pose: 0 | 1 | null = null;
   private poseFor = 0;
   private poseReady = true;
   private sinceInk = 1;
@@ -74,13 +82,19 @@ export class Arena extends Phaser.Scene implements CastHost {
   private get lang() {
     return isScript(this.subject);
   }
-  /** Fire and water are earned and cast while drawing shapes, in Classic and in Duel. */
+  /**
+   * Spells are cast with a held hand pose, so they are off where a pose already means something:
+   * ASL letters are poses, and in math an open hand held still submits the number.
+   */
   private get spellsOn() {
-    return this.subject === "shapes";
+    return this.subject !== "asl" && this.subject !== "math";
   }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
-    this.bag = emptySpells();
+    this.loadout = cleanLoadout(state.loadout);
+    this.mana = MANA.start;
+    this.slowUntil = this.shieldUntil = 0;
+    this.bossPlan = null;
     this.pose = null;
     this.poseFor = 0;
     this.poseReady = true;
@@ -123,7 +137,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.answerText = this.answerBar = null;
     if (has("asl")) {
       this.aslText = this.add
-        .text(cx, 52, "", { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 })
+        .text(cx, 76, "", { fontFamily: FONT, fontSize: "24px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 }) // under the mana bar
         .setOrigin(0.5, 0)
         .setDepth(1000);
       this.aslBar = this.add.graphics().setDepth(1000);
@@ -173,15 +187,15 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
       if (ev.repeat || !this.spellsOn) return;
-      if (ev.key === "1") this.castSpell("fire");
-      if (ev.key === "2") this.castSpell("water");
+      if (ev.key === "1") this.castSpell(this.loadout[0]);
+      if (ev.key === "2") this.castSpell(this.loadout[1]);
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
       this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
     });
 
-    this.hud.setSpells(0, 0, this.spellsOn);
+    this.shieldGfx = this.add.graphics().setDepth(399);
     this.startWave(1);
   }
 
@@ -230,7 +244,17 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.answerText?.setVisible(this.math || this.lang).setFontSize(this.math ? 36 : 28);
     if (this.lang) this.refreshLang();
     else this.refreshAnswer();
-    this.hud.setSpells(this.bag.fire, this.bag.water, this.spellsOn);
+    this.showSpells();
+  }
+
+  private showSpells() {
+    this.hud.setSpells(this.loadout.map((id, i) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: SLOT_GESTURES[i] })), this.spellsOn);
+    this.hud.setMana(this.mana, MANA.max);
+  }
+
+  private gainMana(n: number) {
+    this.mana = Math.min(MANA.max, this.mana + n);
+    this.hud.setMana(this.mana, MANA.max);
   }
 
   private startWave(n: number) {
@@ -242,12 +266,16 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.applySubject();
     this.phase = "banner";
     this.hud.setWave(n);
-    this.fx.banner(`Wave ${n}`, INK_CSS, this.waveSubtitle(n), 1200);
+    // every few waves a boss comes too; ASL words only use letters this difficulty has introduced
+    const boss = isBossWave(n) && !this.demo;
+    this.bossPlan = boss ? bossCards(this.subject, this.asl ? Spawner.poolWave(this.level, this.difficulty) : this.level, this.roll) : null;
+    this.fx.banner(boss ? `Wave ${n}: Boss!` : `Wave ${n}`, boss ? ACCENT_CSS : INK_CSS, this.bossPlan?.title ?? this.waveSubtitle(n), boss ? 1700 : 1200);
     sfx.wave();
     this.time.delayedCall(DIFFICULTY[this.difficulty].breather * 1000, () => {
-      if (this.phase === "over") return;
+      if (this.phase === "over" || this.wave !== n) return;
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
+      if (this.bossPlan) this.spawnBoss(this.bossPlan);
     });
   }
 
@@ -313,7 +341,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const g = this.aslBar!;
     g.clear();
     if (on && letter && !lost) {
-      const w = 160, x = ARENA.width / 2 - w / 2, y = 88;
+      const w = 160, x = ARENA.width / 2 - w / 2, y = 112;
       g.fillStyle(castColor(`asl_${letter}`), 1);
       g.fillRect(x, y, w * state.aslProgress, 10);
       g.lineStyle(2, INK, 0.9);
@@ -396,7 +424,20 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private spawn(o: SpawnOrder) {
     const p = edgePoint(o.angle);
-    this.monsters.push(new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels));
+    this.monsters.push(new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels, o.boss));
+  }
+
+  /** One big, slow monster with a long row of cards. The wave isn't over until it is gone. */
+  private spawnBoss(cards: BossCards) {
+    this.spawn({
+      angle: this.roll() * Math.PI * 2,
+      symbols: cards.symbols,
+      labels: cards.labels,
+      speed: this.spawner.speed * BOSS.speed,
+      palette: Math.floor(this.roll() * 3),
+      boss: true,
+    });
+    sfx.hurt();
   }
 
   update(_t: number, deltaMs: number) {
@@ -415,6 +456,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.math) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
     if (this.spellsOn && this.phase === "play") this.tickSpells(dt);
+    this.paintShield();
     if (this.phase === "over") return;
 
     if (this.phase === "play") {
@@ -422,8 +464,10 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     const { x: px, y: py } = this.player;
+    const frozen = this.time.now < this.slowUntil;
     for (const m of [...this.monsters]) {
-      m.step(dt, px, py);
+      if (frozen) m.sprite.setTint(0x9fd0ff);
+      m.step(frozen ? dt * SPELL_POWER.freezeSpeed : dt, px, py);
       if (!m.dying && m.distanceTo(px, py) < GAME.contactDistance) this.contact(m);
       if (this.hearts <= 0) return;
     }
@@ -432,20 +476,12 @@ export class Arena extends Phaser.Scene implements CastHost {
       const bonus = Math.round(500 * this.wave * DIFFICULTY[this.difficulty].scoreMult);
       this.score += bonus;
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
-      if (this.spellsOn) this.awardSpell();
+      this.gainMana(MANA.perWave);
       this.startWave(this.wave + 1);
     }
   }
 
-  private awardSpell() {
-    const drop = rollSpell(Math.random);
-    this.bag[drop.id] += drop.count;
-    this.hud.setSpells(this.bag.fire, this.bag.water, true);
-    const how = drop.id === "fire" ? "horns" : "open palm";
-    this.fx.floatText(this.player.x, this.player.y - 136, `+${drop.count} ${drop.id} · ${how}`, drop.id === "fire" ? "#e25b2a" : "#2f7dff", 26);
-  }
-
-  /** A held horns or open palm spends one charge on the nearest monster. */
+  /** A held horns (slot 1) or open palm (slot 2) casts that spell. */
   private tickSpells(dt: number) {
     if (state.inking) {
       this.sinceInk = 0;
@@ -455,7 +491,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
     this.sinceInk += dt;
     const pose = state.mode === "hand" && this.sinceInk >= SPELL_AFTER_INK ? readSpellPose(state.landmarks) : null;
-    if (!pose) {
+    if (pose === null) {
       this.pose = null;
       this.poseFor = 0;
       this.poseReady = true;
@@ -469,45 +505,153 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.poseFor += dt;
     if (this.poseReady && this.poseFor >= SPELL_HOLD) {
       this.poseReady = false;
-      this.castSpell(pose);
+      this.castSpell(this.loadout[pose]);
     }
   }
 
   private castSpell(id: SpellId) {
     if (!this.spellsOn || this.phase !== "play") return;
-    if (this.bag[id] <= 0) {
-      this.fx.floatText(this.player.x, this.player.y - 80, `no ${id}`, "#8a857a", 18);
-      return;
+    const spell = SPELLS[id];
+    const { x: px, y: py } = this.player;
+    const no = (why: string) => this.fx.floatText(px, py - 80, why, "#8a857a", 18);
+    if (this.mana < spell.cost) return no(`not enough mana for ${spell.name}`);
+    const live = this.monsters.filter((m) => !m.dying && m.active);
+    const spend = () => {
+      this.mana -= spell.cost;
+      this.hud.setMana(this.mana, MANA.max);
+      this.fx.floatText(px, py - 104, `${spell.glyph} ${spell.name}`, `#${spell.color.toString(16).padStart(6, "0")}`, 24);
+    };
+
+    if (id === "fire") {
+      const target = live.sort((a, b) => a.distanceTo(px, py) - b.distanceTo(px, py))[0];
+      if (!target) return no("nobody near");
+      spend();
+      if (!target.boss) target.dying = true; // spoken for: drawing can't also hit it
+      this.animateSpell("fire", target, () => this.strike(target));
+    } else if (id === "water") {
+      if (!live.length) return no("nobody to wash away");
+      spend();
+      this.pushBack(live);
+    } else if (id === "bomb") {
+      if (!live.some((m) => m.distanceTo(px, py) <= SPELL_POWER.bombRadius)) return no("nothing in range");
+      spend();
+      this.explode();
+    } else if (id === "freeze") {
+      if (!live.length) return no("nobody to freeze");
+      spend();
+      this.slowUntil = this.time.now + SPELL_POWER.freezeSeconds * 1000;
+      sfx.water();
+      this.cameras.main.flash(160, 150, 210, 255);
+      this.time.delayedCall(SPELL_POWER.freezeSeconds * 1000 + 30, () => {
+        if (this.time.now >= this.slowUntil) for (const m of this.monsters) m.sprite.clearTint();
+      });
+    } else if (id === "shield") {
+      if (this.time.now < this.shieldUntil) return no("the shield is already up");
+      spend();
+      this.shieldUntil = this.time.now + SPELL_POWER.shieldSeconds * 1000;
+      sfx.wave();
+    } else {
+      const max = DIFFICULTY[this.difficulty].hearts;
+      if (this.hearts >= max) return no("hearts are already full");
+      spend();
+      this.hearts++;
+      this.hud.setHearts(this.hearts);
+      this.fx.burst(px, py - 20, 0xd7372f, 22);
+      this.fx.floatText(px, py - 130, "+1 heart", ACCENT_CSS, 26);
+      sfx.wave();
     }
-    let nearest: Monster | null = null;
-    let best = Infinity;
-    for (const m of this.monsters) {
-      if (m.dying || !m.active) continue;
-      const d = m.distanceTo(this.player.x, this.player.y);
-      if (d < best) {
-        best = d;
-        nearest = m;
+  }
+
+  /** A damaging spell reaches a monster: it destroys it, or tears a few symbols off a boss. */
+  private strike(m: Monster) {
+    if (!m.active) return;
+    if (m.boss) {
+      for (let i = 0; i < SPELL_POWER.bossSymbols && m.queue.length > 0; i++) {
+        m.queue.shift();
+        m.prompts.shift();
+        m.bubble.popFront();
       }
+      m.flashHit();
+      if (m.queue.length > 0) return;
+      m.dying = true;
     }
-    if (!nearest) {
-      this.fx.floatText(this.player.x, this.player.y - 80, "nobody near", "#8a857a", 18);
-      return;
+    const pts = Math.round(GAME.scorePerKill * this.streakMult * (m.boss ? BOSS.scoreMult : 1));
+    this.score += pts;
+    this.fx.floatText(m.x, m.y - 40, `+${pts}`, ORANGE_CSS, 28);
+    if (this.versus) this.chargeAttack(1, 1);
+    this.kill(m);
+  }
+
+  /** Wave: a ring of water shoves every monster back toward the edge. */
+  private pushBack(live: Monster[]) {
+    const { x: px, y: py } = this.player;
+    sfx.water();
+    const ring = this.add.circle(px, py, 30).setStrokeStyle(10, 0x4db4ff, 0.8).setDepth(850);
+    this.tweens.add({ targets: ring, scale: 12, alpha: 0, duration: 520, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
+    this.cameras.main.flash(120, 70, 150, 255);
+    for (const m of live) {
+      const d = m.distanceTo(px, py) || 1;
+      const ux = (m.x - px) / d, uy = (m.y - py) / d;
+      let done = 0;
+      this.tweens.addCounter({
+        from: 0,
+        to: SPELL_POWER.pushDistance,
+        duration: 420,
+        ease: "Quad.easeOut",
+        onUpdate: (tw) => {
+          if (!m.active) return;
+          const v = tw.getValue() ?? 0;
+          // never further out than where monsters come in from
+          m.x = Phaser.Math.Clamp(m.x + ux * (v - done), -50, ARENA.width + 50);
+          m.y = Phaser.Math.Clamp(m.y + uy * (v - done), -50, ARENA.height + 50);
+          done = v;
+        },
+      });
+      this.fx.puff(m.x, m.y, 0xd7f1ff, 8);
     }
-    this.bag[id] -= 1;
-    this.hud.setSpells(this.bag.fire, this.bag.water, true);
-    nearest.dying = true;
-    const target = nearest;
-    this.animateSpell(id, target, () => {
-      if (!target.active) return;
-      const pts = Math.round(GAME.scorePerKill * this.streakMult);
-      this.score += pts;
-      this.fx.floatText(target.x, target.y - 40, `+${pts}`, ORANGE_CSS, 28);
-      if (this.versus) this.chargeAttack(1, 1);
-      this.kill(target);
+  }
+
+  /** Bomb: everything inside the blast when it goes off is hit. */
+  private explode() {
+    const { x: px, y: py } = this.player;
+    const r = SPELL_POWER.bombRadius;
+    const blast = this.add.circle(px, py, r, 0xff8a3d, 0.28).setStrokeStyle(6, 0xd7372f, 0.9).setDepth(850).setScale(0.1);
+    sfx.fire();
+    this.tweens.add({
+      targets: blast,
+      scale: 1,
+      duration: 240,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        this.tweens.add({ targets: blast, alpha: 0, duration: 260, onComplete: () => blast.destroy() });
+        this.fx.burst(px, py, 0xff4d1a, 40);
+        this.cameras.main.shake(200, 0.012);
+        this.cameras.main.flash(140, 255, 150, 60);
+        for (const m of [...this.monsters]) {
+          if (m.active && !m.dying && m.distanceTo(px, py) <= r) this.strike(m);
+        }
+      },
     });
   }
 
-  private animateSpell(id: SpellId, target: Monster, onHit: () => void) {
+  /** The shield: a ring around you until it is used up or runs out. */
+  private paintShield() {
+    const g = this.shieldGfx;
+    if (!g) return;
+    g.clear();
+    const left = this.shieldUntil - this.time.now;
+    if (left <= 0) return;
+    const { x, y } = this.player;
+    const pulse = 0.6 + 0.25 * Math.sin(this.time.now / 180);
+    // fades out over its last two seconds
+    const a = Math.min(1, left / 2000);
+    g.fillStyle(0x2f9e58, 0.1 * a);
+    g.fillCircle(x, y, 78);
+    g.lineStyle(6, 0x2f9e58, pulse * a);
+    g.strokeCircle(x, y, 78);
+  }
+
+  private animateSpell(id: "fire" | "water", target: Monster, onHit: () => void) {
     const fromX = this.player.x;
     const fromY = this.player.y - 24;
     const toX = target.x;
@@ -582,7 +726,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (!m.active) return;
     const color = castColor(name);
     const mult = multi >= 3 ? 3 : multi >= 2 ? 2 : 1;
-    const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill : 0)) * mult * this.streakMult * DIFFICULTY[this.difficulty].scoreMult);
+    const pts = Math.round((GAME.scorePerSymbol + (killed ? GAME.scorePerKill * (m.boss ? BOSS.scoreMult : 1) : 0)) * mult * this.streakMult * DIFFICULTY[this.difficulty].scoreMult);
+    this.gainMana(MANA.perSymbol + (killed ? MANA.perKill : 0));
     this.score += pts;
     this.fx.floatText(m.x, m.y - 40, `+${pts}`, killed ? ORANGE_CSS : INK_CSS, killed ? 28 : 22);
     m.prompts.shift();
@@ -770,6 +915,16 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private contact(m: Monster) {
     this.removeMonster(m);
+    if (this.time.now < this.shieldUntil) {
+      // the shield takes this one, and is used up
+      this.shieldUntil = 0;
+      this.fx.burst(m.x, m.y, 0x2f9e58, 30);
+      this.fx.floatText(this.player.x, this.player.y - 96, "blocked!", "#2f9e58", 26);
+      this.cameras.main.shake(120, 0.006);
+      sfx.kill();
+      m.destroy();
+      return;
+    }
     this.fx.puff(m.x, m.y, 0x8a857a, 20);
     this.fx.burst(this.player.x, this.player.y, 0xff4d6d, 30);
     m.destroy();

@@ -1,5 +1,6 @@
 import { DIFFICULTIES, INPUT, type Difficulty } from "./config";
 import type { AslLetter } from "./asl/hand";
+import { cleanLoadout, type Loadout } from "./game/spells";
 import { cleanSubjects, type Subject } from "./game/subjects";
 import type { CastName, StrokeName, SymbolName } from "./input/events";
 import type { RecogResult } from "./input/recognizer";
@@ -48,6 +49,26 @@ export function saveSubjects(list: Subject[]) {
   }
 }
 
+const LOADOUT_KEY = "spellcam.loadout";
+
+function loadLoadout(): Loadout {
+  try {
+    return cleanLoadout(JSON.parse(localStorage.getItem(LOADOUT_KEY) ?? "null"));
+  } catch {
+    return cleanLoadout(null);
+  }
+}
+
+/** Remember which two spells go into battle. */
+export function saveLoadout(l: Loadout) {
+  state.loadout = cleanLoadout(l);
+  try {
+    localStorage.setItem(LOADOUT_KEY, JSON.stringify(state.loadout));
+  } catch {
+    // storage blocked: the choice still lasts for this session
+  }
+}
+
 /** Shared app state read by the debug overlay, HUD and input adapters. */
 export const state = {
   /** "hand" in normal play. "mouse" only with the ?mouse URL (testing without a camera): the mouse then draws too. */
@@ -83,6 +104,8 @@ export const state = {
   subjects: loadSubjects(),
   /** Setup-screen choice (in a duel, the host's). */
   difficulty: loadDifficulty(),
+  /** Setup-screen choice: the two spells taken into a round. Each player's own, also in a duel. */
+  loadout: loadLoadout(),
   /** An ASL round is running: the tracker reads handshapes and strokes are ignored. */
   aslActive: false,
   /** An arithmetic round is running. */

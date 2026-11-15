@@ -2,8 +2,9 @@
 import Phaser from "phaser";
 import { DIFFICULTIES, DIFFICULTY, type Difficulty } from "../../config";
 import { pvp } from "../../net/pvp";
-import { saveDifficulty, saveSubjects, state } from "../../state";
+import { saveDifficulty, saveLoadout, saveSubjects, state } from "../../state";
 import { FONT, MUTED_CSS } from "../palette";
+import { pickSpell, SLOT_GESTURES, SPELL_IDS, SPELLS } from "../spells";
 import { SUBJECT_INFO, SUBJECTS, toggleSubject, type Subject } from "../subjects";
 import type { Menu } from "./Menu";
 
@@ -64,3 +65,33 @@ export function subjectChips(menu: Menu, cx: number, y: number, w: number, h: nu
 
 /** ASL reads handshapes, so it can't be played with the mouse. */
 export const cameraNeeded = () => state.subjects.includes("asl") && state.mode !== "hand";
+
+/**
+ * The spell deck: every spell as a card, two of them picked to bring into a round. Picking a
+ * third swaps out the one picked longest ago. Returns the line that says how the two are cast.
+ */
+export function spellDeck(scene: Phaser.Scene, menu: Menu, cx: number, y: number, w: number, h: number, gap: number, cols: number, captionWidth: number) {
+  const rows = Math.ceil(SPELL_IDS.length / cols);
+  SPELL_IDS.forEach((id, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    menu.add({
+      x: cx + (col - (cols - 1) / 2) * (w + gap),
+      y: y + row * (h + gap),
+      w,
+      h,
+      glyph: SPELLS[id].glyph,
+      label: `${SPELLS[id].name} · ${SPELLS[id].cost}`,
+      fontSize: Math.min(20, Math.round(w / 7)),
+      angle: i % 2 ? 0.9 : -0.9,
+      selected: () => state.loadout.includes(id),
+      onClick: () => saveLoadout(pickSpell(state.loadout, id)),
+    });
+  });
+  return scene.add
+    .text(cx, y + (rows - 1) * (h + gap) + h / 2 + 12, "", { fontFamily: FONT, fontSize: "17px", color: MUTED_CSS, align: "center", wordWrap: { width: captionWidth } })
+    .setOrigin(0.5, 0);
+}
+
+/** How the two picked spells are cast and what they do. */
+export const loadoutCaption = (sep = "   ·   ") =>
+  state.loadout.map((id, i) => `${SLOT_GESTURES[i]}: ${SPELLS[id].name} ${SPELLS[id].blurb}`).join(sep);
