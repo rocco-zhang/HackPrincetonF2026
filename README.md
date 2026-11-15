@@ -2,13 +2,13 @@
 
 You are a stick figure on a sheet of paper, and the paper monsters are closing in. Draw shapes in the air with your fingertip to tear them up before they reach you.
 
-Your webcam tracks your hand in the browser (MediaPipe). Pinch your thumb and index finger to start drawing, and release to cast. Each monster carries a queue of symbols on a scrap of paper taped above it. Drawing a symbol strips it from **every** monster whose next symbol matches, so one spell can hit several at once.
+Using MediaPipe, your computer's webcam tracks your hand in the browser. To play, all you have to do is pinch your thumb and index finger to start drawing, and release to cast. Each monster carries a queue of symbols on a scrap of paper taped above it. Drawing a symbol strips it from **every** monster whose next symbol matches, so one spell can eliminate several monsters at once.
 
 Built at HackPrinceton Fall '26 (Entertainment & Media track). The design doc is [`init_plan.md`](init_plan.md).
 
 ![gameplay](docs/screenshot.png)
 
-## Built with
+## Built with:
 
 Everything runs in the browser. There is no backend.
 
@@ -20,14 +20,14 @@ Everything runs in the browser. There is no backend.
 - **Audio:** the Web Audio API generates the sound effects, and an HTML5 audio element plays the music
 - **Tooling:** Vitest, Node.js/npm, and localStorage for settings and recorded ASL examples
 
-## Run it
+## Running it
 
 ```bash
 npm install        # also copies the MediaPipe wasm into public/ and fetches the hand model if missing
 npm run dev        # http://localhost:5173
 ```
 
-Click **Enable camera & sound**. The game is played with your hand, so it needs a camera. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL skips the start screen in mouse mode.
+Click **Enable camera & sound**. The game is played with your hand, so it needs a camera. If the computer has more than one camera, a picker appears on that screen. Camera access works on `localhost` without HTTPS. Adding `?mouse` to the URL starts the mouse-only version of the game (if no camera is available).
 
 Everything runs in the browser. There is no backend (versus mode connects the two browsers directly). The gesture-and-landmark model (`public/models/gesture_recognizer.task`) is stored locally, and the wasm runtime is copied from `node_modules` on install, so the game never needs a CDN or venue Wi‑Fi. If the local files are missing, it falls back to the CDN automatically.
 
@@ -69,15 +69,15 @@ These are experimental parameters, not measured improvements. The lab displays d
 ### Screens
 
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons down the right edge: settings, accessibility, achievements, friends. Every button works with a pinch or a click.
-- **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
-- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and the spell deck, where each player picks their own two spells.
+- **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
+- **Duel:** PvP mode. The same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and the spell deck, where each player picks their own two spells.
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Accessibility:** color-blind marker colors (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
 
-- **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
+- **Hand:** pinch thumb + index to start drawing, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
 - **Mana and spells:** Duel always has spells; in Classic, turn on **Spells** at the top right of setup and pick two. Mana starts at 40 of 100. Clearing a symbol adds 6, a kill adds 8 more, and clearing a wave adds 20. Both modes use the current subject's fixed sign sequence (see below), including ASL and math. Hold thumbs up to start. In Duel, casting slows only your own arena; your opponent continues playing normally. Changing the host's subjects or difficulty clears both Ready states. Readiness is tied to that setup revision, so both players must confirm the new settings.
@@ -113,7 +113,7 @@ Spell damage removes queued symbol cards, equally for ordinary enemies and bosse
 
 With Spells enabled, hold **thumbs up** at or above the confidence threshold for the configured hold time to enter casting mode. Defaults are **0.50 confidence for 250 ms**. It starts as soon as the hold completes; no release is required. The next character selects the spell from its unique first character, then you finish that recipe. The HUD stacks both spells vertically on the right, showing only their icons, names, and mana costs. Setup shows the recipes. While casting, monsters, spawning, world timers, and tweens run at **12% speed**, while hand recognition and input deadlines stay in real time.
 
-Complete the characters in order within **4 seconds per sign** and **14 seconds total**, starting from thumbs-up hold completion. The overlay contains only “Casting [name]” and characters: completed characters are gray, the current character is red, and upcoming characters are black. Before choosing a spell it shows the affordable options. ASL also shows the next letters' reference cards. Spell signs do not hit monsters as normal attacks. Finishing spends the spell's full mana cost and applies its existing effect. A wrong/unrecognized sign, timeout, or Esc cancellation costs **25% of the spell's mana cost, rounded up**, and restores normal time. Before selection the first affordable slot determines the penalty. Completion without a valid target also costs the partial penalty. After resolution, a 750 ms cooldown prevents immediate repeated spell starts. Esc during casting cancels it; a later Esc leaves the round.
+Complete the characters in order within **4 seconds per sign** and **14 seconds total**, starting from thumbs-up hold completion. The overlay contains only “Casting [name]” and characters: completed characters are gray, the current character is red, and upcoming characters are black. Before choosing a spell, it shows the affordable options. ASL also shows the next letters' reference cards. Spell signs do not hit monsters as normal attacks. Finishing spends the spell's full mana cost and applies its existing effect. A wrong/unrecognized sign, timeout, or Esc cancellation costs **25% of the spell's mana cost, rounded up**, and restores normal time. Before selection the first affordable slot determines the penalty. Completion without a valid target also costs the partial penalty. After resolution, a 750 ms cooldown prevents immediate repeated spell starts. Esc during casting cancels it; a later Esc leaves the round.
 
 The tracker uses MediaPipe's pretrained `GestureRecognizer` instead of running a separate hand tracker and gesture task. It returns both landmarks and `Thumb_Up` scores in the same pipeline, with GPU preference and CPU fallback. The model is stored at `public/models/gesture_recognizer.task`; `npm install` / `npm run fetch-model` fetches it when missing. No retraining is required.
 
@@ -130,7 +130,7 @@ The input lab shows live thumbs-up score, hold progress, and `GESTURE` detection
 | Shield | S → A → F → E | ㅡ → ㄱ → ㄴ |
 | Heal | H → E → A → L | ㅅ → ㅇ → ㅣ |
 
-Hold thumbs up before any recipe in the table. Korean uses drawn Hangul jamo, not Korean Sign Language. Shapes use drawn symbol sequences, math uses digits, and Japanese/Chinese use recognized script marks. For alphabets with fewer than six available marks, the two equipped spells are assigned distinct initial characters deterministically for that deck; recipes stay fixed throughout the round. Subject changes select that subject's recipes. Outside gesture confirmation and casting, alphabet signs retain their normal attack behavior. These timings are initial gameplay tuning values in `src/game/spellCasting.ts`.
+Hold thumbs up before any recipe in the table. NOTE: Korean uses drawn Hangul jamo, not Korean Sign Language. Shapes use drawn symbol sequences, math uses digits, and Japanese/Chinese use recognized script marks. For alphabets with fewer than six available marks, the two equipped spells are assigned distinct initial characters deterministically for that deck; recipes stay fixed throughout the round. Subject changes select that subject's recipes. Outside gesture confirmation and casting, alphabet signs retain their normal attack behavior. These timings are initial gameplay tuning values in `src/game/spellCasting.ts`.
 
 Recognition tests cover both the historical reference geometry and the shipped defaults. The shared defaults deliberately allow endpoint hooks; the deterministic scribble rejection budget is 65%, compared with 70% for the stricter reference geometry. These synthetic checks do not replace real-hand testing.
 
@@ -138,9 +138,7 @@ Recognition tests cover both the historical reference geometry and the shipped d
 
 Pick **ASL** as a subject on the Classic or Duel screen. ASL needs the camera, so Start stays disabled until hand input is on.
 
-- Each monster carries a **letter**. Make that letter's ASL handshape and hold it for about half a second to cast it.
-- A reference card appears along the bottom for every letter a monster needs right now.
-- The line under the wave number shows what the camera thinks you are signing, with a bar that fills as you hold it.
+- Each monster carries a **letter**. Make that letter's ASL handshape and hold it for about half a second to cast it. A reference card appears along the bottom for every letter a monster needs right now. The line under the wave number shows what the camera thinks you are signing, with a bar that fills as you hold it.
 - **Letters:** all 24 static letters (J and Z are movements, so they are left out). Wave 1 uses A B C L Y; wave 2 adds D F I O V W; wave 3 adds E K R S U; wave 4 adds G H M N P Q T X. Monsters move slower than in drawing mode.
 
 **How letters are recognised.** A small neural network (`src/asl/model.json`, 138 KB) reads the 21 hand landmarks. It was trained on [`sid220/asl-now-fingerspelling`](https://huggingface.co/datasets/sid220/asl-now-fingerspelling) (MIT licence): about 1,900 landmark recordings of the alphabet from several people, made with the same MediaPipe hand model this game uses. `scripts/asl/train.py` rebuilds it.
@@ -283,13 +281,16 @@ src/
     sfx.ts                procedural Web Audio sound effects, the looping background music (public/audio/bg_music.mp3), and their volume settings
 ```
 
-## Decisions and known gaps
+## Decisions
+
+- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colors live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
+- **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
+- **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
+- **Out of scope for now:** pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).
+
+## Known gaps
 
 - **Webcam tuning still needs real-hand validation.** Shared thresholds come from `config/pinch.defaults.json`: start/end 0.15/0.25, two-frame confirmation, optional 3D veto off, and speed assistance on. One Euro parameters and the drawing box are in `src/config.ts`. Use the input lab for live measurements.
 - **The default cursor follows the thumb tip.** Choose knuckle, index tip, thumb tip, or midpoint in the input lab. Hand loss retains a 300 ms stroke grace, but immediately releases menu presses; missing camera updates also cancel menu holds after 200 ms. Unbuffered strokes trim three points at each end when sufficiently long; buffering uses the inferred boundaries.
 - **Symbols a monster currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
 - **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
-- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colors live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
-- **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
-- **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
-- **Out of scope for now:** pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).
