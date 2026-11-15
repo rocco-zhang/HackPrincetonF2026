@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
 import { pvp } from "../../net/pvp";
-import { friendsIcon, gearIcon, trophyIcon } from "../icons";
+import { accessIcon, friendsIcon, gearIcon, trophyIcon } from "../icons";
 import { FONT, HIGHLIGHTER, INK_CSS, MUTED_CSS, TITLE_FONT } from "../palette";
 import { Menu } from "../systems/Menu";
 
@@ -50,10 +50,11 @@ export class Title extends Phaser.Scene {
       menu.add({ x: W / 2 + m.dx, y: 474, w: 300, h: 128, label: m.label, sub: m.sub, font: TITLE_FONT, fontSize: 58, angle: m.angle, primary: true, onClick: go(m.scene) });
     }
 
-    // friends → achievements → settings, top right
+    // friends → achievements → accessibility → settings, top right
     const corner = [
       { name: "friends", icon: friendsIcon },
       { name: "achievements", icon: trophyIcon },
+      { name: "accessibility", icon: accessIcon },
       { name: "settings", icon: gearIcon },
     ];
     corner.forEach((c, i) => {

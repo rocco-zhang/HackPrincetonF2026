@@ -20,7 +20,16 @@ export class Boot extends Phaser.Scene {
   private drawn: { key: string; canvas: HTMLCanvasElement }[] = [];
   private rnd = mulberry32(11); // seeded so the art is the same every run
 
+  /** Where to go once the art is drawn. The accessibility screen re-runs this scene to recolour it. */
+  private next: { scene: string; data?: object } = { scene: "Title" };
+
+  init(data: { next?: string; data?: object }) {
+    this.next = { scene: data?.next ?? "Title", data: data?.data };
+  }
+
   create() {
+    this.drawn = [];
+    this.rnd = mulberry32(11);
     this.makeSpark();
     this.makeStar();
     this.makeScrap();
@@ -42,8 +51,9 @@ export class Boot extends Phaser.Scene {
     let pending = this.drawn.length;
     for (const { key, canvas } of this.drawn) {
       this.textures.once(`${Phaser.Textures.Events.ADD_KEY}${key}`, () => {
-        if (--pending === 0) this.scene.start("Title");
+        if (--pending === 0) this.scene.start(this.next.scene, this.next.data);
       });
+      if (this.textures.exists(key)) this.textures.remove(key); // a re-run replaces the old art
       this.textures.addBase64(key, canvas.toDataURL("image/png"));
     }
   }

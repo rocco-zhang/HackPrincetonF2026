@@ -19,6 +19,18 @@ export function friendsIcon(g: G) {
   g.strokePath();
 }
 
+/** The accessibility figure: a person with arms out, in a circle. */
+export function accessIcon(g: G) {
+  g.lineStyle(3, INK, 1);
+  g.strokeCircle(0, 0, 19);
+  g.fillStyle(INK, 1);
+  g.fillCircle(0, -10, 3.5);
+  g.lineBetween(-11, -3, 11, -3); // arms
+  g.lineBetween(0, -3, 0, 4); // body
+  g.lineBetween(0, 4, -6, 13);
+  g.lineBetween(0, 4, 6, 13);
+}
+
 /** A trophy cup. */
 export function trophyIcon(g: G) {
   g.lineStyle(3, INK, 1);

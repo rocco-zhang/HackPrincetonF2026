@@ -488,3 +488,9 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* accessibility: plain font for the start screen, room-code panel and messages too */
+body.plain-font,
+body.plain-font * {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+}

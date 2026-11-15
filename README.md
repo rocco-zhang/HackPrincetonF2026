@@ -52,10 +52,11 @@ These are experimental parameters, not measured improvements. The lab displays d
 
 ### Screens
 
-- **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and three icons in the top right: friends, achievements, settings. Every button works with a pinch or a click.
+- **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons in the top right: friends, achievements, accessibility, settings. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
 - **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
+- **Accessibility:** colour-blind marker colours (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
@@ -188,6 +189,7 @@ src/
   config.ts               every tunable: pinch thresholds, One Euro, drawing box, recognizer, waves, scoring
   state.ts                shared app state (mode, tracker status, last recognition…)
   actions.ts              what the settings screen and the hotkeys both do
+  a11y.ts                 accessibility settings (colour-blind colours, card size, reduced motion, plain font)
   asl/
     features.ts           landmarks → the 63 numbers the classifier reads (position, size and mirror removed)
     hand.ts               trained model + your recorded examples → letter; hold-to-cast

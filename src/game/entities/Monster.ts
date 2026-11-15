@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { cardScale } from "../../a11y";
 import { GAME } from "../../config";
 import type { CastName } from "../../input/events";
 import { SymbolBubble } from "./SymbolBubble";
@@ -24,7 +25,9 @@ export class Monster extends Phaser.GameObjects.Container {
     this.palette = palette;
     this.shadow = scene.add.ellipse(0, 44, 50, 10, 0x281e0a, 0.14);
     this.sprite = scene.add.image(0, 0, `monster${palette}`);
-    this.bubble = new SymbolBubble(scene, labels ? -92 : -78, symbols, labels);
+    // bigger cards (accessibility setting) grow upwards, away from the monster
+    const s = cardScale();
+    this.bubble = new SymbolBubble(scene, (labels ? -92 : -78) - (s - 1) * 34, symbols, labels).setScale(s);
     this.add([this.shadow, this.sprite, this.bubble]);
     this.setSize(GAME.monsterRadius * 2, GAME.monsterRadius * 2);
     scene.add.existing(this);

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { a11y } from "../../a11y";
 import { ARENA, DIFFICULTY } from "../../config";
 import { state } from "../../state";
 import { arrowIcon, pinchIcon } from "../icons";
@@ -62,7 +63,7 @@ export class Classic extends Phaser.Scene {
   private begin() {
     if (cameraNeeded()) return;
     sfx.start();
-    this.cameras.main.flash(250, 255, 255, 255);
+    if (!a11y.reduceMotion) this.cameras.main.flash(250, 255, 255, 255);
     this.scene.start("Arena", { subjects: state.subjects });
   }
 

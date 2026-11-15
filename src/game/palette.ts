@@ -1,3 +1,4 @@
+import { a11y, onA11y } from "../a11y";
 import { ASL_NAMES, isLang, isMath, isSymbol, type CastName, type SymbolName } from "../input/events";
 
 /** Pencil graphite: every line and all text. */
@@ -14,7 +15,7 @@ export const MUTED_CSS = "#8a857a";
 export const HIGHLIGHTER = 0xffe95c;
 
 // Felt-tip marker colours, dark enough to read on paper.
-export const SYMBOL_COLOR: Record<SymbolName, number> = {
+const MARKER_COLORS: Record<SymbolName, number> = {
   hline: 0x2b6fd0,
   vline: 0x2f9e58,
   v: 0xe8762c,
@@ -22,14 +23,27 @@ export const SYMBOL_COLOR: Record<SymbolName, number> = {
   circle: 0xd09a00,
   zigzag: 0x7a4fc4,
 };
+// Colour-blind mode: the Okabe–Ito set, which stays apart for red-green colour blindness
+// (blue, bluish green, orange, black, sky blue, reddish purple; no red next to green).
+const COLORBLIND_COLORS: Record<SymbolName, number> = {
+  hline: 0x0072b2,
+  vline: 0x009e73,
+  v: 0xe69f00,
+  caret: 0x1c1b1a,
+  circle: 0x56b4e9,
+  zigzag: 0xcc79a7,
+};
 
-const MARKERS = Object.values(SYMBOL_COLOR);
+/** The marker colour of each symbol. Changes in place with the colour-blind setting. */
+export const SYMBOL_COLOR: Record<SymbolName, number> = { ...MARKER_COLORS };
+
 /** Marker colour for anything castable; ASL letters cycle through the six markers. */
 export function castColor(name: CastName): number {
   if (isSymbol(name)) return SYMBOL_COLOR[name];
   if (isMath(name) || isLang(name)) return SYMBOL_COLOR.hline;
   const i = ASL_NAMES.indexOf(name);
-  return MARKERS[(i < 0 ? 0 : i) % MARKERS.length];
+  const markers = Object.values(SYMBOL_COLOR);
+  return markers[(i < 0 ? 0 : i) % markers.length];
 }
 
 export const css = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
@@ -43,5 +57,15 @@ export const MONSTER_PALETTES = [
 
 // macOS handwriting fonts first; elsewhere the bundled Patrick Hand / Permanent Marker
 // (imported in main.ts, served locally, so the game still works offline).
-export const FONT = '"Chalkboard SE", "Chalkboard", "Patrick Hand", "Comic Sans MS", cursive';
+const HANDWRITING = '"Chalkboard SE", "Chalkboard", "Patrick Hand", "Comic Sans MS", cursive';
+const PLAIN = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
+/** The font for everything you read. Handwriting, or a plain sans-serif with the "plain font" setting. */
+export let FONT = HANDWRITING;
 export const TITLE_FONT = '"Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive';
+
+// keep the colours and the reading font in step with the accessibility settings
+onA11y(() => {
+  Object.assign(SYMBOL_COLOR, a11y.colorblind ? COLORBLIND_COLORS : MARKER_COLORS);
+  FONT = a11y.plainFont ? PLAIN : HANDWRITING;
+  if (typeof document !== "undefined") document.body?.classList.toggle("plain-font", a11y.plainFont);
+});

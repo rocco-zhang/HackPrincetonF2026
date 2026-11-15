@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { calmCamera } from "../../a11y";
 import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
 import { recognizeDigit } from "../../input/digits";
 import { castLabel, mathName, onInput, type CastName } from "../../input/events";
@@ -89,6 +90,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   create() {
+    calmCamera(this.cameras.main);
     const cx = ARENA.width / 2, cy = ARENA.height / 2;
     this.add.image(cx, cy, "floor").setDepth(-10);
     this.player = new Player(this, cx, cy);
