@@ -95,6 +95,16 @@ export function langPool(script: Script, level: number): LangPrompt[] {
   return lessons[Math.max(1, level) - 1] ?? lessons.flat();
 }
 
+/**
+ * The characters a player has already met when wave `level` of a script begins: every lesson
+ * before this wave's (at least the first one, and everything once the lessons run out).
+ */
+export function taughtLabels(script: Script, level: number): Set<string> {
+  const lessons = LESSONS[script];
+  const done = level > lessons.length ? lessons.length : Math.max(1, level - 1);
+  return new Set(lessons.slice(0, done).flat().map((item) => item.label));
+}
+
 export function pickLang(script: Script, level: number, rand: () => number): LangPrompt {
   const pool = langPool(script, level);
   return pool[Math.floor(rand() * pool.length)];

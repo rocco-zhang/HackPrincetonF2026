@@ -2,7 +2,7 @@
 // For the language subjects and ASL the row is a real word.
 import type { AslLetter } from "../asl/hand";
 import { aslName, SYMBOLS, type CastName } from "../input/events";
-import { langCast, type Mark } from "./languages";
+import { langCast, taughtLabels, type Mark } from "./languages";
 import { makeProblem } from "./math";
 import type { Subject } from "./subjects";
 
@@ -30,6 +30,15 @@ const m = (...marks: Mark[]) => marks;
 /** Words written with the characters each language's lessons teach: [character, its strokes] pairs. */
 const WORDS: Record<"korean" | "japanese" | "chinese", { word: [string, Mark[]][]; meaning: string }[]> = {
   korean: [
+    // spelled letter by letter, for before any syllables have been taught
+    { word: [["ㅇ", m("circle")], ["ㅣ", m("vline")], ["ㄴ", m("nieun")], ["ㄱ", m("giyeok")], ["ㅣ", m("vline")]], meaning: "인기 (popularity), letter by letter" },
+    { word: [["ㅇ", m("circle")], ["ㅡ", m("hline")], ["ㄴ", m("nieun")], ["ㄱ", m("giyeok")], ["ㅡ", m("hline")], ["ㄴ", m("nieun")]], meaning: "은근 (subtle), letter by letter" },
+    { word: [["ㅇ", m("circle")], ["ㅣ", m("vline")], ["ㄱ", m("giyeok")], ["ㅣ", m("vline")], ["ㄴ", m("nieun")]], meaning: "이긴 (won), letter by letter" },
+    // from the two-letter syllables
+    { word: [["그", m("giyeok", "hline")], ["이", m("circle", "vline")]], meaning: "그이 (that person)" },
+    { word: [["기", m("giyeok", "vline")], ["니", m("nieun", "vline")]], meaning: "기니 (Guinea)" },
+    { word: [["이", m("circle", "vline")], ["기", m("giyeok", "vline")], ["니", m("nieun", "vline")]], meaning: "이기니 (are you winning?)" },
+    // whole words, once their syllables have been taught
     { word: [["저", m("hline", "caret", "hline", "vline")], ["기", m("giyeok", "vline")], ["요", m("circle", "vline", "vline", "hline")]], meaning: "저기요 (excuse me)" },
     { word: [["아", m("circle", "vline", "hline")], ["니", m("nieun", "vline")], ["요", m("circle", "vline", "vline", "hline")]], meaning: "아니요 (no)" },
     { word: [["마", m("vline", "giyeok", "hline", "vline", "hline")], ["시", m("caret", "vline")], ["다", m("hline", "nieun", "vline", "hline")]], meaning: "마시다 (to drink)" },
@@ -74,6 +83,19 @@ export function bossCards(subject: Subject, level: number, rand: () => number): 
     }
     return { symbols, title: `${n} shapes in a row` };
   }
-  const { word, meaning } = pick(WORDS[subject], rand);
+  // only words whose every character has been taught by now, and of those the hardest ones:
+  // the words that use the latest lesson learned
+  const taught = taughtLabels(subject, level);
+  const known = WORDS[subject].filter((w) => w.word.every(([char]) => taught.has(char)));
+  let pool = known.length ? known : WORDS[subject];
+  for (let l = level; l > 1; l--) {
+    const earlier = taughtLabels(subject, l - 1);
+    const newest = known.filter((w) => w.word.some(([char]) => !earlier.has(char)));
+    if (newest.length) {
+      pool = newest;
+      break;
+    }
+  }
+  const { word, meaning } = pick(pool, rand);
   return { symbols: word.map(([, strokes]) => langCast(strokes)), labels: word.map(([char]) => char), title: `Write ${meaning}` };
 }
