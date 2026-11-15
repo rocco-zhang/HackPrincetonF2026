@@ -157,3 +157,21 @@ describe("explicit language submission", () => {
     expect(casting.cast).not.toHaveBeenCalled();
   });
 });
+
+
+describe("completed spell characters", () => {
+  it.each(["shapes", "asl", "math", "korean", "japanese", "chinese"] as const)("clears ink immediately after a character in %s", subject => {
+    const arena = new Arena();
+    arena["subject"] = subject;
+    arena["phase"] = "play";
+    arena["spells"] = true;
+    const clearCompletedInk = vi.fn();
+    Object.assign(arena, { casting: { clearCompletedInk } });
+    const now = performance.now();
+    arena["incantation"].beginFrom("spell_thumbs_up", ["fire", "water"], subject, 100, now);
+    const first = spellRecipes(["fire", "water"], subject)[0].steps[0].token;
+    expect(arena["routeSpellSign"](first)).toBe(true);
+    expect(arena["incantation"].active?.step).toBe(1);
+    expect(clearCompletedInk).toHaveBeenCalledTimes(1);
+  });
+});

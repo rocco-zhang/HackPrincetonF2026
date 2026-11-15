@@ -63,7 +63,7 @@ export class Duel extends Phaser.Scene {
 
     // right: the spell deck. Each player picks their own two.
     const rx = 1020;
-    heading(this, rx, 124, "Spell deck", "pick two; hold thumbs up to cast");
+    heading(this, rx, 124, "Spell deck", "pick two; hold 👍 to begin casting");
     this.spellNote = spellDeck(this, menu, rx, 208, 112, 112, 12, 3, 380);
 
     // bottom: finding an opponent

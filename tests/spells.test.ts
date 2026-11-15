@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { bossCards, isBossWave } from "../src/game/bosses";
 import { castMarks, scriptMarks } from "../src/game/languages";
-import { cleanLoadout, damageSpellTarget, spellMovementScale, SPELL_POWER, MANA, pickSpell, SPELL_IDS, SPELLS } from "../src/game/spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, wavePushDistance, SPELL_POWER, MANA, pickSpell, SPELL_IDS, SPELLS } from "../src/game/spells";
 import { aslPool } from "../src/game/systems/Spawner";
 describe("spell deck", () => {
   it("has at least six spells, each with a cost the mana bar can pay", () => {
@@ -93,6 +93,14 @@ describe("spell effects", () => {
     expect(boss.visible()).toBe(3);
     expect(damageSpellTarget(boss, SPELL_POWER.bombDamage)).toBe(true);
     expect(boss.visible()).toBe(0);
+  });
+  it("Wave pushes close enemies farther and keeps a minimum push at and beyond the edge", () => {
+    const radius = 600, screenSize = 720;
+    expect(wavePushDistance(0, radius, screenSize)).toBeCloseTo(396);
+    expect(wavePushDistance(300, radius, screenSize)).toBeCloseTo(234);
+    expect(wavePushDistance(600, radius, screenSize)).toBeCloseTo(72);
+    expect(wavePushDistance(900, radius, screenSize)).toBeCloseTo(72);
+    expect(wavePushDistance(0, 360, screenSize)).toBeCloseTo(237.6);
   });
   it("freeze stops movement even during Wave, then remaining slow resumes until expiry", () => {
     expect(spellMovementScale(100, 200, 300)).toBe(0);

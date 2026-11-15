@@ -5,11 +5,11 @@ export const SPELL_IDS: SpellId[] = ["fire", "water", "bomb", "freeze", "shield"
 
 export const SPELLS: Record<SpellId, { name: string; glyph: string; cost: number; blurb: string; color: number }> = {
   fire: { name: "Fire", glyph: "🔥", cost: 30, blurb: "deals 1 damage to every monster", color: 0xe25b2a },
-  water: { name: "Wave", glyph: "🌊", cost: 35, blurb: "pushes every monster back and slows them", color: 0x2f7dff },
+  water: { name: "Wave", glyph: "🌊", cost: 20, blurb: "pushes every monster back and slows them", color: 0x2f7dff },
   bomb: { name: "Bomb", glyph: "💣", cost: 60, blurb: "deals 5 damage in a wide blast", color: 0x33312e },
   freeze: { name: "Freeze", glyph: "❄️", cost: 40, blurb: "stops every monster for 7 seconds", color: 0x56b4e9 },
   shield: { name: "Shield", glyph: "🛡️", cost: 45, blurb: "blocks the next monster, with no time limit", color: 0x2f9e58 },
-  heal: { name: "Heal", glyph: "❤️", cost: 70, blurb: "gives one heart back", color: 0xd7372f },
+  heal: { name: "Heal", glyph: "❤️", cost: 50, blurb: "gives one heart back", color: 0xd7372f },
 };
 
 /** Mana: what spells cost, and how drawing earns it back. */
@@ -19,12 +19,21 @@ export const MANA = { max: 100, start: 40, perSymbol: 6, perKill: 8, perWave: 20
 export const SPELL_POWER = {
   fireDamage: 1,
   bombDamage: 5,
-  pushDistance: 460,
+  wavePushRadiusFraction: 0.66,
+  waveMinPushScreenFraction: 0.1,
   waveSlowSeconds: 4,
   waveSpeed: 0.35,
   bombRadius: 500,
   freezeSeconds: 7,
 };
+
+/** Nearby enemies move to about 66% of the arena radius; edge enemies still move. */
+export function wavePushDistance(distance: number, radius: number, screenSize: number): number {
+  const minimum = screenSize * SPELL_POWER.waveMinPushScreenFraction;
+  const maximum = Math.max(minimum, radius * SPELL_POWER.wavePushRadiusFraction);
+  const proximity = 1 - Math.max(0, Math.min(1, distance / radius));
+  return minimum + (maximum - minimum) * proximity;
+}
 
 /** Remove matching cards and their displayed prompts; damage is identical for bosses. */
 export function damageSpellTarget(target: { queue: unknown[]; prompts: unknown[]; bubble: { popFront(): void } }, damage: number): boolean {

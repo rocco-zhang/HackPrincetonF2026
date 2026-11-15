@@ -108,7 +108,7 @@ export class Classic extends Phaser.Scene {
     set(this.matchText, `2. A monster carries a card: ${hows.join(", or ")} to tear it up`);
     if (this.spellNote) {
       const recipes=spellRecipes(state.loadout,state.subjects[0]);
-      set(this.spellNote,recipes.map(r=>`${SPELLS[r.id].name}: 👍 then ${r.steps.map(s=>s.label).join(" → ")}`).join("   ·   ")+"\nHold thumbs up to begin immediately. First character selects the spell; finish in order or lose mana.");
+      set(this.spellNote,recipes.map(r=>`${SPELLS[r.id].name}: ${r.steps.map(s=>s.label).join(" → ")}`).join("   ·   ")+"\nFirst character selects the spell; finish in order or lose mana.");
     }
     set(this.warn, cameraNeeded() ? "ASL needs the camera (mouse test mode)" : "");
   }

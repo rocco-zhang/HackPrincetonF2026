@@ -20,7 +20,7 @@ import { hintFor, langCast, langWaveBlurb, nextMarks, pickLang, scriptMarks, typ
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
-import { cleanLoadout, damageSpellTarget, spellMovementScale, MANA, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, wavePushDistance, MANA, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
@@ -297,13 +297,14 @@ export class Arena extends Phaser.Scene implements CastHost {
     const now = performance.now();
     if (this.incantation.active) {
       const result = this.incantation.input(sign,now);
+      this.casting.clearCompletedInk();
       if (result) this.finishIncantation(result);
       return true;
     }
     if (!this.incantation.beginFrom(sign,this.loadout,this.subject,this.mana,now)) return false;
     resetAslHold();
     this.languageStrokes=[];this.buffer="";this.answerHold=0;
-    this.answerBar?.clear();this.casting.releaseHeld();
+    this.answerBar?.clear();this.casting.clearCompletedInk();
     this.setSpellTime(true);
     this.paintIncantation();
     return true;
@@ -321,7 +322,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.setSpellTime(false);
     this.languageStrokes = [];
     this.refreshLang();
-    this.casting.releaseHeld();
+    this.casting.clearCompletedInk();
     if (result.success && this.castSpell(result.id)) return;
     const penalty=Math.min(this.mana,spellFailureCost(result.id));
     this.mana-=penalty;this.hud.setMana(this.mana,MANA.max);
@@ -381,7 +382,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   private subjectBlurb(n: number): string | undefined {
     const level = this.level;
     // math and languages follow their own curriculum on every difficulty
-    if (isScript(this.subject)) return langWaveBlurb(this.subject, level);
+    if (isScript(this.subject)) return langWaveBlurb(this.subject, level, this.wave <= 1);
     if (this.math) return mathWaveBlurb(level);
     if (level === 1) {
       if (this.asl) return "Make the handshape for a monster's letter, and hold it";
@@ -661,20 +662,22 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.tweens.add({ targets: ring, scale: 12, alpha: 0, duration: 520, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
     this.cameras.main.flash(120, 70, 150, 255);
     for (const m of live) {
-      const d = m.distanceTo(px, py) || 1;
-      const ux = (m.x - px) / d, uy = (m.y - py) / d;
+      const d = m.distanceTo(px, py);
+      const ux = d > 0 ? (m.x - px) / d : 1, uy = d > 0 ? (m.y - py) / d : 0;
+      const radiusX = Math.abs(ux) > 1e-6 ? (ux > 0 ? ARENA.width - px : px) / Math.abs(ux) : Infinity;
+      const radiusY = Math.abs(uy) > 1e-6 ? (uy > 0 ? ARENA.height - py : py) / Math.abs(uy) : Infinity;
+      const push = wavePushDistance(d, Math.min(radiusX, radiusY), Math.min(ARENA.width, ARENA.height));
       let done = 0;
       this.tweens.addCounter({
         from: 0,
-        to: SPELL_POWER.pushDistance,
+        to: push,
         duration: 420,
         ease: "Quad.easeOut",
         onUpdate: (tw) => {
           if (!m.active) return;
           const v = tw.getValue() ?? 0;
-          // never further out than where monsters come in from
-          m.x = Phaser.Math.Clamp(m.x + ux * (v - done), -50, ARENA.width + 50);
-          m.y = Phaser.Math.Clamp(m.y + uy * (v - done), -50, ARENA.height + 50);
+          m.x += ux * (v - done);
+          m.y += uy * (v - done);
           done = v;
         },
       });
@@ -853,7 +856,6 @@ export class Arena extends Phaser.Scene implements CastHost {
     const name = langCast(marks);
     this.languageStrokes = [];
     if ((this.subject === "japanese" || this.subject === "chinese") && this.incantation.active) {
-      this.casting.releaseHeld(castColor(name));
       this.routeSpellSign(name);
     } else {
       this.casting.releaseHeld(castColor(name));
@@ -867,8 +869,9 @@ export class Arena extends Phaser.Scene implements CastHost {
     const drawn = this.languageStrokes.length ? `${this.languageStrokes.length} stroke${this.languageStrokes.length === 1 ? "" : "s"}` : "";
     const hint = this.monsters.find((m) => !m.dying && m.prompts[0])?.prompts[0];
     const help = hint ? hintFor(hint) : "";
-    if (drawn) this.answerText.setText(`${drawn}  ·  🤟 to submit / Backspace to clear`);
-    else this.answerText.setText(`${help || "draw the character"} / 🤟 to submit`);
+    const submitHint = this.wave <= 1 ? " / 🤟 to submit" : "";
+    if (drawn) this.answerText.setText(`${drawn}${submitHint}`);
+    else this.answerText.setText(`${help || "draw the character"}${submitHint}`);
   }
 
   private onDrawnDigit(points: { x: number; y: number }[], hand = 0) {

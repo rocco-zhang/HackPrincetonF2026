@@ -89,7 +89,7 @@ describe("spell incantations",()=>{
   });
   it("does not start without full mana, and cancellation is penalized only once",()=>{
     const caster=new SpellCasting();
-    expect(caster.beginFrom("spell_thumbs_up",deck,"asl",SPELLS.fire.cost-1,0)).toBe(false);
+    expect(caster.beginFrom("spell_thumbs_up",deck,"asl",Math.min(...deck.map(id => SPELLS[id].cost))-1,0)).toBe(false);
     startFire(caster);
     expect(caster.cancel(500)).toMatchObject({id:"fire",success:false,reason:"cancelled"});
     expect(caster.cancel(501)).toBeNull();

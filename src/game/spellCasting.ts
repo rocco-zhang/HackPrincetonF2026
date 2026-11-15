@@ -24,7 +24,7 @@ export function spellRecipes(loadout: Loadout, subject: Subject): {id:SpellId;st
       while (used.has(langCast(characters[first].strokes))) first = (first + 1) % characters.length;
       used.add(langCast(characters[first].strokes));
       return { id, steps: [first, (first + 1) % characters.length, (first + 2) % characters.length].map(i => ({
-        label: characters[i].label, token: langCast(characters[i].strokes), hint: `Draw ${characters[i].label}, then hold 🤟`
+        label: characters[i].label, token: langCast(characters[i].strokes), hint: `Draw ${characters[i].label}`
       })) };
     }
     const alphabet=subject==="korean"?KOREAN:isScript(subject)?scriptMarks(subject):subject==="math"?["1","2","3","4","5","6"]:SHAPES;

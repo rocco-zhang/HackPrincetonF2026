@@ -116,6 +116,15 @@ export class Casting {
     this.held = [];
   }
 
+  /** Remove a completed spell character immediately while preserving any active stroke. */
+  clearCompletedInk() {
+    this.fading = [];
+    this.held = [];
+    this.finished = [];
+    this.lastByHand.clear();
+    this.gfx.clear();
+  }
+
   /** A stroke is being drawn right now. */
   get drawing() {
     return this.currents.size > 0;
@@ -146,8 +155,8 @@ export class Casting {
     player.castPulse(color);
 
     const targets = this.host.monsters.filter(
-      // ASL holds can finish while a monster is still in the spawn margin.
-      (m) => !m.dying && m.front === name && (spawnedTarget ? m === spawnedTarget : name.startsWith("asl_") || (m.x > -20 && m.x < ARENA.width + 20 && m.y > -20 && m.y < ARENA.height + 20)),
+      // Matching monsters can be hit immediately, including in the spawn margin.
+      (m) => !m.dying && m.front === name && (!spawnedTarget || m === spawnedTarget),
     );
     for (const m of targets) {
       m.queue.shift();

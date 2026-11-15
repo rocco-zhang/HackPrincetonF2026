@@ -123,10 +123,10 @@ export function pickLang(script: Script, level: number, rand: () => number): Lan
   return pool[Math.floor(rand() * pool.length)];
 }
 
-export function langWaveBlurb(script: Script, level: number): string {
-  if (script === "japanese") return `Japanese. ${langPool(script, level).map(item => item.label).join(" ")} / draw one hiragana, then hold 🤟`;
-  if (level <= 1) return `${NAMES[script]}. Draw the marks, then hold 🤟 to submit`;
-  if (level === 2) return `${NAMES[script]}. Longer ones: draw the marks in order, then hold 🤟`;
+export function langWaveBlurb(script: Script, level: number, showSubmitHint = level <= 1): string {
+  if (script === "japanese") return `Japanese. ${langPool(script, level).map(item => item.label).join(" ")} / draw one hiragana${showSubmitHint ? ", then hold 🤟" : ""}`;
+  if (level <= 1) return `${NAMES[script]}. Draw the marks${showSubmitHint ? ", then hold 🤟 to submit" : ""}`;
+  if (level === 2) return `${NAMES[script]}. Longer ones: draw the marks in order`;
   if (level === 3 && LESSONS[script].length >= 3) return `${NAMES[script]}. Syllables for whole words: follow the hint`;
   return `${NAMES[script]}. Everything so far`;
 }
