@@ -7,6 +7,15 @@ import { BASE_SHAPES, mulberry32 } from "../../input/shapes";
 import { castColor, css, INK_CSS, MONSTER_PALETTES, PAPER_CSS, SYMBOL_COLOR, TITLE_FONT } from "../palette";
 
 type Ctx = CanvasRenderingContext2D;
+
+/** Extra room above the casting figure for its raised pencil, and where that pencil's tip ends up. */
+export const CAST_HEADROOM = 24;
+const CAST_PENCIL_ANGLE = 0.3;
+/** The raised pencil's tip, measured from the centre of the `player_cast` image. */
+export const CAST_TIP = {
+  x: 26 + 2 + 36 * Math.sin(CAST_PENCIL_ANGLE),
+  y: CAST_HEADROOM + 28 - 1 - 36 * Math.cos(CAST_PENCIL_ANGLE) - (132 + CAST_HEADROOM) / 2,
+};
 type P = [number, number];
 
 /**
@@ -49,6 +58,7 @@ export class Boot extends Phaser.Scene {
     }
     this.makeHeart("heart", true);
     this.makeHeart("heart_empty", false);
+    this.makePlayerCasting(); // last, so adding it didn't change the random wobble of the art above
 
     if (this.recolor) return this.swapColors(this.recolor);
 
@@ -284,14 +294,25 @@ export class Boot extends Phaser.Scene {
 
   /** You: a stick figure holding a pencil. */
   private makePlayer() {
-    const W = 120, H = 132;
-    const ctx = this.canvas("player", W, H);
+    this.drawPlayer(this.canvas("player", 120, 132), 0, false);
+  }
+
+  /** The same figure mid-spell: pencil arm thrown up, other arm out, mouth open. Taller, for the raised pencil. */
+  private makePlayerCasting() {
+    this.drawPlayer(this.canvas("player_cast", 120, 132 + CAST_HEADROOM), CAST_HEADROOM, true);
+  }
+
+  private drawPlayer(ctx: Ctx, top: number, casting: boolean) {
+    const W = 120;
     const cx = W / 2;
     const w = 4.2;
-    // pencil in the raised hand
     ctx.save();
-    ctx.translate(cx + 30, 44);
-    ctx.rotate(0.55);
+    ctx.translate(0, top);
+    // pencil in the raised hand
+    const hand: P = casting ? [cx + 26, 28] : [cx + 27, 45];
+    ctx.save();
+    ctx.translate(hand[0] + (casting ? 2 : 3), hand[1] - 1);
+    ctx.rotate(casting ? CAST_PENCIL_ANGLE : 0.55);
     ctx.fillStyle = "#f4c531";
     ctx.fillRect(-4, -26, 8, 24);
     ctx.fillStyle = "#f08a9b";
@@ -310,8 +331,8 @@ export class Boot extends Phaser.Scene {
     this.sketch(ctx, [[cx, 48], [cx + 1, 88]], { width: w });
     this.sketch(ctx, [[cx + 1, 88], [cx - 15, 121], [cx - 23, 122]], { width: w });
     this.sketch(ctx, [[cx + 1, 88], [cx + 16, 121], [cx + 24, 122]], { width: w });
-    this.sketch(ctx, [[cx, 61], [cx - 22, 79]], { width: w });
-    this.sketch(ctx, [[cx, 61], [cx + 27, 45]], { width: w });
+    this.sketch(ctx, casting ? [[cx, 61], [cx - 27, 60]] : [[cx, 61], [cx - 22, 79]], { width: w });
+    this.sketch(ctx, [[cx, 61], hand], { width: w });
     // head, filled with paper so anything behind doesn't show through the face
     const head = this.ring(cx, 29, 18, 18.5, 20);
     ctx.beginPath();
@@ -324,14 +345,16 @@ export class Boot extends Phaser.Scene {
     this.sketch(ctx, [[cx - 5, 12], [cx - 9, 3]], { width: 2.4, passes: 1 });
     this.sketch(ctx, [[cx, 11], [cx + 1, 1]], { width: 2.4, passes: 1 });
     this.sketch(ctx, [[cx + 5, 12], [cx + 10, 4]], { width: 2.4, passes: 1 });
-    // face
+    // face: a smile, or an open mouth while casting
     this.dot(ctx, cx - 6.5, 26, 2.4, INK_CSS);
     this.dot(ctx, cx + 6.5, 26, 2.4, INK_CSS);
     ctx.beginPath();
-    ctx.arc(cx, 31, 6.5, 0.15 * Math.PI, 0.85 * Math.PI);
+    if (casting) ctx.ellipse(cx, 35, 3.6, 4.4, 0, 0, Math.PI * 2);
+    else ctx.arc(cx, 31, 6.5, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.strokeStyle = INK_CSS;
     ctx.lineWidth = 2.4;
     ctx.stroke();
+    ctx.restore();
   }
 
   /** Doodled monster face: angry brows, dot eyes, a zigzag of teeth. */

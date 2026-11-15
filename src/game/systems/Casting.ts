@@ -100,6 +100,11 @@ export class Casting {
     this.held = [];
   }
 
+  /** A stroke is being drawn right now. */
+  get drawing() {
+    return this.currents.size > 0;
+  }
+
   get holding() {
     return this.held.length > 0;
   }

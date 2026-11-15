@@ -405,6 +405,8 @@ export class Arena extends Phaser.Scene implements CastHost {
     const partDrawn = (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
     if (!partDrawn && this.casting.holding) this.casting.releaseHeld();
     this.casting.update(dt);
+    // the figure casts while a stroke is being drawn, or (ASL) while a letter is being held
+    this.player.setCasting(this.phase !== "over" && (this.casting.drawing || (this.asl && state.aslProgress > 0)));
     this.hud.update(this.score);
     const fronts = this.monsters.filter((m) => !m.dying && m.front).map((m) => m.front!) as CastName[];
     state.wanted = this.phase === "over" ? [] : fronts;
