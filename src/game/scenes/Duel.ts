@@ -3,10 +3,12 @@ import { ARENA, DIFFICULTY } from "../../config";
 import { openLobby } from "../../net/lobby";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
+import { spellRecipes } from "../spellCasting";
+import { SPELLS } from "../spells";
 import { FONT, INK_CSS } from "../palette";
 import { sfx } from "../sfx";
 import { heading, Menu, screenFrame } from "../systems/Menu";
-import { cameraNeeded, difficultyRow, guestLocked, loadoutCaption, spellDeck, subjectChips } from "../systems/pickers";
+import { cameraNeeded, difficultyRow, guestLocked, spellDeck, subjectChips } from "../systems/pickers";
 
 const MODES = [
   { id: "ranked", label: "Ranked", sub: "coming soon" },
@@ -61,7 +63,7 @@ export class Duel extends Phaser.Scene {
 
     // right: the spell deck. Each player picks their own two.
     const rx = 1020;
-    heading(this, rx, 124, "Spell deck", "pick two");
+    heading(this, rx, 124, "Spell deck", "pick two; hold thumbs up to cast");
     this.spellNote = spellDeck(this, menu, rx, 208, 112, 112, 12, 3, 380);
 
     // bottom: finding an opponent
@@ -161,6 +163,7 @@ export class Duel extends Phaser.Scene {
     const set = (t: Phaser.GameObjects.Text, s: string) => t.text !== s && t.setText(s);
     set(this.blurb, DIFFICULTY[state.difficulty].blurb);
     set(this.status, this.statusLine());
-    set(this.spellNote, loadoutCaption("\n"));
+    const recipes = spellRecipes(state.loadout, state.subjects[0]);
+    set(this.spellNote, recipes.map(r => `${SPELLS[r.id].name}: ${r.steps.map(step => step.label).join(" > ")}`).join("\n") + "\nHold thumbs up, then finish the sequence. Casting slows your arena; mistakes cost mana.");
   }
 }

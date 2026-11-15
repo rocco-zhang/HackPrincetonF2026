@@ -68,7 +68,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 - **Hand:** pinch thumb + index to start inking, move to draw, release to cast. The cursor follows the base knuckle of your index finger, so it stays put while you pinch and release. Both hands can draw at once, so one hand can make a line while the other makes a circle. A line or a closed circle is eased a little toward a clean shape, and the ends of the stroke stay on your hand. A V is left as drawn. Language waves keep the stroke exactly as drawn.
 - **Mouse:** works in the menus only (alongside the pinch pointer). Rounds are played with your hand. For testing without a camera, open the page with `?mouse` in the URL and the mouse draws too.
 - **Restart:** after a round, pinch and hold (or hold the mouse button, or press Space). Esc goes back to change the difficulty or subjects.
-- **Mana and spells:** Duel always has spells; in Classic, turn on **Spells** at the top right of setup and pick two. Mana starts at 40 of 100. Clearing a symbol adds 6, a kill adds 8 more, and clearing a wave adds 20. Classic spells use the current subject's fixed sign sequence (see below). Duel retains horns / open palm or `1` / `2`, disabled in ASL and math waves.
+- **Mana and spells:** Duel always has spells; in Classic, turn on **Spells** at the top right of setup and pick two. Mana starts at 40 of 100. Clearing a symbol adds 6, a kill adds 8 more, and clearing a wave adds 20. Both modes use the current subject's fixed sign sequence (see below), including ASL and math. Hold thumbs up to start. In Duel, casting slows only your own arena; your opponent continues playing normally.
 
   | Spell | Mana | What it does |
   |---|---|---|
@@ -197,7 +197,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
 | `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
-| `1` / `2` | Duel: cast your first / second spell, if you have the mana; Classic spells start with their first sign |
+| Hold thumbs up | Classic with spells enabled / Duel: begin casting, then complete the spell sequence |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
 

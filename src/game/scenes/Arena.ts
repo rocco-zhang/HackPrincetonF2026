@@ -18,7 +18,7 @@ import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, MAX_MARKS, nextMa
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
-import { cleanLoadout, damageSpellTarget, spellMovementScale, MANA, readSpellPose, SLOT_GESTURES, SPELL_AFTER_INK, SPELL_HOLD, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, MANA, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
@@ -55,10 +55,6 @@ export class Arena extends Phaser.Scene implements CastHost {
   private shieldGfx: Phaser.GameObjects.Graphics | null = null;
   /** What this wave's boss will carry, on a boss wave. */
   private bossPlan: BossCards | null = null;
-  private pose: 0 | 1 | null = null;
-  private poseFor = 0;
-  private poseReady = true;
-  private sinceInk = 1;
   private marks: Mark[] = [];
   private buffer = "";
   private answerHold = 0;
@@ -94,9 +90,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   /** This round has mana and spells: always in a duel, in Classic only when switched on there. */
   private spells = false;
 
-  /** Classic uses the subject's alphabet; Duel keeps its existing pose controls. */
+  /** Both game modes use the current subject's spell sequences. */
   private get spellsOn() {
-    return this.spells && (!this.versus || (this.subject !== "asl" && this.subject !== "math"));
+    return this.spells;
   }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
@@ -107,10 +103,6 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.mana = MANA.start;
     this.slowUntil = this.freezeUntil = this.shieldUntil = 0;
     this.bossPlan = null;
-    this.pose = null;
-    this.poseFor = 0;
-    this.poseReady = true;
-    this.sinceInk = 1;
     this.versus = !!data?.pvp;
     this.demo = !!data?.demo && !this.versus;
     // the demo run is scripted for drawn shapes
@@ -182,7 +174,7 @@ export class Arena extends Phaser.Scene implements CastHost {
           if (this.math && this.phase === "play") this.onDrawnDigit(e.points, e.hand);
           return;
         case "spellGesture":
-          if(!this.routeSpellSign("spell_thumbs_up") && this.spellsOn && !this.versus && this.phase==="play"){
+          if(!this.routeSpellSign("spell_thumbs_up") && this.spellsOn && this.phase==="play"){
             this.fx.floatText(this.player.x,this.player.y-80,"not enough mana or spell cooling down","#8a857a",18);
           }
           return;
@@ -215,11 +207,6 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.aslActive = false;
       state.mathActive = false;
       state.langActive = false;
-    });
-    this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
-      if (ev.repeat || !this.spellsOn || !this.versus) return;
-      if (ev.key === "1") this.castSpell(this.loadout[0]);
-      if (ev.key === "2") this.castSpell(this.loadout[1]);
     });
     this.input.keyboard?.on("keydown-ESC", () => {
       const cancelled = this.incantation.cancel(performance.now());
@@ -284,7 +271,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private showSpells() {
     this.hud.showSpells(this.spells); // no mana bar when the round has no spells
-    this.hud.setSpells(this.loadout.map((id, i) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: this.versus ? SLOT_GESTURES[i] : "" })), this.spellsOn);
+    this.hud.setSpells(this.loadout.map((id) => ({ name: SPELLS[id].name, glyph: SPELLS[id].glyph, cost: SPELLS[id].cost, gesture: "" })), this.spellsOn);
     this.hud.setMana(this.mana, MANA.max);
   }
 
@@ -295,7 +282,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   /** Only the first sign of an affordable equipped recipe can enter slow-time casting. */
   private routeSpellSign(sign: string): boolean {
-    if (this.versus || !this.spellsOn || this.phase !== "play") return false;
+    if (!this.spellsOn || this.phase !== "play") return false;
     const now = performance.now();
     if (this.incantation.active) {
       const result = this.incantation.input(sign,now);
@@ -365,7 +352,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (this.phase === "over" || this.wave !== n) return;
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
-      state.spellGesturesEnabled=this.spells&&!this.versus;
+      state.spellGesturesEnabled=this.spells;
       if (this.bossPlan) this.spawnBoss(this.bossPlan);
     });
   }
@@ -535,7 +522,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const expired=this.incantation.tick(performance.now());
     if(expired)this.finishIncantation(expired);
     const dt = Math.min(0.05, deltaMs / 1000)*(this.incantation.active?INCANTATION.timeScale:1);
-    this.worldTime=this.versus?this.time.now:this.worldTime+dt*1000;
+    this.worldTime+=dt*1000;
     this.paintIncantation();
     // strokes are only kept while a card or number is half drawn
     const partDrawn = !!this.incantation.active || (this.lang && this.marks.length > 0) || (this.math && this.buffer.length > 0);
@@ -550,7 +537,6 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.aslText) this.updateAsl();
     if (this.math && !this.incantation.active) this.tickAnswerHold(dt);
     if (this.versus && this.phase !== "over") this.updateVersus();
-    if (this.versus && this.spellsOn && this.phase === "play") this.tickSpells(dt);
     this.paintShield();
     if (this.phase === "over") return;
 
@@ -575,34 +561,6 @@ export class Arena extends Phaser.Scene implements CastHost {
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);
       this.gainMana(MANA.perWave);
       this.startWave(this.wave + 1);
-    }
-  }
-
-  /** A held horns (slot 1) or open palm (slot 2) casts that spell. */
-  private tickSpells(dt: number) {
-    if (state.inking) {
-      this.sinceInk = 0;
-      this.pose = null;
-      this.poseFor = 0;
-      return;
-    }
-    this.sinceInk += dt;
-    const pose = state.mode === "hand" && this.sinceInk >= SPELL_AFTER_INK ? readSpellPose(state.landmarks) : null;
-    if (pose === null) {
-      this.pose = null;
-      this.poseFor = 0;
-      this.poseReady = true;
-      return;
-    }
-    if (pose !== this.pose) {
-      this.pose = pose;
-      this.poseFor = 0;
-      this.poseReady = true;
-    }
-    this.poseFor += dt;
-    if (this.poseReady && this.poseFor >= SPELL_HOLD) {
-      this.poseReady = false;
-      this.castSpell(this.loadout[pose]);
     }
   }
 
