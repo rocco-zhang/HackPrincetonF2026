@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { bossCards, isBossWave } from "../src/game/bosses";
 import { castMarks, scriptMarks } from "../src/game/languages";
-import { cleanLoadout, MANA, pickSpell, readSpellPose, SPELL_IDS, SPELLS } from "../src/game/spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, SPELL_POWER, MANA, pickSpell, readSpellPose, SPELL_IDS, SPELLS } from "../src/game/spells";
 import { aslPool } from "../src/game/systems/Spawner";
 import type { Landmark } from "../src/state";
 
@@ -106,5 +106,35 @@ describe("bosses", () => {
         for (const card of boss.symbols) for (const mark of castMarks(card)) expect(marks).toContain(mark);
       }
     }
+  });
+});
+
+describe("spell effects", () => {
+  function target(cards: number) {
+    let visible = cards;
+    return { queue: Array(cards).fill("card"), prompts: Array(cards).fill("prompt"),
+      bubble: { popFront() { visible--; } }, visible: () => visible };
+  }
+  it("fire removes one card without destroying enemies that still have cards", () => {
+    const monster = target(3);
+    expect(damageSpellTarget(monster, SPELL_POWER.fireDamage)).toBe(false);
+    expect(monster.queue).toHaveLength(2);
+    expect(monster.prompts).toHaveLength(2);
+    expect(monster.visible()).toBe(2);
+    expect(damageSpellTarget(target(1), SPELL_POWER.fireDamage)).toBe(true);
+  });
+  it("bomb removes five cards and caps damage at the remaining card count", () => {
+    const boss = target(8);
+    expect(damageSpellTarget(boss, SPELL_POWER.bombDamage)).toBe(false);
+    expect(boss.queue).toHaveLength(3);
+    expect(boss.prompts).toHaveLength(3);
+    expect(boss.visible()).toBe(3);
+    expect(damageSpellTarget(boss, SPELL_POWER.bombDamage)).toBe(true);
+    expect(boss.visible()).toBe(0);
+  });
+  it("freeze stops movement even during Wave, then remaining slow resumes until expiry", () => {
+    expect(spellMovementScale(100, 200, 300)).toBe(0);
+    expect(spellMovementScale(200, 200, 300)).toBe(.35);
+    expect(spellMovementScale(300, 200, 300)).toBe(1);
   });
 });

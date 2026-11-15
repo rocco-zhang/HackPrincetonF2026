@@ -18,7 +18,7 @@ import { hintFor, isMark, langCast, langWaveBlurb, MARK_GLYPH, MAX_MARKS, nextMa
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
 import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
-import { cleanLoadout, MANA, readSpellPose, SLOT_GESTURES, SPELL_AFTER_INK, SPELL_HOLD, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
+import { cleanLoadout, damageSpellTarget, spellMovementScale, MANA, readSpellPose, SLOT_GESTURES, SPELL_AFTER_INK, SPELL_HOLD, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
 
@@ -50,6 +50,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   private loadout: Loadout = ["fire", "water"];
   private mana = MANA.start;
   private slowUntil = 0;
+  private freezeUntil = 0;
   private shieldUntil = 0;
   private shieldGfx: Phaser.GameObjects.Graphics | null = null;
   /** What this wave's boss will carry, on a boss wave. */
@@ -104,7 +105,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.spells = !!data?.pvp || (state.classicSpells && !data?.demo);
     this.loadout = cleanLoadout(state.loadout);
     this.mana = MANA.start;
-    this.slowUntil = this.shieldUntil = 0;
+    this.slowUntil = this.freezeUntil = this.shieldUntil = 0;
     this.bossPlan = null;
     this.pose = null;
     this.poseFor = 0;
@@ -557,10 +558,12 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     const { x: px, y: py } = this.player;
-    const frozen = this.worldTime < this.slowUntil;
+    const frozen = this.worldTime < this.freezeUntil;
+    const slowed = this.worldTime < this.slowUntil;
     for (const m of [...this.monsters]) {
-      if (frozen) m.sprite.setTint(0x9fd0ff);
-      m.step(frozen ? dt * SPELL_POWER.freezeSpeed : dt, px, py);
+      if (frozen || slowed) m.sprite.setTint(0x9fd0ff);
+      else if (m.sprite.tintTopLeft === 0x9fd0ff) m.sprite.clearTint();
+      m.step(dt * spellMovementScale(this.worldTime, this.freezeUntil, this.slowUntil), px, py);
       if (!m.dying && m.distanceTo(px, py) < GAME.contactDistance) this.contact(m);
       if (this.hearts <= 0) return;
     }
@@ -616,11 +619,11 @@ export class Arena extends Phaser.Scene implements CastHost {
     };
 
     if (id === "fire") {
-      const target = live.sort((a, b) => a.distanceTo(px, py) - b.distanceTo(px, py))[0];
-      if (!target) return no("nobody near");
+      if (!live.length) return no("nobody near");
       spend();
-      if (!target.boss) target.dying = true; // spoken for: drawing can't also hit it
-      this.animateSpell("fire", target, () => this.strike(target));
+      for (const target of live) {
+        this.animateSpell("fire", target, () => this.strike(target, SPELL_POWER.fireDamage));
+      }
     } else if (id === "water") {
       if (!live.length) return no("nobody to wash away");
       spend();
@@ -632,16 +635,13 @@ export class Arena extends Phaser.Scene implements CastHost {
     } else if (id === "freeze") {
       if (!live.length) return no("nobody to freeze");
       spend();
-      this.slowUntil = this.worldTime + SPELL_POWER.freezeSeconds * 1000;
+      this.freezeUntil = this.worldTime + SPELL_POWER.freezeSeconds * 1000;
       sfx.water();
       this.cameras.main.flash(160, 150, 210, 255);
-      this.time.delayedCall(SPELL_POWER.freezeSeconds * 1000 + 30, () => {
-        if (this.worldTime >= this.slowUntil) for (const m of this.monsters) m.sprite.clearTint();
-      });
     } else if (id === "shield") {
       if (this.worldTime < this.shieldUntil) return no("the shield is already up");
       spend();
-      this.shieldUntil = this.worldTime + SPELL_POWER.shieldSeconds * 1000;
+      this.shieldUntil = Infinity;
       sfx.wave();
     } else {
       const max = DIFFICULTY[this.difficulty].hearts;
@@ -656,19 +656,13 @@ export class Arena extends Phaser.Scene implements CastHost {
     return true;
   }
 
-  /** A damaging spell reaches a monster: it destroys it, or tears a few symbols off a boss. */
-  private strike(m: Monster) {
-    if (!m.active) return;
-    if (m.boss) {
-      for (let i = 0; i < SPELL_POWER.bossSymbols && m.queue.length > 0; i++) {
-        m.queue.shift();
-        m.prompts.shift();
-        m.bubble.popFront();
-      }
-      m.flashHit();
-      if (m.queue.length > 0) return;
-      m.dying = true;
-    }
+  /** One damage removes one symbol, for ordinary monsters and bosses alike. */
+  private strike(m: Monster, damage: number) {
+    if (!m.active || m.dying) return;
+    const killed = damageSpellTarget(m, damage);
+    m.flashHit();
+    if (!killed) return;
+    m.dying = true;
     const pts = Math.round(GAME.scorePerKill * this.streakMult * (m.boss ? BOSS.scoreMult : 1));
     this.score += pts;
     this.fx.floatText(m.x, m.y - 40, `+${pts}`, ORANGE_CSS, 28);
@@ -679,6 +673,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   /** Wave: a ring of water shoves every monster back toward the edge. */
   private pushBack(live: Monster[]) {
     const { x: px, y: py } = this.player;
+    this.slowUntil = this.worldTime + SPELL_POWER.waveSlowSeconds * 1000;
     sfx.water();
     const ring = this.add.circle(px, py, 30).setStrokeStyle(10, 0x4db4ff, 0.8).setDepth(850);
     this.tweens.add({ targets: ring, scale: 12, alpha: 0, duration: 520, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
@@ -722,13 +717,13 @@ export class Arena extends Phaser.Scene implements CastHost {
         this.cameras.main.shake(200, 0.012);
         this.cameras.main.flash(140, 255, 150, 60);
         for (const m of [...this.monsters]) {
-          if (m.active && !m.dying && m.distanceTo(px, py) <= r) this.strike(m);
+          if (m.active && !m.dying && m.distanceTo(px, py) <= r) this.strike(m, SPELL_POWER.bombDamage);
         }
       },
     });
   }
 
-  /** The shield: a ring around you until it is used up or runs out. */
+  /** The shield: a ring around you until it blocks a hit. */
   private paintShield() {
     const g = this.shieldGfx;
     if (!g) return;
@@ -737,8 +732,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (left <= 0) return;
     const { x, y } = this.player;
     const pulse = 0.6 + 0.25 * Math.sin(this.worldTime / 180);
-    // fades out over its last two seconds
-    const a = Math.min(1, left / 2000);
+    const a = 1;
     g.fillStyle(0x2f9e58, 0.1 * a);
     g.fillCircle(x, y, 78);
     g.lineStyle(6, 0x2f9e58, pulse * a);

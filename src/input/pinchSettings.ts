@@ -1,7 +1,12 @@
-import type { experiment } from "./pinchConfig";
+import defaults from "../../config/pinch.defaults.json" with { type: "json" };
+type Settings = Omit<typeof defaults, "variant" | "anchor" | "timing"> & {
+  variant: "C" | "E";
+  anchor: "knuckle" | "tip" | "thumb" | "pinch";
+  timing: "time" | "frames";
+};
 
 /** Local dev defaults only; reject invalid files rather than silently mixing settings. */
-export function parsePinchSettings(value: unknown): Partial<typeof experiment> {
+export function parsePinchSettings(value: unknown): Partial<Settings> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("Pinch config must be an object");
   const v = value as Record<string, unknown>;
   const rules: Record<string, (x: unknown) => boolean> = {
@@ -31,9 +36,9 @@ export function parsePinchSettings(value: unknown): Partial<typeof experiment> {
     thumbUpHoldMs: x => typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 3000,
   };
   for (const [key, entry] of Object.entries(v)) if (!rules[key]?.(entry)) throw Error(`Invalid pinch config setting: ${key}`);
-  const on = typeof v.on === "number" ? v.on : .28;
-  const off = typeof v.off === "number" ? v.off : .5;
-  const gap=typeof v.hysteresisGap === "number" ? v.hysteresisGap : .1;
+  const on = typeof v.on === "number" ? v.on : defaults.on;
+  const off = typeof v.off === "number" ? v.off : defaults.off;
+  const gap=typeof v.hysteresisGap === "number" ? v.hysteresisGap : defaults.hysteresisGap;
   if (off - on < gap - 1e-9) throw Error(`Pinch end ratio must be at least ${gap.toFixed(3)} above start ratio`);
-  return v as Partial<typeof experiment>;
+  return v as Partial<Settings>;
 }

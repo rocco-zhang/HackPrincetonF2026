@@ -5,6 +5,7 @@ import { onInput, SYMBOLS, type Pt, type InputEvent } from "./events";
 import { cancelHandStroke, initHandTracker, pinchEngine, observationListeners, inferenceMs, processObservation, setReplaying, replaying } from "./handTracker";
 import { calibrationRatio, calibratePinch, experiment, type Observation } from "./pinchExperiment";
 import { recognizer } from "./castPipeline";
+import { pinchDefaults } from "./pinchConfig";
 import { measureLine, type LineMetrics } from "./recognizer";
 import "./pinchLab.css";
 
@@ -193,7 +194,7 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
   el<HTMLInputElement>("use3d").onchange=()=>{
     change();experiment.use3d=el<HTMLInputElement>("use3d").checked;
     calibration=null;poses.closed=[];poses.open=[];poseSummary();
-    if(experiment.calibrated){experiment.on=INPUT.pinchOn;experiment.off=Math.max(INPUT.pinchOff,INPUT.pinchOn+experiment.hysteresisGap);}
+    if(experiment.calibrated){experiment.on=pinchDefaults.on;experiment.off=Math.max(pinchDefaults.off,pinchDefaults.on+experiment.hysteresisGap);}
     experiment.calibrated=false;syncRatios();
     el("sampling").classList.remove("is-sampling");el<HTMLProgressElement>("sample-progress").value=0;
     el("sample-state").textContent="Distance mode changed: pose samples cleared.";el("sample-live").textContent="";
@@ -241,11 +242,11 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
   el("calibrate").onclick=()=>{
     if(calibration){el("calibration-result").textContent="Wait for sampling to finish.";return;}
     change();const ok=calibratePinch(poses.closed,poses.open);experiment.calibrated=ok;
-    if(!ok){experiment.on=INPUT.pinchOn;experiment.off=Math.max(INPUT.pinchOff,INPUT.pinchOn+experiment.hysteresisGap);}
+    if(!ok){experiment.on=pinchDefaults.on;experiment.off=Math.max(pinchDefaults.off,pinchDefaults.on+experiment.hysteresisGap);}
     syncRatios();
     el("calibration-result").textContent=ok?`Applied: close below ${experiment.on.toFixed(3)}, open above ${experiment.off.toFixed(3)}. Active with buffering on or off.`:"Rejected: need at least 20 samples per pose, separated distributions, and thresholds within safe bounds. Defaults restored.";
   };
-  el("default").onclick=()=>{change();experiment.calibrated=false;experiment.on=INPUT.pinchOn;experiment.off=Math.max(INPUT.pinchOff,INPUT.pinchOn+experiment.hysteresisGap);syncRatios();el("calibration-result").textContent=`Default thresholds restored: close ${experiment.on.toFixed(3)}, open ${experiment.off.toFixed(3)} (respecting minimum gap).`;};
+  el("default").onclick=()=>{change();experiment.calibrated=false;experiment.on=pinchDefaults.on;experiment.off=Math.max(pinchDefaults.off,pinchDefaults.on+experiment.hysteresisGap);syncRatios();el("calibration-result").textContent=`Default thresholds restored: close ${experiment.on.toFixed(3)}, open ${experiment.off.toFixed(3)} (respecting minimum gap).`;};
   observationListeners.add(o=>{
     if(recording){if(samples.length>=18000){recording=false;el("record").textContent="Start recording";message("Recording stopped at 18,000 observations. Download to keep it.");}else samples.push(structuredClone({...o,t:o.t-base}));}
     if(calibration){

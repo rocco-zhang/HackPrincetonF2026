@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { experiment } from "../src/input/pinchConfig";
 import { createDefaultRecognizer, lineCheck, measureLine } from "../src/input/recognizer";
 import { isStrokeTooSmall } from "../src/input/strokeDetector";
 import { BASE_SHAPES, densify, jitteredStroke, mulberry32 } from "../src/input/shapes";
 
 const original = {...experiment};
+beforeEach(()=>Object.assign(experiment,{
+  lineStraightness:.86,lineThinness:.28,lineAngleTolerance:35,lineAngleToleranceWanted:55,
+  minStrokeLengthEnabled:true,minStrokePointsEnabled:true,
+}));
 afterEach(()=>Object.assign(experiment,original));
 
 describe("recognition controls",()=>{

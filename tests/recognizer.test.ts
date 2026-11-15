@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { experiment } from "../src/input/pinchConfig";
 import { SYMBOLS, type SymbolName } from "../src/input/events";
 import { createDefaultRecognizer, lineCheck } from "../src/input/recognizer";
 import { BASE_SHAPES, jitteredStroke, mulberry32, type XY } from "../src/input/shapes";
 
 const rec = createDefaultRecognizer();
+const saved = { ...experiment };
+// Reference accuracy suite uses the original line geometry, independently of personal tuning.
+beforeEach(() => Object.assign(experiment, { lineStraightness: .86, lineThinness: .28 }));
+afterEach(() => Object.assign(experiment, saved));
 
 function testStrokes(name: SymbolName, seed: number, perShape = 12) {
   const rand = mulberry32(seed);
