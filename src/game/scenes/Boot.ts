@@ -20,7 +20,7 @@ export class Boot extends Phaser.Scene {
   private drawn: { key: string; canvas: HTMLCanvasElement }[] = [];
   private rnd = mulberry32(11); // seeded so the art is the same every run
 
-  /** Where to go once the art is drawn. The accessibility screen re-runs this scene to recolour it. */
+  /** Where to go once the art is drawn. The accessibility screen re-runs this scene to recolor it. */
   private next: { scene: string; data?: object } = { scene: "Title" };
 
   init(data: { next?: string; data?: object }) {
@@ -462,7 +462,7 @@ export class Boot extends Phaser.Scene {
     ctx.fillText(letter, 14, 10);
   }
 
-  /** Hearts are drawn in red pen and coloured in with hatching. */
+  /** Hearts are drawn in red pen and colored in with hatching. */
   private makeHeart(key: string, filled: boolean) {
     const S = 40;
     const ctx = this.canvas(key, S, S);

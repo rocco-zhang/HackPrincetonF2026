@@ -14,7 +14,7 @@ export const ORANGE_CSS = "#d9661c";
 export const MUTED_CSS = "#8a857a";
 export const HIGHLIGHTER = 0xffe95c;
 
-// Felt-tip marker colours, dark enough to read on paper.
+// Felt-tip marker colors, dark enough to read on paper.
 const MARKER_COLORS: Record<SymbolName, number> = {
   hline: 0x2b6fd0,
   vline: 0x2f9e58,
@@ -23,7 +23,7 @@ const MARKER_COLORS: Record<SymbolName, number> = {
   circle: 0xd09a00,
   zigzag: 0x7a4fc4,
 };
-// Colour-blind mode: the Okabe–Ito set, which stays apart for red-green colour blindness
+// Color-blind mode: the Okabe–Ito set, which stays apart for red-green color blindness
 // (blue, bluish green, orange, black, sky blue, reddish purple; no red next to green).
 const COLORBLIND_COLORS: Record<SymbolName, number> = {
   hline: 0x0072b2,
@@ -34,10 +34,10 @@ const COLORBLIND_COLORS: Record<SymbolName, number> = {
   zigzag: 0xcc79a7,
 };
 
-/** The marker colour of each symbol. Changes in place with the colour-blind setting. */
+/** The marker color of each symbol. Changes in place with the color-blind setting. */
 export const SYMBOL_COLOR: Record<SymbolName, number> = { ...MARKER_COLORS };
 
-/** Marker colour for anything castable; ASL letters cycle through the six markers. */
+/** Marker color for anything castable; ASL letters cycle through the six markers. */
 export function castColor(name: CastName): number {
   if (isSymbol(name)) return SYMBOL_COLOR[name];
   if (isMath(name) || isLang(name)) return SYMBOL_COLOR.hline;
@@ -48,7 +48,7 @@ export function castColor(name: CastName): number {
 
 export const css = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
 
-/** The three paper monsters. `rim` is the colour of the scraps when one is torn up. */
+/** The three paper monsters. `rim` is the color of the scraps when one is torn up. */
 export const MONSTER_PALETTES = [
   { name: "crumpled ball", rim: "#ffffff" },
   { name: "torn notebook page", rim: "#cfe0f7" },
@@ -63,7 +63,7 @@ const PLAIN = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
 export let FONT = HANDWRITING;
 export const TITLE_FONT = '"Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive';
 
-// keep the colours and the reading font in step with the accessibility settings
+// keep the colors and the reading font in step with the accessibility settings
 onA11y(() => {
   Object.assign(SYMBOL_COLOR, a11y.colorblind ? COLORBLIND_COLORS : MARKER_COLORS);
   FONT = a11y.plainFont ? PLAIN : HANDWRITING;

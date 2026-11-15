@@ -21,7 +21,8 @@ export class Title extends Phaser.Scene {
     // paper monsters loitering in the margins
     for (let i = 0; i < 6; i++) {
       // kept to the side margins so they never sit behind the text
-      const x = i % 2 ? Phaser.Math.Between(60, 190) : Phaser.Math.Between(W - 190, W - 60);
+      // (on the right they stay between the Duel button and the column of icons)
+      const x = i % 2 ? Phaser.Math.Between(60, 190) : Phaser.Math.Between(W - 235, W - 185);
       const m = this.add.image(x, 190 + Math.floor(i / 2) * 180 + Phaser.Math.Between(-30, 30), `monster${i % 3}`).setFlipX(i % 2 === 0);
       this.tweens.add({ targets: m, x: m.x + Phaser.Math.Between(-30, 30), y: m.y + Phaser.Math.Between(-30, 30), duration: Phaser.Math.Between(3000, 5000), yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     }
@@ -50,17 +51,17 @@ export class Title extends Phaser.Scene {
       menu.add({ x: W / 2 + m.dx, y: 474, w: 300, h: 128, label: m.label, sub: m.sub, font: TITLE_FONT, fontSize: 58, angle: m.angle, primary: true, onClick: go(m.scene) });
     }
 
-    // friends → achievements → accessibility → settings, top right
+    // down the right edge, settings at the top: settings → accessibility → achievements → friends
     const corner = [
-      { name: "friends", icon: friendsIcon },
-      { name: "achievements", icon: trophyIcon },
-      { name: "accessibility", icon: accessIcon },
       { name: "settings", icon: gearIcon },
+      { name: "accessibility", icon: accessIcon },
+      { name: "achievements", icon: trophyIcon },
+      { name: "friends", icon: friendsIcon },
     ];
     corner.forEach((c, i) => {
-      const x = W - 62 - (corner.length - 1 - i) * 104;
-      menu.add({ x, y: 56, w: 68, h: 64, icon: c.icon, angle: i % 2 ? 1.5 : -1.5, onClick: go("Panel", { kind: c.name }) });
-      this.add.text(x, 104, c.name, { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
+      const x = W - 62, y = 56 + i * 104;
+      menu.add({ x, y, w: 68, h: 64, icon: c.icon, angle: i % 2 ? 1.5 : -1.5, onClick: go("Panel", { kind: c.name }) });
+      this.add.text(x, y + 48, c.name, { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
     });
 
     this.note = this.add.text(W / 2, 592, "", { fontFamily: FONT, fontSize: "20px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 }).setOrigin(0.5);

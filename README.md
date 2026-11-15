@@ -52,11 +52,11 @@ These are experimental parameters, not measured improvements. The lab displays d
 
 ### Screens
 
-- **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons in the top right: friends, achievements, accessibility, settings. Every button works with a pinch or a click.
+- **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and four icons down the right edge: settings, accessibility, achievements, friends. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
 - **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
-- **Accessibility:** colour-blind marker colours (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
+- **Accessibility:** color-blind marker colors (the Okabe–Ito set, with no red next to green), larger cards on the monsters (normal, large, extra large), reduced motion (no screen shake or flashes), and a plain sans-serif font in place of the handwriting. A preview on the screen shows the result, and the choices are saved in the browser.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
 ### Playing
@@ -189,7 +189,7 @@ src/
   config.ts               every tunable: pinch thresholds, One Euro, drawing box, recognizer, waves, scoring
   state.ts                shared app state (mode, tracker status, last recognition…)
   actions.ts              what the settings screen and the hotkeys both do
-  a11y.ts                 accessibility settings (colour-blind colours, card size, reduced motion, plain font)
+  a11y.ts                 accessibility settings (color-blind colors, card size, reduced motion, plain font)
   asl/
     features.ts           landmarks → the 63 numbers the classifier reads (position, size and mirror removed)
     hand.ts               trained model + your recorded examples → letter; hold-to-cast
@@ -225,7 +225,7 @@ src/
 - **The cursor follows the index-finger base knuckle** (`INPUT.cursorAnchor: "knuckle"`), which does not move when the fingers pinch or open. Set it to `"pinch"` for the thumb–index midpoint instead. A release has to last 180 ms (300 ms if the hand is lost) before a stroke ends, and the stroke is cut back to where the release began. The first and last 3 points of each hand stroke are also trimmed.
 - **Symbols a monster currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
 - **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
-- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colours live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
+- **Art and sound are procedural** (canvas drawing and Web Audio oscillators). Everything is paper and pencil: a plain folded sheet for the arena, wobbly double-stroked pencil lines, cut-out monsters (a crumpled ball, a torn notebook page, a sticky note), marker symbols and handwriting fonts (the macOS ones, with bundled Patrick Hand and Permanent Marker as the fallback elsewhere). Colors live in `src/game/palette.ts` and the drawings in `src/game/scenes/Boot.ts`. There are no third-party assets. Textures are drawn once and registered as images, so they survive a WebGL context loss.
 - **The webcam feed sits faintly behind the whole arena** (greyscale, under a mostly opaque sheet of paper, so it reads as a faint pencil sketch), with a full preview in the debug overlay.
 - **All tunables are in a single `src/config.ts`**, instead of separate input and game config files.
 - **Out of scope for now:** mana, pose modifiers, combos, PvP, learning modes, and the leaderboard (see `init_plan.md` §9).

@@ -58,18 +58,18 @@ export class Panel extends Phaser.Scene {
     this.say(y0 + 7 * row + 8, "Rounds that mix subjects keep their own best score, shown when a round ends.", 17, MUTED_CSS);
   }
 
-  /** Colour-blind colours, card size, reduced motion and a plain font, with a preview of what they change. */
+  /** Color-blind colors, card size, reduced motion and a plain font, with a preview of what they change. */
   private accessibility() {
     const onOff = (v: boolean) => (v ? "On" : "Off");
     const again = () => this.scene.restart({ kind: "accessibility" });
     const flip = (k: "colorblind" | "reduceMotion" | "plainFont") => setA11y({ [k]: !a11y[k] } as Partial<A11y>);
     const rows = [
       {
-        name: "Colour-blind colours",
+        name: "Color-blind colors",
         note: "markers that stay apart without telling red from green",
         label: onOff(a11y.colorblind),
         on: a11y.colorblind,
-        // the symbols are drawn once, so redraw the art in the new colours and come back here
+        // the symbols are drawn once, so redraw the art in the new colors and come back here
         run: () => (flip("colorblind"), this.scene.start("Boot", { next: "Panel", data: { kind: "accessibility" } })),
       },
       {
@@ -89,7 +89,7 @@ export class Panel extends Phaser.Scene {
       this.menu.add({ x: 700, y, w: 200, h: 54, label: r.label, fontSize: 22, angle: i % 2 ? 0.6 : -0.6, selected: () => r.on, onClick: r.run });
     });
 
-    // preview: a monster carrying cards at the chosen size, and the six markers in the chosen colours
+    // preview: a monster carrying cards at the chosen size, and the six markers in the chosen colors
     this.add.text(1030, 132, "Preview", { fontFamily: FONT, fontSize: "20px", fontStyle: "bold", color: INK_CSS }).setOrigin(0.5);
     new Monster(this, 1030, 300 + (cardScale() - 1) * 40, ["circle", "v"], 0, 1);
     SYMBOLS.forEach((s, i) => this.add.image(1030 + ((i % 3) - 1) * 84, 410 + Math.floor(i / 3) * 78, `sym_${s}`).setScale(1.15));

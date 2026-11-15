@@ -2,7 +2,7 @@
 const KEY = "spellcam.a11y";
 
 export type A11y = {
-  /** Marker colours that stay apart for red-green colour blindness. */
+  /** Marker colors that stay apart for red-green color blindness. */
   colorblind: boolean;
   /** How big the cards monsters carry are: 0 normal, 1 large, 2 extra large. */
   size: 0 | 1 | 2;
