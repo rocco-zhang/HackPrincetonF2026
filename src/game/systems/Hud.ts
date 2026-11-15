@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ARENA, DIFFICULTY, type Difficulty } from "../../config";
 import { state } from "../../state";
+import { setMusicFast } from "../sfx";
 import { FONT, INK, INK_CSS, MUTED_CSS, ORANGE_CSS } from "../palette";
 
 const MANA_W = 210, MANA_H = 18, MANA_Y = 50;
@@ -75,6 +76,7 @@ export class Hud {
   }
 
   setHearts(n: number) {
+    setMusicFast(n === 1); // last heart: the music hurries
     this.hearts.forEach((h, i) => {
       const was = h.texture.key === "heart";
       h.setTexture(i < n ? "heart" : "heart_empty");

@@ -9,7 +9,7 @@ import { state } from "../../state";
 import { Monster } from "../entities/Monster";
 import { Player } from "../entities/Player";
 import { ACCENT_CSS, castColor, FONT, INK, INK_CSS, MONSTER_PALETTES, ORANGE_CSS } from "../palette";
-import { sfx } from "../sfx";
+import { setMusicFast, sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
@@ -182,6 +182,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       off();
+      setMusicFast(false); // leaving the round (game over, menu): normal speed again
       state.wanted = [];
       state.langMarks = null;
       state.wantedMarks = [];

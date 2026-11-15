@@ -12,6 +12,8 @@ const MUSIC_URL = "./audio/bg_music.mp3";
 // what a slider at full means: effects are short and loud, music sits underneath them
 const SFX_GAIN = 0.7;
 const MUSIC_GAIN = 0.6;
+const MUSIC_FAST = 1.5; // music speed on your last heart
+let musicRate = 1;
 
 export type AudioSettings = { sfxOn: boolean; sfxVol: number; musicOn: boolean; musicVol: number };
 
@@ -34,6 +36,7 @@ function applyAudio() {
   if (master) master.gain.value = audio.sfxOn ? audio.sfxVol * SFX_GAIN : 0;
   if (!music) return;
   music.volume = audio.musicVol * MUSIC_GAIN;
+  music.playbackRate = musicRate;
   const play = audio.musicOn && audio.musicVol > 0;
   if (play && music.paused) void music.play().catch(() => {}); // refused until the first click or key press
   else if (!play && !music.paused) music.pause();
@@ -66,6 +69,12 @@ export function unlockAudio() {
   }
   void ctx.resume();
   applyAudio();
+}
+
+/** Speed the music up (last heart) or back to normal. */
+export function setMusicFast(fast: boolean) {
+  musicRate = fast ? MUSIC_FAST : 1;
+  if (music) music.playbackRate = musicRate;
 }
 
 /** Everything off, or (if everything already is) everything back on. Returns true when now silent. */
