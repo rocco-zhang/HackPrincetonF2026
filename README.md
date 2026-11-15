@@ -4,7 +4,7 @@ You are a stick figure on a sheet of paper, and the paper monsters are closing i
 
 Using MediaPipe, your computer's webcam tracks your hand in the browser. To play, all you have to do is pinch your thumb and index finger to start drawing, and release to cast. Each monster carries a queue of symbols on a scrap of paper taped above it. Drawing a symbol strips it from **every** monster whose next symbol matches, so one spell can eliminate several monsters at once.
 
-Built at HackPrinceton Fall '26 (Entertainment & Media track). The design doc is [`init_plan.md`](init_plan.md).
+Built at HackPrinceton Fall '26 (Entertainment & Media track).
 
 ![gameplay](docs/screenshot.png)
 
