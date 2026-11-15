@@ -8,6 +8,18 @@ Built at HackPrinceton Fall '26 (Entertainment & Media track). The design doc is
 
 ![gameplay](docs/screenshot.png)
 
+## Built with
+
+Everything runs in the browser. There is no backend.
+
+- **Game:** TypeScript, [Phaser 3](https://phaser.io/), [Vite](https://vite.dev/), HTML/CSS, and [Fontsource](https://fontsource.org/) handwriting fonts
+- **Hand tracking:** [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer) (GestureRecognizer, 21 landmarks per hand, WebAssembly on the GPU with a CPU fallback) and the webcam via `getUserMedia`
+- **Drawing input:** a One Euro filter for smoothing, our own pinch detector, and a direction-aware version of the [$1 Unistroke Recognizer](https://depts.washington.edu/acelab/proj/dollar/index.html)
+- **ASL model:** Python, scikit-learn (`MLPClassifier`), NumPy, PyArrow, Pillow, and MediaPipe for Python, trained on the [`sid220/asl-now-fingerspelling`](https://huggingface.co/datasets/sid220/asl-now-fingerspelling) dataset. The trained network ships as JSON and runs in our own TypeScript, with no ML library in the browser.
+- **Multiplayer:** WebRTC through [PeerJS](https://peerjs.com/): the two browsers connect directly, and PeerJS's public broker only helps them find each other
+- **Audio:** the Web Audio API generates the sound effects, and an HTML5 audio element plays the music
+- **Tooling:** Vitest, Node.js/npm, and localStorage for settings and recorded ASL examples
+
 ## Run it
 
 ```bash
