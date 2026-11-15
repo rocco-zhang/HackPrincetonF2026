@@ -5,6 +5,7 @@ import { createDefaultRecognizer, type Recognizer } from "./recognizer";
 import type { XY } from "./shapes";
 import { isStrokeTooSmall } from "./strokeDetector";
 import bundled from "./templates.json";
+import { isInfinityRune } from "./spellRune";
 
 const STORAGE_KEY = "spellcam.templates.v1";
 
@@ -26,8 +27,17 @@ export function initCastPipeline() {
   recognizer = createDefaultRecognizer([bundled as TemplateSet, local]);
 
   onInput((e) => {
-    if (e.type !== "strokeEnd" || state.aslActive) return;
+    if (e.type !== "strokeEnd") return;
     const pts = e.points;
+    const runePoints=e.rawPoints??pts;
+    if(state.spellRunesEnabled && !state.spellCastingActive && isInfinityRune(runePoints)){
+      e.rune="infinity"; // synchronous: math must not also consume this stroke as a digit
+      state.lastStroke=runePoints;
+      state.lastRecog=null;
+      queueMicrotask(()=>emit({type:"spellRune",name:"infinity",points:runePoints,hand:e.hand}));
+      return;
+    }
+    if(state.aslActive)return;
     state.lastStroke = pts;
     if (isStrokeTooSmall(pts)) {
       state.lastRecog = recognizer.recognize(pts);

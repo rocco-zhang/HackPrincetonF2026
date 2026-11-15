@@ -65,7 +65,7 @@ export class Casting {
   onCursor(p: Pt, inking: boolean, hand = 0) {
     const cursor = this.cursorFor(hand);
     this.cursorAt.set(hand, performance.now());
-    cursor.root.setVisible(!state.aslActive);
+    cursor.root.setVisible(!state.aslActive || (state.spellRunesEnabled && !state.spellCastingActive && inking));
     cursor.root.setPosition(p.x, p.y);
     cursor.ring.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
     cursor.dot.setVisible(inking);
@@ -80,6 +80,10 @@ export class Casting {
 
   onStrokePoint(p: Pt, hand = 0) {
     this.currents.get(hand)?.push(p);
+  }
+
+  cancelStroke(hand=0) {
+    this.currents.delete(hand);
   }
 
   onStrokeEnd(hand = 0) {

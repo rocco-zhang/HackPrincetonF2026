@@ -34,3 +34,4 @@ body.pinch-lab {overflow:auto;background:#e9e7dd;user-select:text;font-family:sy
 
 #lab-results {height:8.5em;max-height:none;overflow-y:auto;scrollbar-gutter:stable;}
 #lab-gate-reason {height:8em;overflow:auto;scrollbar-gutter:stable;padding:10px;background:#e4ece5;border-left:4px solid #257c81;line-height:1.5;}
+#lab-line-metrics {height:10em;overflow:auto;scrollbar-gutter:stable;}

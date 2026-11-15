@@ -1,11 +1,20 @@
-import { INPUT, RECOG } from "../config";
+import defaults from "../../config/pinch.defaults.json";
+import { parsePinchSettings } from "./pinchSettings";
 
 export type Variant = "A" | "B" | "C" | "D" | "E" | "F";
+
+// One checked, versioned baseline for both development and production.
+parsePinchSettings(defaults);
+export const pinchDefaults = Object.freeze({
+  ...defaults,
+  variant: defaults.variant as Variant,
+  anchor: defaults.anchor as "knuckle" | "tip" | "thumb" | "pinch",
+  timing: defaults.timing as "time" | "frames",
+});
+
 export const experiment = {
-  version: "pinch-v1", variant: "A" as Variant, anchor: "knuckle" as "knuckle" | "tip" | "thumb" | "pinch",
-  timing: "time" as "time" | "frames", startFrames: 2, endFrames: 3, calibrated: false,
-  releaseMs: 80, startMs: 30, lostHandMs: 300, historyMs: 750, prefixMs: 80,
-  minStrokeLengthEnabled: true, minStrokePointsEnabled: true,
-  recognitionThreshold: RECOG.acceptScore, wantedRecognitionThreshold: RECOG.acceptScoreWanted,
-  on: INPUT.pinchOn, off: INPUT.pinchOff, speedAssist: false, speedAssistRange: .08, depthVeto: true, use3d: false,
+  version: "pinch-v1",
+  ...pinchDefaults,
+  calibrated: false,
+  lostHandMs: 300, historyMs: 750, prefixMs: 80,
 };

@@ -138,10 +138,36 @@ describe("Korean words", () => {
     const taught = new Map(langPool("korean", 9).map((item) => [item.label, langCast(item.strokes)]));
     const seen = new Set<string>();
     for (let i = 0; i < 60; i++) {
-      const boss = bossCards("korean", 1, rand);
+      const boss = bossCards("korean", 4 + (i % 3), rand);
       seen.add(boss.labels!.join(""));
       boss.labels!.forEach((syllable, j) => expect(boss.symbols[j], syllable).toBe(taught.get(syllable))); // same strokes as the lesson card, so the hint is right
     }
     expect([...seen].sort()).toEqual(["마시다", "아니요", "저기요"]);
+  });
+
+  it("only gives a boss characters from lessons already finished", () => {
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    const strokes = new Map(langPool("korean", 9).map((item) => [item.label, langCast(item.strokes)]));
+    const letters = langPool("korean", 1).map((item) => item.label);
+    const syllables = langPool("korean", 2).map((item) => item.label);
+    const allowed = [letters, letters, [...letters, ...syllables]]; // waves 1, 2, 3
+    allowed.forEach((ok, i) => {
+      const seen = new Set<string>();
+      for (let k = 0; k < 40; k++) {
+        const boss = bossCards("korean", i + 1, rand);
+        seen.add(boss.title);
+        boss.labels!.forEach((char, j) => {
+          expect(ok, `wave ${i + 1}: ${char}`).toContain(char);
+          expect(boss.symbols[j]).toBe(strokes.get(char));
+        });
+      }
+      expect(seen.size).toBe(3);
+    });
+    // wave 3 is the first with syllables to draw on, so its boss uses them
+    expect(bossCards("korean", 3, rand).labels!.every((c) => syllables.includes(c))).toBe(true);
   });
 });

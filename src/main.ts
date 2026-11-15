@@ -56,6 +56,14 @@ if (import.meta.env.DEV) {
     const value=Number(params.get(key));
     if(params.has(key)&&Number.isFinite(value)&&value>=0&&value<=1)experiment[key]=value;
   }
+  for(const key of ["thumbUpThreshold","thumbUpHoldMs"] as const){
+    const value=Number(params.get(key));
+    if(params.has(key)&&Number.isFinite(value)&&(key==="thumbUpThreshold"?value>0&&value<=1:Number.isInteger(value)&&value>=0&&value<=3000))experiment[key]=value;
+  }
+  for(const key of ["lineStraightness","lineThinness","lineAngleTolerance","lineAngleToleranceWanted"] as const){
+    const value=Number(params.get(key)),max=key==="lineAngleTolerance"?45:key==="lineAngleToleranceWanted"?90:1;
+    if(params.has(key)&&Number.isFinite(value)&&value>=0&&value<=max)experiment[key]=value;
+  }
   // Only explicit lab calibration is carried into gameplay; never infer thresholds from a match.
   if (params.has("speedAssist")) experiment.speedAssist=params.get("speedAssist")==="true";
   const speedRange=Number(params.get("speedRange"));
@@ -64,8 +72,14 @@ if (import.meta.env.DEV) {
   if (params.has("minStrokePointsEnabled")) experiment.minStrokePointsEnabled=params.get("minStrokePointsEnabled")!=="false";
   if (params.has("minStrokeLengthEnabled")) experiment.minStrokeLengthEnabled=params.get("minStrokeLengthEnabled")!=="false";
   if (params.has("use3d")) experiment.use3d=params.get("use3d")==="true";
+  const hysteresisGap=Number(params.get("hysteresisGap"));
+  if(params.has("hysteresisGap")&&Number.isFinite(hysteresisGap)&&hysteresisGap>=.01&&hysteresisGap<=.3){
+    experiment.hysteresisGap=hysteresisGap;
+    experiment.on=Math.min(experiment.on,.85-hysteresisGap);
+    experiment.off=Math.min(.85,Math.max(experiment.off,experiment.on+hysteresisGap));
+  }
   const on = Number(params.get("on")), off = Number(params.get("off"));
-  if (on >= .05 && on <= .7 && off >= on + .1 && off <= .85) {experiment.on=on;experiment.off=off;experiment.calibrated=params.get("calibrated")==="true";}
+  if (on >= .05 && on <= .7 && off - on >= experiment.hysteresisGap - 1e-9 && off <= .85) {experiment.on=on;experiment.off=off;experiment.calibrated=params.get("calibrated")==="true";}
 }
 if (import.meta.env.DEV && location.pathname.replace(/\/$/, "") === "/dev/pinch") {
   initCastPipeline();

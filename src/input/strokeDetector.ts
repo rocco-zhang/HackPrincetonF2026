@@ -113,10 +113,11 @@ export class StrokeDetector {
       const kept = pts.filter((p) => p.t <= cutoffT);
       if (kept.length >= 2) pts = kept;
     }
+    const rawPoints=pts;
     if (this.trim > 0 && pts.length > this.trim * 2 + INPUT.minStrokePoints) {
       pts = pts.slice(this.trim, pts.length - this.trim);
     }
-    this.send({ type: "strokeEnd", points: pts });
+    this.send({ type: "strokeEnd", points: pts, rawPoints });
   }
 }
 

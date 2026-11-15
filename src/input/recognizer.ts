@@ -124,11 +124,11 @@ export function distanceAtBestAngle(pts: XY[], tmpl: XY[], tolDeg: number) {
   return Math.min(f1, f2, pathDistance(pts, tmpl));
 }
 
-/** Straight-line check: high chord/path ratio and a thin principal-axis spread. */
-export function lineCheck(
-  pts: XY[],
-  wanted: readonly StrokeName[] = [],
-): { kind: "hline" | "vline" | "diagonal"; straightness: number } | null {
+export type LineMetrics = { straightness:number; thinness:number; angle:number };
+
+/** Measure the exact geometric checks, including when they fail. */
+export function measureLine(pts: XY[]): LineMetrics | null {
+  if(pts.length<2)return null;
   // coarse resample so per-frame jitter doesn't inflate the path length
   const L = pathLength(resample(pts, 12));
   if (L === 0) return null;
@@ -137,7 +137,6 @@ export function lineCheck(
   const dx = last.x - first.x;
   const dy = last.y - first.y;
   const straightness = Math.hypot(dx, dy) / L;
-  if (straightness < RECOG.lineStraightness) return null;
 
   const c = centroid(pts);
   let sxx = 0, syy = 0, sxy = 0;
@@ -153,14 +152,25 @@ export function lineCheck(
   const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
   const l1 = tr / 2 + disc;
   const l2 = Math.max(0, tr / 2 - disc);
-  if (l1 <= 0 || Math.sqrt(l2 / l1) > RECOG.lineThinness) return null;
+  if (l1 <= 0) return null;
+  const thinness=Math.sqrt(l2/l1);
 
   const angle = (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI; // 0 = horizontal, 90 = vertical
+  return {straightness,thinness,angle};
+}
+
+/** Straight-line check: high chord/path ratio and a thin principal-axis spread. */
+export function lineCheck(
+  pts: XY[], wanted: readonly StrokeName[] = [],
+): { kind: "hline" | "vline" | "diagonal"; straightness: number } | null {
+  const metrics=measureLine(pts);
+  if(!metrics || metrics.straightness<experiment.lineStraightness || metrics.thinness>experiment.lineThinness)return null;
+  const {straightness,angle}=metrics;
   // A slanted line is ambiguous on its own, but not when only one of dash / pillar is needed.
   const wantH = wanted.includes("hline");
   const wantV = wanted.includes("vline");
-  const tolH = wantH && !wantV ? RECOG.lineAngleToleranceWanted : wantH && wantV ? 45 : RECOG.lineAngleTolerance;
-  const tolV = wantV && !wantH ? RECOG.lineAngleToleranceWanted : wantH && wantV ? 45 : RECOG.lineAngleTolerance;
+  const tolH = wantH && !wantV ? experiment.lineAngleToleranceWanted : wantH && wantV ? 45 : experiment.lineAngleTolerance;
+  const tolV = wantV && !wantH ? experiment.lineAngleToleranceWanted : wantH && wantV ? 45 : experiment.lineAngleTolerance;
   const kind = angle <= tolH ? "hline" : angle >= 90 - tolV ? "vline" : "diagonal";
   return { kind, straightness };
 }

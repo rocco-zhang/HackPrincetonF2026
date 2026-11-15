@@ -95,6 +95,13 @@ export const state = {
   mode: "mouse" as "mouse" | "hand",
   /** A round is running. The mouse works in menus but not here (unless ?mouse). */
   inRound: false,
+  /** The lab retains the legacy infinity rune; Classic uses the held thumbs-up gesture. */
+  spellRunesEnabled: false,
+  spellGesturesEnabled: false,
+  spellCastingActive: false,
+  thumbUpScore: 0,
+  thumbUpProgress: 0,
+  thumbUpHolding: false,
   cameraOn: false,
   trackerReady: false,
   delegate: "" as "" | "GPU" | "CPU",
@@ -114,7 +121,7 @@ export const state = {
   calibrating: false,
   lastStroke: null as { x: number; y: number }[] | null,
   lastRecog: null as RecogResult | null,
-  /** Symbols a monster currently needs; the recognizer favours these. Empty outside the arena. */
+  /** Monster fronts, or the expected spell characters while casting; the recognizer favours these. */
   wanted: [] as CastName[],
   /** A language round is running: the marks that language uses (the only things a stroke can be read as)… */
   langMarks: null as StrokeName[] | null,
