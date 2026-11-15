@@ -69,8 +69,8 @@ export class Panel extends Phaser.Scene {
         note: "markers that stay apart without telling red from green",
         label: onOff(a11y.colorblind),
         on: a11y.colorblind,
-        // the symbols are drawn once, so redraw the art in the new colors and come back here
-        run: () => (flip("colorblind"), this.scene.start("Boot", { next: "Panel", data: { kind: "accessibility" } })),
+        // the symbols are drawn once: redraw them in the new colors behind this screen, which then refreshes
+        run: () => (flip("colorblind"), this.scene.launch("Boot", { recolor: "Panel", data: { kind: "accessibility" } })),
       },
       {
         name: "Card size",

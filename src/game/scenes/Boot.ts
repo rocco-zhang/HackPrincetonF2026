@@ -20,11 +20,14 @@ export class Boot extends Phaser.Scene {
   private drawn: { key: string; canvas: HTMLCanvasElement }[] = [];
   private rnd = mulberry32(11); // seeded so the art is the same every run
 
-  /** Where to go once the art is drawn. The accessibility screen re-runs this scene to recolor it. */
-  private next: { scene: string; data?: object } = { scene: "Title" };
+  /**
+   * Set when the accessibility screen launches this scene on top of itself to recolor the art:
+   * the screen to redraw once the new art is ready.
+   */
+  private recolor: { scene: string; data?: object } | null = null;
 
-  init(data: { next?: string; data?: object }) {
-    this.next = { scene: data?.next ?? "Title", data: data?.data };
+  init(data: { recolor?: string; data?: object }) {
+    this.recolor = data?.recolor ? { scene: data.recolor, data: data.data } : null;
   }
 
   create() {
@@ -46,15 +49,40 @@ export class Boot extends Phaser.Scene {
     this.makeHeart("heart", true);
     this.makeHeart("heart_empty", false);
 
+    if (this.recolor) return this.swapColors(this.recolor);
+
     // Register as decoded images, not canvas textures: browsers may evict
     // offscreen 2D canvases, and a WebGL context restore would then re-upload blanks.
     let pending = this.drawn.length;
     for (const { key, canvas } of this.drawn) {
       this.textures.once(`${Phaser.Textures.Events.ADD_KEY}${key}`, () => {
-        if (--pending === 0) this.scene.start(this.next.scene, this.next.data);
+        if (--pending === 0) this.scene.start("Title");
       });
-      if (this.textures.exists(key)) this.textures.remove(key); // a re-run replaces the old art
       this.textures.addBase64(key, canvas.toDataURL("image/png"));
+    }
+  }
+
+  /**
+   * Replace the art that uses the marker colors, without a blank frame: the new images load
+   * under temporary names while the current screen stays up, then take over the real names
+   * and that screen is redrawn, all before the next frame is painted.
+   */
+  private swapColors(then: { scene: string; data?: object }) {
+    const colored = this.drawn.filter(({ key }) => key.startsWith("sym_") || key.startsWith("aslcard_"));
+    const temp = (key: string) => `recolor:${key}`;
+    let pending = colored.length;
+    for (const { key, canvas } of colored) {
+      this.textures.once(`${Phaser.Textures.Events.ADD_KEY}${temp(key)}`, () => {
+        if (--pending > 0) return;
+        for (const { key } of colored) {
+          this.textures.remove(key);
+          this.textures.renameTexture(temp(key), key);
+        }
+        this.scene.get(then.scene).scene.restart(then.data);
+        this.scene.stop();
+      });
+      if (this.textures.exists(temp(key))) this.textures.remove(temp(key));
+      this.textures.addBase64(temp(key), canvas.toDataURL("image/png"));
     }
   }
 
