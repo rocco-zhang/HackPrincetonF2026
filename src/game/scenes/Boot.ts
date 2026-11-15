@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ARENA } from "../../config";
+import { renderDensity } from "../../density";
 import { ASL_LETTERS, prototype, type AslLetter } from "../../asl/hand";
 import { aslName, SYMBOLS, type SymbolName } from "../../input/events";
 import { BASE_SHAPES, mulberry32 } from "../../input/shapes";
@@ -17,7 +18,7 @@ export class Boot extends Phaser.Scene {
     super("Boot");
   }
 
-  private drawn: { key: string; canvas: HTMLCanvasElement }[] = [];
+  private drawn: { key: string; canvas: HTMLCanvasElement; w: number; h: number }[] = [];
   private rnd = mulberry32(11); // seeded so the art is the same every run
 
   /**
@@ -54,8 +55,9 @@ export class Boot extends Phaser.Scene {
     // Register as decoded images, not canvas textures: browsers may evict
     // offscreen 2D canvases, and a WebGL context restore would then re-upload blanks.
     let pending = this.drawn.length;
-    for (const { key, canvas } of this.drawn) {
+    for (const { key, canvas, w, h } of this.drawn) {
       this.textures.once(`${Phaser.Textures.Events.ADD_KEY}${key}`, () => {
+        this.useGameSize(key, w, h);
         if (--pending === 0) this.scene.start("Title");
       });
       this.textures.addBase64(key, canvas.toDataURL("image/png"));
@@ -71,8 +73,9 @@ export class Boot extends Phaser.Scene {
     const colored = this.drawn.filter(({ key }) => key.startsWith("sym_") || key.startsWith("aslcard_"));
     const temp = (key: string) => `recolor:${key}`;
     let pending = colored.length;
-    for (const { key, canvas } of colored) {
+    for (const { key, canvas, w, h } of colored) {
       this.textures.once(`${Phaser.Textures.Events.ADD_KEY}${temp(key)}`, () => {
+        this.useGameSize(temp(key), w, h);
         if (--pending > 0) return;
         for (const { key } of colored) {
           this.textures.remove(key);
@@ -86,12 +89,27 @@ export class Boot extends Phaser.Scene {
     }
   }
 
+  /**
+   * The art is drawn with `renderDensity()` times the pixels, so it stays sharp on high-density
+   * screens. This makes the texture report its size in game pixels again (so nothing in the game
+   * changes size) while still showing the whole, larger image.
+   */
+  private useGameSize(key: string, w: number, h: number) {
+    if (renderDensity() === 1) return;
+    const frame = this.textures.get(key).get();
+    frame.setSize(w, h); // also recomputes the UVs for a w×h cut, which would show only a corner…
+    frame.u0 = frame.v0 = 0; // …so point them back at the full image
+    frame.u1 = frame.v1 = 1;
+  }
+
   private canvas(key: string, w: number, h: number) {
+    const k = renderDensity();
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    this.drawn.push({ key, canvas });
+    canvas.width = w * k;
+    canvas.height = h * k;
+    this.drawn.push({ key, canvas, w, h });
     const ctx = canvas.getContext("2d")!;
+    ctx.scale(k, k); // all drawing below stays in game pixels
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     return ctx;

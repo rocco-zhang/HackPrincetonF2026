@@ -5,6 +5,7 @@ import "@fontsource/permanent-marker/latin-400.css";
 import "./style.css";
 import { actions } from "./actions";
 import { ARENA } from "./config";
+import { renderDensity } from "./density";
 import { applyMirror, listCameras, nextCamera, startCamera } from "./input/camera";
 import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
@@ -90,13 +91,8 @@ initLobby(() => game);
  * The game's world is 1280×720, stretched to the window. On a high-density (Retina) screen each
  * of those pixels covers several real ones, which makes text and lines look soft. So the canvas
  * is given `density` times as many pixels, every scene's camera zooms in by the same amount (the
- * world stays 1280×720 to all the game code), and text is rendered at that density too.
+ * world stays 1280×720 to all the game code), and text and art are rendered at that density too.
  */
-function renderDensity() {
-  const fit = Math.min(window.innerWidth / ARENA.width, window.innerHeight / ARENA.height);
-  return Math.min(2, Math.max(1, Math.ceil(fit * (window.devicePixelRatio || 1) - 0.15))); // 1 or 2: beyond that costs more than it shows
-}
-
 function startGame() {
   if (game) return;
   const density = renderDensity();
