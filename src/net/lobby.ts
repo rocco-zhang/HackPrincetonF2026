@@ -1,7 +1,8 @@
-// The versus panel: quick match, a list of open public games, or a private game with a room code.
+// The Browse games panel: your name, quick match, the list of open games, and joining by a
+// friend's four-letter code. Hosting is the Duel screen's own Host a game button, not part of this.
 import type Phaser from "phaser";
 import { DIFFICULTY, type Difficulty } from "../config";
-import { subjectsLabel, type Subject } from "../game/subjects";
+import { SUBJECT_INFO } from "../game/subjects";
 import { state } from "../state";
 import { pvp, setModeSource, type RoomInfo } from "./pvp";
 
@@ -25,8 +26,8 @@ export function openLobby() {
   const kb = getGame()?.input.keyboard;
   if (kb) kb.enabled = false;
   render();
-  if (pvp.status === "off") void refresh();
   clearInterval(refreshTimer);
+  if (pvp.status === "off") void refresh();
   refreshTimer = window.setInterval(() => {
     if (pvp.status === "off" && performance.now() - lastScan > REFRESH_MS) void refresh();
   }, 1000);
@@ -73,26 +74,37 @@ function saveName(name: string) {
   }
 }
 
-function describe(r: { subjects: Subject[]; difficulty: Difficulty }) {
-  return `${subjectsLabel(r.subjects)} · ${DIFFICULTY[r.difficulty].label}`;
+function tag(text: string, cls = "") {
+  const el = document.createElement("span");
+  el.className = `roomTag ${cls}`.trim();
+  el.textContent = text;
+  return el;
+}
+
+/** One tag per subject, then the difficulty in its own colour. */
+function tags(r: RoomInfo) {
+  const wrap = document.createElement("span");
+  wrap.className = "roomTags";
+  for (const s of r.subjects) wrap.append(tag(SUBJECT_INFO[s].label));
+  wrap.append(tag(DIFFICULTY[r.difficulty].label, r.difficulty satisfies Difficulty));
+  return wrap;
 }
 
 function render() {
   const s = pvp.status;
   const status = $("lobbyStatus");
-  const publicGame = pvp.slot >= 0;
   status.textContent =
     pvp.error ? pvp.error
     : s === "searching" ? "Looking for an opponent…"
-    : s === "hosting" && pvp.quick ? "No one was waiting, so you're hosting a public game. Waiting for an opponent…"
-    : s === "hosting" && publicGame ? `Your game is listed as “${pvp.name}”. Waiting for someone to join…`
-    : s === "hosting" && pvp.code ? `Your code is ${pvp.code}. Your friend opens Duel on their computer and joins with it.`
-    : s === "hosting" ? "Opening a game…"
+    : s === "hosting" && pvp.hostKind === "private" ? `Private game, join code ${pvp.joinCode || "…"}. Waiting for your friend to join…`
+    : s === "hosting" && pvp.slot < 0 ? "Opening a public game…"
+    : s === "hosting" ? `Your game is listed as “${pvp.name}”${pvp.joinCode ? `, join code ${pvp.joinCode}` : ""}. Waiting for someone to join…`
     : s === "joining" ? `Joining ${pvp.code}…`
     : s === "connected" ? `Connected${pvp.isHost ? "" : ` to ${pvp.code}`}. Now both press Ready.`
     : s === "reconnecting" ? "Connection trouble…"
-    : "Quick match finds you an opponent, or pick an open game below.";
+    : "Join an open game, try quick match, or type a friend's code.";
   status.classList.toggle("error", !!pvp.error);
+  status.classList.toggle("live", s !== "off" && !pvp.error); // waiting / connected: the message is the main thing
   $("lobbyMenu").hidden = s !== "off";
   $("lobbyLeave").hidden = s === "off";
   $("lobbyLeave").textContent = s === "searching" || s === "hosting" || s === "joining" ? "Cancel" : "Disconnect";
@@ -105,13 +117,15 @@ function render() {
   const key = rooms.length ? JSON.stringify(rooms) : `empty:${scanning}`;
   if (key === shownList) return;
   shownList = key;
+  const open = rooms.filter((r) => r.open).length;
+  $("lobbyRoomCount").textContent = rooms.length ? `· ${open} open${rooms.length > open ? `, ${rooms.length - open} playing` : ""}` : "";
   // room names come from other players: set as text, never as HTML
   const list = $("lobbyRoomList");
   list.replaceChildren();
   if (!rooms.length) {
     const li = document.createElement("li");
     li.className = "empty";
-    li.textContent = scanning ? "Looking for open games…" : "No open games right now. Host one, or use quick match.";
+    li.textContent = scanning ? "Looking for open games…" : "No open games right now. Host one, or join with a code.";
     list.append(li);
   }
   for (const r of rooms) {
@@ -119,22 +133,21 @@ function render() {
     const name = document.createElement("span");
     name.className = "roomName";
     name.textContent = r.name;
-    const mode = document.createElement("span");
-    mode.className = "roomMode";
-    mode.textContent = describe(r);
-    li.append(name, mode);
+    const action = document.createElement("span");
+    action.className = "roomAction";
     if (r.open) {
       const join = document.createElement("button");
       join.className = "small";
       join.textContent = "Join";
       join.addEventListener("click", () => pvp.joinRoom(r));
-      li.append(join);
+      action.append(join);
     } else {
       const busy = document.createElement("span");
       busy.className = "roomBusy";
       busy.textContent = "playing";
-      li.append(busy);
+      action.append(busy);
     }
+    li.append(name, tags(r), action);
     list.append(li);
   }
 }
@@ -154,9 +167,7 @@ export function initLobby(game: () => Phaser.Game | null) {
 
   const code = $<HTMLInputElement>("lobbyCode");
   $("lobbyQuick").addEventListener("click", () => void pvp.quickMatch());
-  $("lobbyHostPublic").addEventListener("click", () => void pvp.hostPublic().catch(() => {}));
   $("lobbyRefresh").addEventListener("click", () => void refresh());
-  $("lobbyHost").addEventListener("click", () => void pvp.host().catch(() => {}));
   const join = () => {
     if (code.value.trim().length === 4) pvp.join(code.value);
     else code.focus();

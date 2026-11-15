@@ -10,21 +10,18 @@ import { cameraNeeded, difficultyRow, guestLocked, subjectChips } from "../syste
 
 const MODES = [
   { id: "ranked", label: "Ranked", sub: "coming soon" },
-  { id: "casual", label: "Casual", sub: "match with anyone" },
-  { id: "friend", label: "Friend", sub: "play by room code" },
+  { id: "casual", label: "Casual", sub: "open games or a code" },
 ] as const;
-
-type MatchMode = "casual" | "friend";
-/** Which kind of match the bottom buttons find; kept while the page is open. */
-let matchMode: MatchMode = "casual";
 
 const DECK_SLOTS = 6;
 
-/** Multiplayer setup: subjects, match type (casual matchmaking or a friend's room code), the spell deck, and getting ready. */
+/** Multiplayer setup: subjects, match type (casual: open games or a join code), the spell deck, and getting ready. */
 export class Duel extends Phaser.Scene {
   private menu!: Menu;
   private blurb!: Phaser.GameObjects.Text;
   private status!: Phaser.GameObjects.Text;
+  /** Host a game was pressed: the bottom row shows Public / Private instead. */
+  private choosingHost = false;
 
   constructor() {
     super("Duel");
@@ -45,7 +42,7 @@ export class Duel extends Phaser.Scene {
     heading(this, lx, 392, "Mode");
     MODES.forEach((m, i) => {
       menu.add({
-        x: lx + (i - 1) * 218,
+        x: lx + (i - 0.5) * 218,
         y: 452,
         w: 200,
         h: 86,
@@ -53,12 +50,9 @@ export class Duel extends Phaser.Scene {
         sub: m.sub,
         fontSize: 28,
         angle: i === 1 ? 0.8 : -1,
-        selected: () => m.id === matchMode,
-        // ranked isn't built yet; the match type is fixed once you're searching or connected
-        enabled: () => m.id !== "ranked" && (pvp.status === "off" || m.id === matchMode),
-        onClick: () => {
-          if (m.id !== "ranked" && pvp.status === "off") matchMode = m.id;
-        },
+        selected: () => m.id === "casual",
+        enabled: () => m.id === "casual", // ranked isn't built yet
+        onClick: () => {},
       });
     });
 
@@ -78,25 +72,26 @@ export class Duel extends Phaser.Scene {
       .text(rx, 468, "Spells are coming.\nThe ones you bring to a duel will go here.", { fontFamily: FONT, fontSize: "18px", color: MUTED_CSS, align: "center" })
       .setOrigin(0.5, 0);
 
-    // bottom: the friend match itself
+    // bottom: finding an opponent
     this.status = this.add
       .text(W / 2, 566, "", { fontFamily: FONT, fontSize: "22px", fontStyle: "bold", color: INK_CSS, align: "center", wordWrap: { width: 1000 } })
       .setOrigin(0.5);
     const y = 646;
-    const idle = (mode: MatchMode) => () => pvp.status === "off" && matchMode === mode;
-    menu.add({ x: W / 2 - 150, y, w: 270, h: 66, label: "Quick match", fontSize: 30, primary: true, angle: -0.8, visible: idle("casual"), onClick: () => void pvp.quickMatch() });
-    menu.add({ x: W / 2 + 150, y, w: 270, h: 66, label: "Browse games", fontSize: 26, angle: 0.8, visible: idle("casual"), onClick: openLobby });
-    menu.add({ x: W / 2, y, w: 340, h: 66, label: "Host or join a game", fontSize: 28, primary: true, angle: -0.8, visible: idle("friend"), onClick: openLobby });
-    menu.add({
-      x: W / 2 - 130,
-      y,
-      w: 240,
-      h: 66,
-      label: () => (pvp.status === "hosting" && pvp.slot < 0 ? "Show the code" : "Open lobby"),
-      fontSize: 26,
-      visible: () => pvp.status === "searching" || pvp.status === "hosting" || pvp.status === "joining",
-      onClick: openLobby,
-    });
+    this.choosingHost = false;
+    const idle = () => pvp.status === "off" && !this.choosingHost;
+    const choosing = () => pvp.status === "off" && this.choosingHost;
+    const host = (how: "public" | "private") => () => {
+      this.choosingHost = false;
+      void (how === "public" ? pvp.hostPublic() : pvp.hostPrivate()).catch(() => {});
+    };
+    const pending = () => pvp.status === "searching" || pvp.status === "hosting" || pvp.status === "joining";
+    // browsing (open games, quick match, a join code) is the panel; hosting is its own button
+    menu.add({ x: W / 2 - 150, y, w: 270, h: 66, label: "Browse games", fontSize: 26, angle: -0.8, visible: idle, onClick: () => openLobby() });
+    menu.add({ x: W / 2 + 150, y, w: 270, h: 66, label: "Host a game", fontSize: 30, primary: true, angle: 0.8, visible: idle, onClick: () => (this.choosingHost = true) });
+    // after Host a game: listed for anyone, or code only
+    menu.add({ x: W / 2 - 390, y, w: 130, h: 66, label: "‹ Back", fontSize: 22, angle: -1.2, visible: choosing, onClick: () => (this.choosingHost = false) });
+    menu.add({ x: W / 2 - 120, y, w: 280, h: 76, label: "Public game", sub: "anyone can find it", fontSize: 28, primary: true, angle: -0.8, visible: choosing, onClick: host("public") });
+    menu.add({ x: W / 2 + 190, y, w: 280, h: 76, label: "Private game", sub: "join code only", fontSize: 28, angle: 0.8, visible: choosing, onClick: host("private") });
     menu.add({
       x: W / 2 - 130,
       y,
@@ -110,16 +105,9 @@ export class Duel extends Phaser.Scene {
       enabled: () => pvp.status === "connected" && !cameraNeeded(),
       onClick: () => this.toggleReady(),
     });
-    menu.add({
-      x: W / 2 + 130,
-      y,
-      w: 220,
-      h: 66,
-      label: () => (pvp.active ? "Disconnect" : "Cancel"),
-      fontSize: 24,
-      visible: () => pvp.status !== "off",
-      onClick: () => pvp.leave(),
-    });
+    menu.add({ x: W / 2 + 130, y, w: 220, h: 66, label: "Disconnect", fontSize: 24, visible: () => pvp.active, onClick: () => pvp.leave() });
+    // while hosting or joining there's nothing to do but wait, so Cancel sits alone
+    menu.add({ x: W / 2, y, w: 240, h: 66, label: "Cancel", fontSize: 26, visible: pending, onClick: () => pvp.leave() });
     this.input.keyboard?.on("keydown-SPACE", () => this.toggleReady());
     this.input.keyboard?.on("keydown-ENTER", () => this.toggleReady());
 
@@ -154,15 +142,17 @@ export class Duel extends Phaser.Scene {
     if (pvp.error) return pvp.error;
     switch (pvp.status) {
       case "off":
-        return matchMode === "casual"
-          ? "Casual: quick match pairs you with whoever's waiting, or browse the open games."
-          : "Friend match: one of you hosts and reads out a four-letter code, the other joins with it.";
+        return this.choosingHost
+          ? "Public: anyone can find it in Browse games. Private: only people with the code can join."
+          : "Browse the open games (or join a friend's code), or host a game for someone to join.";
       case "searching": return "Looking for an opponent…";
       case "hosting":
-        if (pvp.slot < 0) return `Your code is ${pvp.code}. Waiting for your friend to join…`;
-        return pvp.quick ? "No one was waiting, so you're hosting. Waiting for an opponent…" : `Your game is listed as “${pvp.name}”. Waiting for someone to join…`;
+        if (pvp.hostKind === "private") return pvp.joinCode ? `Private game. Your join code is ${pvp.joinCode}: share it with your friend. Waiting for them to join…` : "Opening a private game…";
+        if (pvp.slot < 0) return "Opening a public game…";
+        if (!pvp.joinCode) return `Your game is listed as “${pvp.name}”. Waiting for someone to join…`;
+        return `Your game is listed as “${pvp.name}”, join code ${pvp.joinCode}. Waiting for someone to join…`;
       case "joining": return `Joining ${pvp.code}…`;
-      case "reconnecting": return "Connection trouble: waiting for your friend…";
+      case "reconnecting": return "Connection trouble: waiting for your opponent…";
     }
     if (cameraNeeded()) return "ASL needs the camera, and this is the mouse-only test mode.";
     const who = pvp.isHost ? "You're the host: you pick the subjects and difficulty." : "The host picks the subjects and difficulty.";

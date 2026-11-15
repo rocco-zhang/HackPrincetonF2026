@@ -54,7 +54,7 @@ These are experimental parameters, not measured improvements. The lab displays d
 
 - **Title:** two buttons, **Classic** (singleplayer) and **Duel** (multiplayer), and three icons in the top right: friends, achievements, settings. Every button works with a pinch or a click.
 - **Classic:** pick a difficulty and one or more subjects (Shapes, ASL, Math, Korean, Japanese, Chinese), read the three-step "how it works", and press **Start**. With several subjects picked, each wave switches to the next one, and each subject keeps its own lesson order.
-- **Duel:** the same subject and difficulty pickers, a mode row (**Casual** matches you with anyone, **Friend** uses a room code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
+- **Duel:** the same subject and difficulty pickers, a mode row (**Casual**: open games or a join code; Ranked isn't built yet), and an empty spell deck (no spells exist yet). See [Versus mode](#versus-mode-two-computers).
 - **Settings:** separate on/off switches and volume sliders for sound effects and music, mirroring, camera, drawing-area calibration, the ASL trainer, and the debug overlay.
 - **Achievements** shows your best Classic scores (there are no badges yet). **Friends** has no friends list yet and points to Duel.
 
@@ -122,11 +122,12 @@ Pick any of the three as a subject. Everything is drawn with the same five marks
 
 ### Versus mode (two computers)
 
-Both players open the game and choose **Duel** on the title screen. Under **Mode**, pick **Casual** (press **Quick match**, or **Browse games** for the lobby) or **Friend** (press **Host or join a game**). The lobby has all three ways to find an opponent, and your name:
+Both players open the game and choose **Duel** on the title screen (Mode stays on **Casual**; Ranked isn't built yet).
 
-- **Quick match** joins an open public game, preferring one with your subjects and difficulty. If nobody is waiting, it hosts one and keeps looking, so two people who press it at the same time still find each other.
-- **Open games** lists every public game with its host, subjects and difficulty. Click **Join** on one, or click **Host a public game** to list your own.
-- **Host a private game** gives a four-letter code to read out; the other player types it and clicks **Join**.
+- **Host a game**, then choose:
+  - **Public game**: listed in Browse games under your name, subjects and difficulty, and also given a four-letter **join code** (shown on the Duel screen) for friends.
+  - **Private game**: not listed anywhere; only someone with its join code can join.
+- **Browse games** opens a panel with your name, the list of **open games** (click **Join** on one), **Quick match** (joins the open game most like yours; it never hosts), and **Have a code?**, where you type a friend's join code and press **Join**.
 
 Once connected, both press **Ready** (or Space). The round begins when both are ready.
 
@@ -136,7 +137,7 @@ Once connected, both press **Ready** (or Space). The round begins when both are 
 - Pressing Esc mid-round gives up the round. If the connection drops, the other player has 5 seconds to come back before it counts as a forfeit.
 - After a round, hold to return to the Duel screen and ready up again for a rematch.
 
-The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results. Without a server, the lobby works by giving public games a fixed set of 12 broker ids: hosting claims a free one, and the lobby lists games by briefly connecting to each id and asking who's there. So at most 12 public games run at once; private games aren't limited.
+The two browsers talk directly to each other (WebRTC) and find each other through PeerJS's free public broker, so both need internet access, and some networks (often venue or campus Wi-Fi) block this kind of connection. A phone hotspot is the usual workaround. There is no cheat protection: each game reports its own results. Without a server, the lobby works by giving public games a fixed set of 12 broker ids: hosting claims a free one (plus a second id for its join code), and the lobby lists games by briefly connecting to each id and asking who's there. So at most 12 games can be hosted at once.
 
 ### Hotkeys
 

@@ -3,11 +3,13 @@
 // public broker. There is no game server and no cheat protection.
 //
 // Finding each other, with no server of our own:
-// - Private games use a four-letter room code that one player reads out to the other.
-// - Public games claim one of a fixed set of well-known room ids (the broker refuses an id that's
+// - Hosting claims one of a fixed set of well-known room ids (the broker refuses an id that's
 //   already taken, so each slot has one host). The lobby lists open games by briefly connecting to
 //   every slot and asking who's there; hosts answer those probes with a RoomInfo and hang up.
-// - Quick match joins an open public game, or hosts one and keeps looking while it waits.
+// - Each public game also registers a second id, PREFIX + a four-letter join code, so a friend can
+//   type the code instead of finding the game in the list. Both ids lead to the same host.
+// - A private game registers only the join-code id, so it never shows up in the list.
+// - Quick match joins the best open public game. It never hosts: hosting is its own button.
 import Peer, { type DataConnection } from "peerjs";
 import { DIFFICULTY, type Difficulty } from "../config";
 import { cleanSubjects, type Subject } from "../game/subjects";
@@ -42,18 +44,20 @@ const PREFIX = "spellcam-pvp-";
 const ROOM_PREFIX = "spellcam-room-v1-";
 export const ROOM_SLOTS = 12;
 const PROBE_MS = 3500; // a slot that hasn't answered by then is empty
-const REMATCH_SCAN_MS = 6000; // quick match: how often a waiting host looks for someone else waiting
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they get misread
 
 type Status = "off" | "searching" | "hosting" | "joining" | "connected" | "reconnecting";
 
 let peer: Peer | null = null;
+/** Host: the second broker id, for the join code. */
+let alias: Peer | null = null;
+/** Bumped by leave(), so a claim still retrying from an earlier game gives up instead of registering. */
+let session = 0;
 let conn: DataConnection | null = null;
 let lastHeard = 0;
 let timer = 0;
 let everConnected = false;
 let lastRetry = 0;
-let quickTimer = 0;
 const listeners = new Set<(e: PvpEvent) => void>();
 
 export const pvp = {
@@ -63,8 +67,12 @@ export const pvp = {
   /** The broker id we dial as a guest. */
   target: "",
   isHost: false,
-  /** Hosting a public game that shows up in the lobby (slot ≥ 0), or a private one (-1). */
+  /** The lobby slot of the public game we're hosting (-1 when not hosting, or hosting privately). */
   slot: -1,
+  /** Which kind of game we're hosting, set as soon as hosting starts (before the ids are registered). */
+  hostKind: null as "public" | "private" | null,
+  /** The four-letter code friends can type to join the game we're hosting ("" if none). */
+  joinCode: "",
   /** Looking for an opponent with quick match. */
   quick: false,
   /** Shown to other players in the lobby. */
@@ -92,45 +100,56 @@ export const pvp = {
     if (conn?.open) conn.send(msg);
   },
 
-  /** Open a private room and wait for a friend. Resolves with the code to give them. */
-  host(): Promise<string> {
+  /** Host a public game: list it in the lobby, and give it a join code for friends too. */
+  hostPublic(): Promise<void> {
     this.leave();
     this.isHost = true;
-    this.code = Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
-    setStatus("hosting");
-    return claim([PREFIX + this.code]).then(
-      () => this.code,
-      (err: { type?: string }) => {
-        fail(err.type === "unavailable-id" ? "That code is taken, try hosting again." : `Couldn't open a room (${err.type}). Check the internet connection.`);
-        throw err;
-      },
-    );
-  },
-
-  /** Open a public game that other players can see in the lobby and join. */
-  hostPublic(quick = false): Promise<void> {
-    this.leave();
-    this.isHost = true;
-    this.quick = quick;
+    this.hostKind = "public";
     setStatus("hosting");
     // start at a random slot so two people hosting at once rarely race for the same one
     const first = Math.floor(Math.random() * ROOM_SLOTS);
     const ids = Array.from({ length: ROOM_SLOTS }, (_, i) => ROOM_PREFIX + ((first + i) % ROOM_SLOTS));
     return claim(ids).then(
-      (id) => {
+      async (id) => {
         this.slot = Number(id.slice(ROOM_PREFIX.length));
         this.code = this.name;
         emit({ type: "state" });
-        if (quick) quickTimer = window.setInterval(lookForWaitingHost, REMATCH_SCAN_MS);
+        // the join code is a bonus: if every try is taken or fails, the game is still listed
+        const codes = Array.from({ length: 4 }, randomCode);
+        const got = await claim(codes.map((c) => PREFIX + c), true).catch(() => null);
+        if (got && this.status === "hosting") {
+          this.joinCode = got.slice(PREFIX.length);
+          emit({ type: "state" });
+        }
       },
       (err: { type?: string }) => {
-        fail(err.type === "unavailable-id" ? "Every public game slot is in use. Try again in a minute, or host a private game." : `Couldn't open a game (${err.type}). Check the internet connection.`);
+        fail(err.type === "unavailable-id" ? "Every game slot is in use. Try again in a minute." : `Couldn't open a game (${err.type}). Check the internet connection.`);
         throw err;
       },
     );
   },
 
-  /** Join a friend's private room by its code. */
+  /** Host a private game: not listed anywhere, joined only by its four-letter code. */
+  hostPrivate(): Promise<void> {
+    this.leave();
+    this.isHost = true;
+    this.hostKind = "private";
+    setStatus("hosting");
+    const codes = Array.from({ length: 4 }, randomCode);
+    return claim(codes.map((c) => PREFIX + c)).then(
+      (id) => {
+        this.joinCode = id.slice(PREFIX.length);
+        this.code = this.joinCode;
+        emit({ type: "state" });
+      },
+      (err: { type?: string }) => {
+        fail(`Couldn't open a game (${err.type}). Check the internet connection.`);
+        throw err;
+      },
+    );
+  },
+
+  /** Join a game by its four-letter code. */
   join(code: string) {
     const c = code.trim().toUpperCase();
     this.dialTo(PREFIX + c, c);
@@ -157,7 +176,7 @@ export const pvp = {
     });
   },
 
-  /** Quick match: join an open public game (one like yours if there is one), or host one and wait. */
+  /** Quick match: join the open public game most like yours. If none is open, say so (hosting is its own button). */
   async quickMatch() {
     this.leave();
     this.quick = true;
@@ -165,12 +184,9 @@ export const pvp = {
     const rooms = await scanRooms();
     if (this.status !== "searching") return; // cancelled meanwhile
     const best = pickRoom(rooms.filter((r) => r.open));
-    if (best) {
-      this.joinRoom(best);
-      this.quick = true;
-    } else {
-      await this.hostPublic(true).catch(() => {});
-    }
+    if (!best) return fail("No one is waiting right now. Press Host a game so someone can join you, or try again in a moment.");
+    this.joinRoom(best);
+    this.quick = true; // joinRoom reset it; keep it so a game that fills up first sends us looking again
   },
 
   /** Ask every public slot who's there. */
@@ -191,14 +207,17 @@ export const pvp = {
   leave() {
     clearInterval(timer);
     timer = 0;
-    clearInterval(quickTimer);
-    quickTimer = 0;
     this.slot = -1;
     this.quick = false;
     conn?.close();
     conn = null;
     peer?.destroy();
     peer = null;
+    alias?.destroy();
+    alias = null;
+    this.joinCode = "";
+    this.hostKind = null;
+    session++;
     everConnected = false;
     this.myReady = this.theirReady = false;
     this.error = "";
@@ -242,8 +261,6 @@ function adopt(c: DataConnection) {
     lastHeard = performance.now();
     pvp.graceLeft = 0;
     pvp.error = "";
-    clearInterval(quickTimer); // matched: stop looking
-    quickTimer = 0;
     setStatus("connected");
     if (pvp.isHost) pvp.sendMode();
     pvp.send({ t: "ready", v: pvp.myReady }); // after a reconnect, say where we stand
@@ -312,11 +329,22 @@ function tick() {
   }
 }
 
-/** Host: register the first of these broker ids that's free, and accept guests and lobby probes on it. */
-function claim(ids: string[]): Promise<string> {
+function randomCode() {
+  return Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
+}
+
+/**
+ * Host: register the first of these broker ids that's free, and accept guests and lobby probes on it.
+ * The main id becomes `peer`; with asAlias it becomes `alias` (the join code), which works the same way.
+ */
+function claim(ids: string[], asAlias = false): Promise<string> {
+  const mine = session;
   return new Promise((resolve, reject) => {
     const tryAt = (i: number) => {
-      const p = (peer = new Peer(ids[i]));
+      if (session !== mine) return reject(new Error("left"));
+      const p = new Peer(ids[i]);
+      if (asAlias) alias = p;
+      else peer = p;
       let opened = false;
       p.on("open", () => {
         opened = true;
@@ -421,21 +449,4 @@ function pickRoom(rooms: RoomInfo[]): RoomInfo | null {
     rooms[0] ??
     null
   );
-}
-
-let scanning = false;
-/**
- * Quick match while hosting: if two people pressed it at the same moment they'd both be waiting
- * in their own games. Whoever holds the higher slot gives theirs up and joins the other.
- */
-async function lookForWaitingHost() {
-  if (scanning || pvp.status !== "hosting" || !pvp.quick) return;
-  scanning = true;
-  const rooms = await scanRooms().finally(() => (scanning = false));
-  if (pvp.status !== "hosting" || !pvp.quick) return;
-  const other = pickRoom(rooms.filter((r) => r.open && r.slot < pvp.slot));
-  if (other) {
-    pvp.joinRoom(other);
-    pvp.quick = true;
-  }
 }

@@ -18,32 +18,32 @@
         <p id="gateMsg"></p>
       </div>
     </div>
-    <div id="lobby" hidden>
-      <h2>Versus</h2>
+    <div id="lobby" hidden role="dialog" aria-modal="true" aria-labelledby="lobbyTitle">
+      <header id="lobbyHead">
+        <h2 id="lobbyTitle">Browse games</h2>
+        <button id="lobbyClose" class="secondary icon" aria-label="Close">✕</button>
+      </header>
       <p id="lobbyStatus"></p>
       <div id="lobbyMenu">
-        <label id="lobbyNameRow">Your name <input id="lobbyName" maxlength="16" autocomplete="off" spellcheck="false" /></label>
-        <div class="lobbyRow">
+        <div id="lobbyBrowse">
+          <label id="lobbyNameRow"><span>Your name</span><input id="lobbyName" maxlength="16" autocomplete="off" spellcheck="false" /></label>
           <button id="lobbyQuick">Quick match</button>
-          <button id="lobbyHostPublic" class="secondary">Host a public game</button>
         </div>
-        <div id="lobbyRooms">
+        <section id="lobbyRooms">
           <div id="lobbyRoomsHead">
-            <span>Open games</span>
+            <h3>Open games <span id="lobbyRoomCount"></span></h3>
             <button id="lobbyRefresh" class="secondary small">Refresh</button>
           </div>
           <ul id="lobbyRoomList"></ul>
-        </div>
-        <div class="lobbyRow" id="lobbyPrivate">
-          <button id="lobbyHost" class="secondary">Host a private game</button>
-          <span>or join a code</span>
-          <input id="lobbyCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Friend's four-letter code" />
-          <button id="lobbyJoin" class="secondary">Join</button>
+        </section>
+        <div id="lobbyCodeRow">
+          <label for="lobbyCode">Have a code?</label>
+          <input id="lobbyCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Friend's four-letter join code" />
+          <button id="lobbyJoin">Join</button>
         </div>
       </div>
       <div id="lobbyFoot">
-        <button id="lobbyLeave" class="secondary">Disconnect</button>
-        <button id="lobbyClose" class="secondary">Close</button>
+        <button id="lobbyLeave" class="secondary">Cancel</button>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

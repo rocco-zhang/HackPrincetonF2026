@@ -202,96 +202,71 @@ body {
   transform: translate(-50%, 0);
 }
 
-/* "play versus a friend" panel: a sheet of paper on top of the game */
+/* Browse games panel: a sheet of paper over the dimmed game */
 #lobby {
+  --ink: #33312e;
+  --muted: #6f6a60;
+  --paper: #fffefa;
+  --line: #8fb3d966;
   position: fixed;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) rotate(-0.6deg);
-  width: min(600px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  padding: 22px 28px 20px;
-  background: #fffefa;
-  border: 2.5px solid #33312e;
+  padding: 22px 30px 24px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
   border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
-  box-shadow: 6px 9px 0 #281e0a33;
-  text-align: center;
+  /* the second shadow dims everything behind the panel */
+  box-shadow: 6px 9px 0 #281e0a33, 0 0 0 100vmax #281e0a4d;
   z-index: 30;
   user-select: text;
 }
 
 #lobby[hidden],
 #lobby [hidden] {
-  display: none;
+  display: none !important;
+}
+
+#lobbyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 #lobby h2 {
-  margin: 0 0 8px;
+  margin: 0;
   font-family: "Marker Felt", "Permanent Marker", "Patrick Hand", "Comic Sans MS", cursive;
   font-weight: 400;
-  font-size: 34px;
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+#lobby h3 {
+  margin: 0;
+  font-size: 22px;
 }
 
 #lobbyStatus {
-  min-height: 2.6em;
-  margin: 0 0 14px;
-  font-size: 19px;
+  margin: 4px 0 14px;
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+#lobbyStatus.live {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: bold;
 }
 
 #lobbyStatus.error {
   color: #d7372f;
-}
-
-.lobbyRow,
-#lobbyFoot {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-#lobbyFoot {
-  margin-top: 16px;
-}
-
-#lobby button,
-#lobbyCode,
-#lobbyName {
-  font: inherit;
-  font-size: 20px;
-  color: #33312e;
-  padding: 8px 18px;
-  border: 2.5px solid #33312e;
-  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
-}
-
-#lobby button {
-  cursor: pointer;
-  background: #ffe95c;
-  box-shadow: 2px 3px 0 #281e0a33;
-}
-
-#lobby button.secondary {
-  background: #fffefa;
-  border-width: 2px;
-  font-size: 17px;
-}
-
-#lobbyCode {
-  width: 5.2em;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  background: #fffefa;
-}
-
-#lobby button:focus-visible,
-#lobbyCode:focus-visible,
-#lobbyName:focus-visible {
-  outline: 3px dashed #d7372f;
-  outline-offset: 4px;
+  font-weight: bold;
 }
 
 #lobbyMenu {
@@ -300,22 +275,50 @@ body {
   gap: 14px;
 }
 
-#lobbyNameRow {
-  font-size: 18px;
+#lobby button,
+#lobby input {
+  font: inherit;
+  font-size: 21px;
+  color: var(--ink);
+  padding: 8px 20px;
+  border: 2.5px solid var(--ink);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
 }
 
-#lobbyName {
-  width: 9em;
-  margin-left: 6px;
-  padding: 6px 12px;
-  font-size: 18px;
-  background: #fffefa;
+#lobby input {
+  background: var(--paper);
+}
+
+#lobby button {
+  cursor: pointer;
+  font-weight: bold;
+  background: #ffe95c;
+  box-shadow: 2px 3px 0 #281e0a33;
+}
+
+#lobby button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+#lobby button.secondary {
+  background: var(--paper);
+  border-width: 2px;
+  font-weight: normal;
+  font-size: 19px;
 }
 
 #lobby button.small {
-  padding: 3px 12px;
-  font-size: 15px;
-  box-shadow: none;
+  padding: 4px 16px;
+  font-size: 18px;
+}
+
+#lobby button.icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 50%;
 }
 
 #lobby button:disabled {
@@ -323,70 +326,165 @@ body {
   opacity: 0.5;
 }
 
-/* open public games: a list on lined paper */
+#lobby button:focus-visible,
+#lobby input:focus-visible {
+  outline: 3px dashed #d7372f;
+  outline-offset: 4px;
+}
+
+/* name on the left, quick match on the right */
+#lobbyBrowse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#lobbyNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+}
+
+#lobbyName {
+  width: 9em;
+  padding: 6px 14px !important;
+}
+
+/* open games: a short list on lined paper */
 #lobbyRooms {
-  text-align: left;
   border-top: 2px dashed #33312e55;
   border-bottom: 2px dashed #33312e55;
-  padding: 10px 2px;
+  padding: 10px 0;
 }
 
 #lobbyRoomsHead {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 4px;
+}
+
+#lobbyRoomCount {
+  color: var(--muted);
+  font-weight: normal;
   font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 6px;
 }
 
 #lobbyRoomList {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 200px;
+  max-height: 232px;
   overflow-y: auto;
 }
 
 #lobbyRoomList li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 4px;
-  border-bottom: 1px solid #8fb3d955;
-  font-size: 18px;
+  gap: 12px;
+  padding: 8px 6px;
+  border-bottom: 2px solid var(--line);
+}
+
+#lobbyRoomList li:last-child {
+  border-bottom: none;
 }
 
 #lobbyRoomList li.empty {
-  color: #8a857a;
-  font-size: 16px;
   justify-content: center;
-  border-bottom: none;
+  padding: 14px 6px;
+  color: var(--muted);
+  font-size: 19px;
 }
 
 #lobbyRoomList .roomName {
   flex: 1;
+  min-width: 0;
   font-weight: bold;
+  font-size: 22px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-#lobbyRoomList .roomMode {
-  color: #8a857a;
+#lobbyRoomList .roomTags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.roomTag {
+  padding: 2px 10px;
+  border: 1.5px solid #33312e66;
+  border-radius: 999px;
   font-size: 16px;
   white-space: nowrap;
+  background: var(--paper);
+}
+
+.roomTag.easy {
+  background: #d9f2d0;
+}
+
+.roomTag.medium {
+  background: #fff3b0;
+}
+
+.roomTag.hard {
+  background: #ffd6d1;
+}
+
+#lobbyRoomList .roomAction {
+  width: 84px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 #lobbyRoomList .roomBusy {
-  color: #8a857a;
-  font-size: 15px;
+  color: var(--muted);
+  font-size: 17px;
   font-style: italic;
-  min-width: 4.4em;
-  text-align: center;
 }
 
-#lobbyPrivate {
-  font-size: 16px;
-  color: #8a857a;
+/* join a friend's game by its code */
+#lobbyCodeRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 21px;
+}
+
+#lobbyCode {
+  width: 5.4em;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+#lobbyFoot {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+#lobbyFoot:has(> [hidden]:only-child) {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  #lobby {
+    padding: 18px 16px;
+  }
+  #lobbyBrowse {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #lobbyRoomList li {
+    flex-wrap: wrap;
+  }
 }
