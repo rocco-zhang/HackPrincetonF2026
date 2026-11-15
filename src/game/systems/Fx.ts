@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { ARENA } from "../../config";
 import { FONT, INK_CSS, TITLE_FONT } from "../palette";
 
 /** Particle bursts, floating text and banners. */
@@ -62,7 +63,7 @@ export class Fx {
   }
 
   banner(text: string, color = INK_CSS, sub?: string, hold = 900) {
-    const { width: W, height: H } = this.scene.scale;
+    const { width: W, height: H } = ARENA; // the game world, not the canvas (which has more pixels on Retina screens)
     const t = this.scene.add
       .text(W / 2, H / 2 - 120, text, { fontFamily: TITLE_FONT, fontSize: "84px", color, stroke: "#f9f5ea", strokeThickness: 14 })
       .setOrigin(0.5)
