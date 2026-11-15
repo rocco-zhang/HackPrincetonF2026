@@ -79,6 +79,8 @@ export class Panel extends Phaser.Scene {
       { name: "ASL letters", note: "", label: "Teach it your own hand", run: () => this.scene.start("AslTrainer") },
       { name: "Debug overlay", note: "D", label: () => onOff(state.debug), run: actions.toggleDebug },
     ];
+    // the pinch-tuning page only exists on the dev server
+    if (import.meta.env.DEV) rows.push({ name: "Input lab", note: "", label: "Tune pinch settings", run: () => void (location.href = "/dev/pinch") });
     rows.forEach((r, i) => {
       const y = 140 + i * 62;
       this.add.text(300, y, r.name, { fontFamily: FONT, fontSize: "26px", fontStyle: "bold", color: INK_CSS }).setOrigin(0, 0.5);

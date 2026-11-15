@@ -108,12 +108,6 @@ function startArena(demo: boolean) {
 }
 
 const gate = document.getElementById("gate")!;
-if (import.meta.env.DEV) {
-  const labButton=document.createElement("button");
-  labButton.textContent="Input lab / pinch settings";labButton.className="secondary";
-  labButton.onclick=()=>{location.href="/dev/pinch";};
-  gate.insertBefore(labButton,document.getElementById("gateMsg"));
-}
 const gateMsg = document.getElementById("gateMsg")!;
 const enableBtn = document.getElementById("enable") as HTMLButtonElement;
 const camPick = document.getElementById("camPick") as HTMLLabelElement;

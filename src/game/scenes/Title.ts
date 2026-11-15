@@ -65,13 +65,6 @@ export class Title extends Phaser.Scene {
     this.note = this.add.text(W / 2, 592, "", { fontFamily: FONT, fontSize: "20px", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 6 }).setOrigin(0.5);
     this.add.text(W / 2, H - 28, "pinch or click a button   ·   C classic   ·   V duel   ·   G demo run", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
 
-    if (import.meta.env.DEV) {
-      menu.add({
-        x: 150, y: 56, w: 260, h: 64, label: "Input lab / settings", fontSize: 20,
-        onClick: () => { location.href = "/dev/pinch"; },
-      });
-    }
-
     this.input.keyboard?.on("keydown-C", go("Classic"));
     this.input.keyboard?.on("keydown-V", go("Duel"));
   }
