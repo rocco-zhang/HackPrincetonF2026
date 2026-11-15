@@ -12,6 +12,10 @@ type Ctx = CanvasRenderingContext2D;
 export const CAST_HEADROOM = 24;
 const CAST_PENCIL_ANGLE = 0.3;
 /** The raised pencil's tip, measured from the centre of the `player_cast` image. */
+/** The casting figure's shoulder, measured from the centre of the `player_cast` image: its pencil arm is drawn from here. */
+export const CAST_SHOULDER = { x: 0, y: CAST_HEADROOM + 61 - (132 + CAST_HEADROOM) / 2 };
+/** The loose `pencil` image: where its tip is in the image, how it is held, and how far from the tip the hand grips it. */
+export const PENCIL = { originX: 0.5, originY: 4 / 48, angle: CAST_PENCIL_ANGLE, grip: 35 };
 export const CAST_TIP = {
   x: 26 + 2 + 36 * Math.sin(CAST_PENCIL_ANGLE),
   y: CAST_HEADROOM + 28 - 1 - 36 * Math.cos(CAST_PENCIL_ANGLE) - (132 + CAST_HEADROOM) / 2,
@@ -58,7 +62,8 @@ export class Boot extends Phaser.Scene {
     }
     this.makeHeart("heart", true);
     this.makeHeart("heart_empty", false);
-    this.makePlayerCasting(); // last, so adding it didn't change the random wobble of the art above
+    this.makePlayerCasting(); // last, so adding these didn't change the random wobble of the art above
+    this.makePencil();
 
     if (this.recolor) return this.swapColors(this.recolor);
 
@@ -297,22 +302,23 @@ export class Boot extends Phaser.Scene {
     this.drawPlayer(this.canvas("player", 120, 132), 0, false);
   }
 
-  /** The same figure mid-spell: pencil arm thrown up, other arm out, mouth open. Taller, for the raised pencil. */
+  /**
+   * The same figure mid-spell: other arm out, mouth open. Its pencil arm and the pencil are left
+   * off: they are drawn live (Player), so the pencil can move along the line it is writing.
+   */
   private makePlayerCasting() {
     this.drawPlayer(this.canvas("player_cast", 120, 132 + CAST_HEADROOM), CAST_HEADROOM, true);
   }
 
-  private drawPlayer(ctx: Ctx, top: number, casting: boolean) {
-    const W = 120;
-    const cx = W / 2;
-    const w = 4.2;
-    ctx.save();
-    ctx.translate(0, top);
-    // pencil in the raised hand
-    const hand: P = casting ? [cx + 26, 28] : [cx + 27, 45];
-    ctx.save();
-    ctx.translate(hand[0] + (casting ? 2 : 3), hand[1] - 1);
-    ctx.rotate(casting ? CAST_PENCIL_ANGLE : 0.55);
+  /** A pencil on its own, point up, with the tip at PENCIL's origin: for the casting figure's hand and for the drawing cursor. */
+  private makePencil() {
+    const ctx = this.canvas("pencil", 16, 48);
+    ctx.translate(8, 40);
+    this.drawPencil(ctx);
+  }
+
+  /** The pencil, drawn pointing up from (0, 4) with its tip at (0, -36). */
+  private drawPencil(ctx: Ctx) {
     ctx.fillStyle = "#f4c531";
     ctx.fillRect(-4, -26, 8, 24);
     ctx.fillStyle = "#f08a9b";
@@ -326,13 +332,29 @@ export class Boot extends Phaser.Scene {
     ctx.fill();
     this.sketch(ctx, [[-4, 4], [-4, -26], [0, -36], [4, -26], [4, 4]], { closed: true, width: 1.8, amp: 0.3, passes: 1 });
     this.dot(ctx, 0, -34.5, 1.6, INK_CSS);
-    ctx.restore();
+  }
+
+  private drawPlayer(ctx: Ctx, top: number, casting: boolean) {
+    const W = 120;
+    const cx = W / 2;
+    const w = 4.2;
+    ctx.save();
+    ctx.translate(0, top);
+    // pencil in the raised hand (the casting figure's is separate, see makePlayerCasting)
+    const hand: P = [cx + 27, 45];
+    if (!casting) {
+      ctx.save();
+      ctx.translate(hand[0] + 3, hand[1] - 1);
+      ctx.rotate(0.55);
+      this.drawPencil(ctx);
+      ctx.restore();
+    }
     // body, legs, arms
     this.sketch(ctx, [[cx, 48], [cx + 1, 88]], { width: w });
     this.sketch(ctx, [[cx + 1, 88], [cx - 15, 121], [cx - 23, 122]], { width: w });
     this.sketch(ctx, [[cx + 1, 88], [cx + 16, 121], [cx + 24, 122]], { width: w });
     this.sketch(ctx, casting ? [[cx, 61], [cx - 27, 60]] : [[cx, 61], [cx - 22, 79]], { width: w });
-    this.sketch(ctx, [[cx, 61], hand], { width: w });
+    if (!casting) this.sketch(ctx, [[cx, 61], hand], { width: w });
     // head, filled with paper so anything behind doesn't show through the face
     const head = this.ring(cx, 29, 18, 18.5, 20);
     ctx.beginPath();

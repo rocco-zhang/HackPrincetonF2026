@@ -7,7 +7,11 @@ import type { Monster } from "../entities/Monster";
 import type { Player } from "../entities/Player";
 import { ACCENT, castColor, INK } from "../palette";
 import { sfx } from "../sfx";
+import { PENCIL } from "../scenes/Boot";
 import type { Fx } from "./Fx";
+
+/** The cursor's pencil: body up and to the right of its point. (The image is drawn point up, so this turns it over.) */
+const CURSOR_PENCIL_ANGLE = 210;
 
 type FadingTrail = { pts: Pt[]; color: number; age: number; at: number };
 /** Kept strokes are fainter than the one being drawn, so the new stroke reads clearly on top. */
@@ -26,7 +30,7 @@ export interface CastHost {
 /** Cursor, ink trail, and turning recognized symbols into spells. */
 export class Casting {
   private gfx: Phaser.GameObjects.Graphics;
-  private cursors = new Map<number, { root: Phaser.GameObjects.Container; ring: Phaser.GameObjects.Arc; dot: Phaser.GameObjects.Image }>();
+  private cursors = new Map<number, { root: Phaser.GameObjects.Container; ring: Phaser.GameObjects.Arc; dot: Phaser.GameObjects.Image; pencil: Phaser.GameObjects.Image; lift: number }>();
   private cursorAt = new Map<number, number>();
   private currents = new Map<number, Pt[]>();
   private fading: FadingTrail[] = [];
@@ -49,8 +53,10 @@ export class Casting {
     if (!cursor) {
       const ring = this.scene.add.circle(0, 0, 16, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9);
       const dot = this.scene.add.image(0, 0, "star").setScale(0.55).setTint(ACCENT).setVisible(false);
-      const root = this.scene.add.container(-100, -100, [ring, dot]).setDepth(960);
-      cursor = { root, ring, dot };
+      // a pencil that comes down onto the page while you are drawing, point on the cursor, leaning up and to the right
+      const pencil = this.scene.add.image(0, 0, "pencil").setOrigin(PENCIL.originX, PENCIL.originY).setAngle(CURSOR_PENCIL_ANGLE).setScale(1.5).setAlpha(0);
+      const root = this.scene.add.container(-100, -100, [ring, dot, pencil]).setDepth(960);
+      cursor = { root, ring, dot, pencil, lift: 1 };
       this.cursors.set(hand, cursor);
     }
     return cursor;
@@ -63,6 +69,9 @@ export class Casting {
     cursor.root.setPosition(p.x, p.y);
     cursor.ring.setRadius(inking ? 11 : 16).setStrokeStyle(3, inking ? ACCENT : INK, inking ? 1 : 0.9);
     cursor.dot.setVisible(inking);
+    // the pencil eases down to the page when the pinch starts, and lifts away when it ends
+    cursor.lift += ((inking ? 0 : 1) - cursor.lift) * 0.35;
+    cursor.pencil.setPosition(14 * cursor.lift, -30 * cursor.lift).setAlpha(1 - cursor.lift);
   }
 
   onStrokeStart(p: Pt, hand = 0) {
