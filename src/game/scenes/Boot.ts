@@ -76,7 +76,10 @@ export class Boot extends Phaser.Scene {
         if (--pending === 0) this.scene.start("Title");
       });
       this.textures.addBase64(key, canvas.toDataURL("image/png"));
+      // The encoded PNG is independent of this temporary backing store.
+      canvas.width = canvas.height = 0;
     }
+    this.drawn = [];
   }
 
   /**
@@ -102,6 +105,8 @@ export class Boot extends Phaser.Scene {
       if (this.textures.exists(temp(key))) this.textures.remove(temp(key));
       this.textures.addBase64(temp(key), canvas.toDataURL("image/png"));
     }
+    for (const { canvas } of this.drawn) canvas.width = canvas.height = 0;
+    this.drawn = [];
   }
 
   /**
