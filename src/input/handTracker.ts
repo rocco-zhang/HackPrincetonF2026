@@ -123,8 +123,20 @@ async function hasFile(url: string) {
   }
 }
 
-export async function initHandTracker() {
-  if (landmarker) return;
+let trackerLoading: Promise<void> | null = null;
+
+export function initHandTracker(): Promise<void> {
+  if (landmarker) return Promise.resolve();
+  if (!trackerLoading) {
+    trackerLoading = loadHandTracker().catch(err => {
+      trackerLoading = null;
+      throw err;
+    });
+  }
+  return trackerLoading;
+}
+
+async function loadHandTracker() {
   const local = (await hasFile(`${LOCAL_WASM}/vision_wasm_internal.js`)) && (await hasFile(LOCAL_MODEL));
   state.modelSource = local ? "local" : "cdn";
   const vision = await FilesetResolver.forVisionTasks(local ? LOCAL_WASM : CDN_WASM);

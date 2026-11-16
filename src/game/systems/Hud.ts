@@ -30,7 +30,7 @@ export class Hud {
   ) {
     const depth = 1000;
     for (let i = 0; i < maxHearts; i++) {
-      this.hearts.push(scene.add.image(36 + i * 44, 36, "heart").setDepth(depth));
+      this.hearts.push(scene.add.image(90 + i * 44, 36, "heart").setDepth(depth));
     }
     this.scoreText = scene.add
       .text(ARENA.width + 8, -16, "0", { fontFamily: FONT, fontSize: "40px", fontStyle: "bold", color: INK_CSS, stroke: "#f9f5ea", strokeThickness: 8 })

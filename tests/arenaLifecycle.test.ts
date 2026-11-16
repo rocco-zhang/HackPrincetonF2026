@@ -175,3 +175,62 @@ describe("completed spell characters", () => {
     expect(clearCompletedInk).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("paused gameplay", () => {
+  it("does not advance gameplay or expire a spell while the menu is open", () => {
+    const arena = new Arena();
+    arena["paused"] = true;
+    const tick = vi.spyOn(arena["incantation"], "tick");
+    arena.update(100000, 1000);
+    expect(tick).not.toHaveBeenCalled();
+    expect(arena["worldTime"]).toBe(0);
+  });
+
+  it("preserves the remaining spell deadline across a long pause", () => {
+    const arena = new Arena();
+    const spell = arena["incantation"];
+    spell.beginFrom("spell_thumbs_up", ["fire", "water"], "shapes", 100, 100);
+    const remaining = spell.remaining(600);
+    spell.defer(60000);
+    expect(spell.remaining(60600)).toBe(remaining);
+    expect(spell.tick(60600)).toBeNull();
+    expect(spell.tick(60600 + remaining)?.reason).toBe("too slow");
+  });
+});
+
+
+describe("pause menu clicks", () => {
+  function setup() {
+    const arena = new Arena();
+    arena["paused"] = true;
+    const resume = vi.fn();
+    const exit = vi.fn();
+    Object.assign(arena, { setPaused: resume, exitRound: exit });
+    return { arena, resume, exit };
+  }
+
+  it("resumes outside the menu", () => {
+    const { arena, resume, exit } = setup();
+    arena["onPauseClick"](100, 600);
+    expect(resume).toHaveBeenCalledWith(false);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("ignores the heading and empty menu space", () => {
+    const { arena, resume, exit } = setup();
+    arena["onPauseClick"](640, 302);
+    arena["onPauseClick"](640, 360);
+    expect(resume).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("handles Continue and Exit separately", () => {
+    const { arena, resume, exit } = setup();
+    arena["onPauseClick"](790, 412);
+    expect(resume).toHaveBeenCalledWith(false);
+    expect(exit).not.toHaveBeenCalled();
+    arena["onPauseClick"](490, 412);
+    expect(exit).toHaveBeenCalledOnce();
+  });
+});

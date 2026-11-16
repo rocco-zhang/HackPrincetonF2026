@@ -16,6 +16,7 @@ import { setMusicFast, sfx } from "../sfx";
 import { Casting, type CastHost } from "../systems/Casting";
 import { Fx } from "../systems/Fx";
 import { Hud } from "../systems/Hud";
+import { Menu } from "../systems/Menu";
 import { hintFor, langCast, langWaveBlurb, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
@@ -71,6 +72,10 @@ export class Arena extends Phaser.Scene implements CastHost {
   private aslBar: Phaser.GameObjects.Graphics | null = null;
   private incantation = new SpellCasting();
   private worldTime = 0;
+  private paused = false;
+  private pausedAt = 0;
+  private pauseMenu!: Menu;
+  private pauseOverlay!: Phaser.GameObjects.Container;
   private spellPanel: Phaser.GameObjects.Container | null = null;
   private spellSequenceText: Phaser.GameObjects.Text | null = null;
   private spellCharacters: Phaser.GameObjects.Container | null = null;
@@ -100,6 +105,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
     this.incantation.reset();
     this.worldTime = 0;
+    this.paused = false;
     this.spells = !!data?.pvp || (state.classicSpells && !data?.demo);
     this.loadout = cleanLoadout(state.loadout);
     this.mana = MANA.start;
@@ -126,6 +132,9 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   create() {
     calmCamera(this.cameras.main);
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
     const cx = ARENA.width / 2, cy = ARENA.height / 2;
     this.add.image(cx, cy, "floor").setDepth(-10);
     this.player = new Player(this, cx, cy);
@@ -165,12 +174,13 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
-      if (!this.lang || this.phase !== "play" || ev.repeat) return;
+      if (this.paused || !this.lang || this.phase !== "play" || ev.repeat) return;
       if (ev.code === "Space") { ev.preventDefault(); this.submitLanguage(); }
       if (ev.key === "Backspace") { ev.preventDefault(); this.clearLanguage(); }
     });
 
     const off = onInput((e) => {
+      if (this.paused) return;
       switch (e.type) {
         case "cursor": return this.casting.onCursor(e.p, e.inking, e.hand);
         case "strokeStart": return this.casting.onStrokeStart(e.p, e.hand);
@@ -205,6 +215,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       }
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.anims.resumeAll();
       this.incantation.reset();
       this.setSpellTime(false);
       off();
@@ -219,15 +230,82 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.langActive = false;
       state.langScript = null;
     });
-    this.input.keyboard?.on("keydown-ESC", () => {
-      const cancelled = this.incantation.cancel(performance.now());
-      if (cancelled) { this.finishIncantation(cancelled); return; }
-      if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true }); // leaving a versus game gives it up
-      this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
+    this.createPauseMenu();
+    this.input.keyboard?.on("keydown-ESC", (ev: KeyboardEvent) => {
+      if (ev.repeat) return;
+      if (this.paused) this.exitRound();
+      else this.setPaused(true);
     });
 
     this.shieldGfx = this.add.graphics().setDepth(399);
     this.startWave(1);
+  }
+
+  private createPauseMenu() {
+    const cx = ARENA.width / 2, cy = ARENA.height / 2;
+    const shade = this.add.rectangle(cx, cy, ARENA.width, ARENA.height, INK, 0.45);
+    const paper = this.add.graphics();
+    paper.fillStyle(0xfffefa).fillRoundedRect(cx - 310, cy - 125, 620, 250, 24);
+    paper.lineStyle(3, INK).strokeRoundedRect(cx - 310, cy - 125, 620, 250, 24);
+    const title = this.add.text(cx, cy - 58, "Paused", {
+      fontFamily: FONT, fontSize: "56px", fontStyle: "bold", color: INK_CSS,
+    }).setOrigin(0.5);
+    this.pauseOverlay = this.add.container(0, 0, [shade, paper, title]).setDepth(2000).setVisible(false);
+    this.pauseMenu = new Menu(this, true);
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.leftButtonDown()) return;
+      const x = pointer.x * ARENA.width / this.scale.width;
+      const y = pointer.y * ARENA.height / this.scale.height;
+      this.onPauseClick(x, y);
+    });
+    this.pauseMenu.add({ x: 32, y: 36, w: 44, h: 44,
+      icon: g => { g.fillStyle(INK).fillTriangle(-7, -11, -7, 11, 11, 0); },
+      visible: () => !this.paused && this.phase !== "over", onClick: () => this.setPaused(true),
+    }).setDepth(2001);
+    this.pauseMenu.add({ x: cx - 150, y: cy + 52, w: 250, h: 62, label: "Exit [Esc]",
+      visible: () => this.paused, onClick: () => this.exitRound(),
+    }).setDepth(2001);
+    this.pauseMenu.add({ x: cx + 150, y: cy + 52, w: 250, h: 62, label: "Continue [Click]",
+      visible: () => this.paused, primary: true, onClick: () => this.setPaused(false),
+    }).setDepth(2001);
+  }
+
+  private onPauseClick(x: number, y: number) {
+    if (!this.paused) {
+      if (this.phase !== "over" && Math.abs(x - 32) <= 28 && Math.abs(y - 36) <= 28) this.setPaused(true);
+      return;
+    }
+    const cx = ARENA.width / 2, cy = ARENA.height / 2;
+    if (Math.abs(y - (cy + 52)) <= 37) {
+      if (Math.abs(x - (cx - 150)) <= 131) { this.exitRound(); return; }
+      if (Math.abs(x - (cx + 150)) <= 131) { this.setPaused(false); return; }
+    }
+    if (Math.abs(x - cx) > 310 || Math.abs(y - cy) > 125) this.setPaused(false);
+  }
+
+  private setPaused(paused: boolean) {
+    if (paused === this.paused) return;
+    if (paused) {
+      this.pausedAt = performance.now();
+      this.casting.cancelStroke(0);
+      this.casting.cancelStroke(1);
+      this.tweens.pauseAll();
+      this.anims.pauseAll();
+    } else {
+      this.incantation.defer(performance.now() - this.pausedAt);
+      this.tweens.resumeAll();
+      this.anims.resumeAll();
+    }
+    this.paused = paused;
+    this.time.paused = paused;
+    this.pauseOverlay.setVisible(paused);
+    this.pauseMenu.update();
+    resetAslHold();
+  }
+
+  private exitRound() {
+    if (this.versus && this.phase !== "over") pvp.send({ t: "dead", score: this.score, forfeit: true });
+    this.scene.start(this.versus ? "Duel" : this.demo ? "Title" : "Classic");
   }
 
   /** A spawner for the current wave's subject. */
@@ -543,6 +621,8 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   update(_t: number, deltaMs: number) {
+    this.pauseMenu?.update();
+    if (this.paused) return;
     const expired=this.incantation.tick(performance.now());
     if(expired)this.finishIncantation(expired);
     const dt = Math.min(0.05, deltaMs / 1000)*(this.incantation.active?INCANTATION.timeScale:1);
@@ -844,7 +924,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private submitLanguage(hand = 0) {
-    if (!this.lang || this.phase !== "play" || !this.languageStrokes.length || !isScript(this.subject)) return;
+    if (this.paused || !this.lang || this.phase !== "play" || !this.languageStrokes.length || !isScript(this.subject)) return;
     const cards = this.incantation.active ? this.incantation.expectedTokens : this.monsters.filter(m => !m.dying && m.front).map(m => m.front!);
     const marks: string[] = [];
     for (const points of this.languageStrokes) {
@@ -892,7 +972,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private onAnswerKey(ev: KeyboardEvent) {
-    if (!this.math || this.incantation.active || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (this.paused || !this.math || this.incantation.active || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key >= "0" && ev.key <= "9") {
       ev.preventDefault();
       if (this.buffer.length >= 4) return;

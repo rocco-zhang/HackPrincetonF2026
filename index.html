@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SPELLCAM</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/node_modules/@fontsource/patrick-hand/latin-400.css" />
+    <link rel="stylesheet" href="/node_modules/@fontsource/permanent-marker/latin-400.css" />
+    <link rel="icon" href="data:," />
   </head>
   <body>
     <div id="stage">
@@ -13,9 +17,9 @@
       <div id="gate">
         <h1>SPELLCAM</h1>
         <p class="tag">You're a stick figure. The paper monsters want you. Draw them away.</p>
-        <button id="enable">Enable camera &amp; sound</button>
+        <button id="enable" disabled>Enable camera &amp; sound</button>
         <label id="camPick" hidden>Camera <select id="camSelect"></select></label>
-        <p id="gateMsg"></p>
+        <p id="gateMsg" role="status">Loading game…</p>
       </div>
     </div>
     <div id="lobby" hidden role="dialog" aria-modal="true" aria-labelledby="lobbyTitle">
@@ -46,6 +50,6 @@
         <button id="lobbyLeave" class="secondary">Cancel</button>
       </div>
     </div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/startup.ts"></script>
   </body>
 </html>

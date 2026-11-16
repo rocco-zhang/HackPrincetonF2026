@@ -1,8 +1,4 @@
 import Phaser from "phaser";
-// Bundled handwriting fonts, used when the macOS ones (Chalkboard SE, Marker Felt) are missing.
-import "@fontsource/patrick-hand/latin-400.css";
-import "@fontsource/permanent-marker/latin-400.css";
-import "./style.css";
 import { actions } from "./actions";
 import { ARENA } from "./config";
 import { renderDensity } from "./density";
@@ -26,6 +22,11 @@ import { initLobby, lobbyOpen } from "./net/lobby";
 import { pvp } from "./net/pvp";
 import { state } from "./state";
 import { experiment } from "./input/pinchExperiment";
+
+// Canvas text needs its fonts loaded before Phaser draws it.
+const fontsReady = Promise.allSettled(
+  ['32px "Patrick Hand"', '32px "Permanent Marker"'].map(f => document.fonts.load(f)),
+);
 
 if (import.meta.env.DEV) {
   Object.assign(experiment, __PINCH_LOCAL_CONFIG__);
@@ -179,15 +180,22 @@ camSelect.addEventListener("change", async () => {
   }
 });
 
-// Canvas text is drawn once, so the fallback fonts have to be loaded before the game starts.
-const fontsReady = Promise.race([
-  Promise.allSettled(['32px "Patrick Hand"', '32px "Permanent Marker"'].map((f) => document.fonts.load(f))),
-  new Promise((r) => setTimeout(r, 1500)),
-]);
 
-function closeGate() {
-  gate.classList.add("hidden");
-  void fontsReady.then(startGame);
+async function closeGate() {
+  gateMsg.textContent = "Loading menu…";
+  await fontsReady;
+  startGame();
+  const runningGame = game!;
+  // Scene registration happens asynchronously during Phaser boot. Wait until
+  // Title is active and its first frame has actually been drawn.
+  const revealMenu = () => {
+    const title = runningGame.scene.getScene("Title");
+    if (!title?.sys.isActive()) return;
+    runningGame.events.off(Phaser.Core.Events.POST_RENDER, revealMenu);
+    gate.classList.add("hidden");
+    gateMsg.textContent = "";
+  };
+  runningGame.events.on(Phaser.Core.Events.POST_RENDER, revealMenu);
 }
 
 /** Camera + hand tracker. Throws with a friendly message on failure. */
@@ -215,9 +223,8 @@ enableBtn.addEventListener("click", async () => {
   gateMsg.textContent = "Starting camera…";
   try {
     await enableHands();
-    gateMsg.textContent = "";
     state.mode = "hand";
-    closeGate();
+    await closeGate();
   } catch (err) {
     gateMsg.textContent = (err as Error).message;
     enableBtn.textContent = "Try camera again";
@@ -225,10 +232,19 @@ enableBtn.addEventListener("click", async () => {
   }
 });
 
+// Prepare the menu and tracking model while the camera-enable screen is visible.
+// Camera permission is requested only by the button above.
+enableBtn.disabled = false;
+gateMsg.textContent = "";
+void fontsReady.then(startGame);
+if (!new URLSearchParams(location.search).has("mouse")) {
+  void initHandTracker().catch(err => console.warn("Hand tracking preload failed; will retry on enable", err));
+}
+
 // Testing without a camera: with ?mouse in the URL the mouse plays the whole game.
 if (new URLSearchParams(location.search).has("mouse")) {
   state.mode = "mouse";
-  closeGate();
+  void closeGate();
   // no button was clicked, so sound has to wait for the first click or key press
   const unlock = () => {
     unlockAudio();

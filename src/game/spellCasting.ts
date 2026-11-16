@@ -70,6 +70,11 @@ export class SpellCasting {
     return a.step===a.steps.length?this.finish(true,now):null;
   }
   cancel(now: number) {return this.active?this.finish(false,now,"cancelled"):null;}
+  /** Preserve real-time deadlines while gameplay is paused. */
+  defer(ms: number) {
+    if (this.active) { this.active.started += ms; this.active.advanced += ms; }
+    if (this.readyAt) this.readyAt += ms;
+  }
   reset() {this.active=null;this.choices=[];this.readyAt=0;}
   private finish(success: boolean, now: number, reason?: SpellResult["reason"]): SpellResult {
     const id=this.active!.id;this.active=null;this.choices=[];this.readyAt=now+INCANTATION.cooldownMs;return {id,success,reason};

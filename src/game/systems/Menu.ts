@@ -66,13 +66,14 @@ export class Menu {
   private handSeen = 0;
   private dot: Phaser.GameObjects.Arc;
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(private scene: Phaser.Scene, ignoreMouse = false) {
     this.buttons = [];
     // the hand's cursor; the mouse already has the system pointer
     this.dot = scene.add.circle(-100, -100, 14, 0xfffefa, 0.6).setStrokeStyle(3, INK, 0.9).setDepth(1000).setVisible(false);
     const off = onInput((e) => {
       if (e.type !== "cursor") return;
       const src: Src = e.src ?? "hand";
+      if (ignoreMouse && src === "mouse") return;
       if (src === "hand") {
         this.handSeen = performance.now();
         this.dot.setVisible(true).setPosition(e.p.x, e.p.y).setRadius(e.inking ? 10 : 14);
