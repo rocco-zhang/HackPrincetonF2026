@@ -17,7 +17,7 @@ export function waveOps(wave: number): Op[] {
 export function mathQueue(wave: number): number {
   if (wave < 5) return 1;
   if (wave < 7) return 2;
-  return 3;
+  return wave < 9 ? 3 : 4;
 }
 
 export function mathWaveBlurb(wave: number): string {

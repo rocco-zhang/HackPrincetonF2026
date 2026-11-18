@@ -10,6 +10,7 @@ import { resetAslHold } from "../../input/handTracker";
 import { pvp } from "../../net/pvp";
 import { state } from "../../state";
 import { Monster } from "../entities/Monster";
+import { devControlsEnabled, typingInInput } from "../devControls";
 import { Player } from "../entities/Player";
 import { ACCENT_CSS, castColor, FONT, INK, INK_CSS, MONSTER_PALETTES, ORANGE_CSS } from "../palette";
 import { setMusicFast, sfx } from "../sfx";
@@ -20,10 +21,14 @@ import { Menu } from "../systems/Menu";
 import { hintFor, langCast, langWaveBlurb, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
-import { BOSS, bossCards, isBossWave, type BossCards } from "../bosses";
+import { BOSS, bossCards, bossSpeedBoost, isBossWave, type BossCards } from "../bosses";
 import { cleanLoadout, damageSpellTarget, spellMovementScale, wavePushDistance, MANA, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
+
+import { healthAdjustedSpeed, makeSpawnAnglePicker } from "../systems/spawnGeometry";
+
+const pickSpawnAngle = makeSpawnAnglePicker();
 
 const SHAPE_GLYPH: Partial<Record<CastName, string>> = { caret: "Λ", circle: "◯", zigzag: "zigzag" };
 
@@ -73,6 +78,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   private incantation = new SpellCasting();
   private worldTime = 0;
   private paused = false;
+  private devMode = false;
+  private devSpeed = 1;
+  private devBanner: Phaser.GameObjects.Text | null = null;
   private pausedAt = 0;
   private pauseMenu!: Menu;
   private pauseOverlay!: Phaser.GameObjects.Container;
@@ -103,6 +111,9 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   init(data: { demo?: boolean; subjects?: Subject[]; pvp?: boolean }) {
+    this.devMode = devControlsEnabled();
+    this.devSpeed = 1;
+    this.devBanner = null;
     this.incantation.reset();
     this.worldTime = 0;
     this.paused = false;
@@ -174,6 +185,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     }
 
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
+      if (this.devMode) return;
       if (this.paused || !this.lang || this.phase !== "play" || ev.repeat) return;
       if (ev.code === "Space") { ev.preventDefault(); this.submitLanguage(); }
       if (ev.key === "Backspace") { ev.preventDefault(); this.clearLanguage(); }
@@ -181,6 +193,8 @@ export class Arena extends Phaser.Scene implements CastHost {
 
     const off = onInput((e) => {
       if (this.paused) return;
+      // Debug clicks must not also produce recognized mouse strokes or gesture casts.
+      if (this.devMode) return;
       switch (e.type) {
         case "cursor": return this.casting.onCursor(e.p, e.inking, e.hand);
         case "strokeStart": return this.casting.onStrokeStart(e.p, e.hand);
@@ -217,6 +231,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.anims.resumeAll();
       this.incantation.reset();
+      this.devSpeed = 1;
       this.setSpellTime(false);
       off();
       setMusicFast(false); // leaving the round (game over, menu): normal speed again
@@ -231,6 +246,15 @@ export class Arena extends Phaser.Scene implements CastHost {
       state.langScript = null;
     });
     this.createPauseMenu();
+    if (this.devMode) {
+      this.devBanner = this.add.text(ARENA.width / 2, ARENA.height - 42,
+        "", {
+          fontFamily: FONT, fontSize: "17px", color: INK_CSS,
+          backgroundColor: "#fff6c2", padding: { x: 10, y: 5 },
+        }).setOrigin(0.5).setDepth(1500);
+      this.updateDevBanner();
+      this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => this.onDevKey(ev));
+    }
     this.input.keyboard?.on("keydown-ESC", (ev: KeyboardEvent) => {
       if (ev.repeat) return;
       if (this.paused) this.exitRound();
@@ -256,7 +280,9 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (!pointer.leftButtonDown()) return;
       const x = pointer.x * ARENA.width / this.scale.width;
       const y = pointer.y * ARENA.height / this.scale.height;
+      const wasPaused = this.paused;
       this.onPauseClick(x, y);
+      if (!wasPaused && !this.paused) this.devCastNearest();
     });
     this.pauseMenu.add({ x: 32, y: 36, w: 44, h: 44,
       icon: g => { g.fillStyle(INK).fillTriangle(-7, -11, -7, 11, 11, 0); },
@@ -268,6 +294,42 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.pauseMenu.add({ x: cx + 150, y: cy + 52, w: 250, h: 62, label: "Continue [Click]",
       visible: () => this.paused, primary: true, onClick: () => this.setPaused(false),
     }).setDepth(2001);
+  }
+
+  private devCanAct() {
+    return this.devMode && !this.paused && this.phase === "play" && !this.incantation.active && !typingInInput();
+  }
+
+  private devCastNearest() {
+    if (!this.devCanAct()) return;
+    const target = this.monsters.filter(m => m.active && !m.dying && m.front)
+      .reduce<Monster | undefined>((nearest, m) =>
+        !nearest || m.distanceTo(this.player.x, this.player.y) < nearest.distanceTo(this.player.x, this.player.y) ? m : nearest, undefined);
+    // Use the normal cast path for multi-hits, score, mana, and animations.
+    if (target?.front) this.casting.cast(target.front);
+  }
+
+  private onDevKey(ev: KeyboardEvent) {
+    if (!this.devMode || this.paused || this.phase === "over" || typingInInput() || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.code === "KeyT") {
+      ev.preventDefault();
+      this.devSpeed = this.devSpeed === 1 ? 5 : 1;
+      this.setSpellTime(!!this.incantation.active);
+      this.updateDevBanner();
+      return;
+    }
+    if (!this.devCanAct() || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.code === "Space") {
+      ev.preventDefault();
+      this.devCastNearest();
+    } else if (ev.key === "1" || ev.key === "2") {
+      ev.preventDefault();
+      this.castSpell(this.loadout[Number(ev.key) - 1]);
+    }
+  }
+
+  private updateDevBanner() {
+    this.devBanner?.setText(`DEV ${this.devSpeed}x · T: 1x / 5x · Click / Space: nearest card · 1 / 2: spells · Esc: pause`);
   }
 
   private onPauseClick(x: number, y: number) {
@@ -390,7 +452,7 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private setSpellTime(active: boolean) {
     state.spellCastingActive=active;
-    const scale = active ? INCANTATION.timeScale : 1;
+    const scale = this.devSpeed * (active ? INCANTATION.timeScale : 1);
     this.time.timeScale=scale;
     this.tweens.timeScale=scale;
     if (!active) {this.spellPanel?.setVisible(false);this.spellVisualKey="";}
@@ -478,7 +540,7 @@ export class Arena extends Phaser.Scene implements CastHost {
       }
     }
     const q = waveSpec(n, this.difficulty).maxQueue;
-    if (q > waveSpec(n - 1, this.difficulty).maxQueue) parts.push(q === 2 ? "monsters now carry more than one" : "monsters now carry up to three");
+    if (q > waveSpec(n - 1, this.difficulty).maxQueue) parts.push(q === 2 ? "monsters now carry more than one" : `monsters now carry up to ${q}`);
     if (!parts.length) return undefined;
     const s = parts.join(". ");
     return s[0].toUpperCase() + s.slice(1);
@@ -599,9 +661,9 @@ export class Arena extends Phaser.Scene implements CastHost {
 
   private spawn(o: SpawnOrder) {
     const p = edgePoint(o.angle);
-    const monster = new Monster(this, p.x, p.y, o.symbols, o.speed, o.palette, o.labels, o.boss);
+    const monster = new Monster(this, p.x, p.y, o.symbols, healthAdjustedSpeed(o.speed, o.symbols.length), o.palette, o.labels, o.boss);
     this.monsters.push(monster);
-    if (this.asl && this.phase === "play" && !this.incantation.active && state.aslLetter && state.aslProgress === 1) {
+    if (!this.devMode && this.asl && this.phase === "play" && !this.incantation.active && state.aslLetter && state.aslProgress === 1) {
       const name: CastName = `asl_${state.aslLetter}`;
       if (monster.front === name) this.casting.cast(name, 0, monster);
     }
@@ -610,10 +672,10 @@ export class Arena extends Phaser.Scene implements CastHost {
   /** One big, slow monster with a long row of cards. The wave isn't over until it is gone. */
   private spawnBoss(cards: BossCards) {
     this.spawn({
-      angle: this.roll() * Math.PI * 2,
-      symbols: cards.symbols,
-      labels: cards.labels,
-      speed: this.spawner.speed * BOSS.speed,
+      angle: pickSpawnAngle(this.roll),
+      symbols: cards.symbols.slice(0, BOSS.maxCards),
+      labels: cards.labels?.slice(0, BOSS.maxCards),
+      speed: this.spawner.speed * bossSpeedBoost(this.wave),
       palette: Math.floor(this.roll() * 3),
       boss: true,
     });
@@ -625,7 +687,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.paused) return;
     const expired=this.incantation.tick(performance.now());
     if(expired)this.finishIncantation(expired);
-    const dt = Math.min(0.05, deltaMs / 1000)*(this.incantation.active?INCANTATION.timeScale:1);
+    const dt = Math.min(0.05, deltaMs / 1000)*this.devSpeed*(this.incantation.active?INCANTATION.timeScale:1);
     this.worldTime+=dt*1000;
     this.paintIncantation();
     // strokes are only kept while a card or number is half drawn
@@ -857,7 +919,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     return Math.min(GAME.streakMaxMult, 1 + Math.floor(this.streak / GAME.streakStep) * 0.5);
   }
 
-  onCast(name: CastName, hits: Monster[]) {
+  onCast(_name: CastName, hits: Monster[]) {
     if (hits.length === 0) {
       this.fx.floatText(this.player.x, this.player.y - 70, "no monster needs that", "#8a857a", 16);
       return;
@@ -867,10 +929,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (this.versus) this.chargeAttack(hits.filter((m) => m.queue.length === 0).length, hits.length);
     if (hits.length >= 2) {
       const label = MULTI_NAMES[Math.min(hits.length, MULTI_NAMES.length - 1)];
-      const c = castColor(name);
-      this.cameras.main.flash(160, (c >> 16) & 255, (c >> 8) & 255, c & 255);
-      this.cameras.main.shake(220, 0.008);
-      this.fx.banner(label, ACCENT_CSS, `×${Math.min(3, hits.length)} score`, 350);
+      this.fx.banner(label, ACCENT_CSS, `×${Math.min(3, hits.length)} score`, 350, 72);
       sfx.multi(hits.length);
     }
   }
@@ -896,7 +955,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     const rim = Phaser.Display.Color.HexStringToColor(MONSTER_PALETTES[m.palette].rim).color;
     this.fx.burst(m.x, m.y, rim, 36);
     this.fx.burst(m.x, m.y, 0xffffff, 14);
-    this.cameras.main.shake(120, 0.005);
+    this.cameras.main.shake(90, 0.0025);
     sfx.kill();
     this.tweens.add({
       targets: m,
@@ -972,6 +1031,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private onAnswerKey(ev: KeyboardEvent) {
+    if (this.devMode) return;
     if (this.paused || !this.math || this.incantation.active || this.phase !== "play" || ev.repeat || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (ev.key >= "0" && ev.key <= "9") {
       ev.preventDefault();

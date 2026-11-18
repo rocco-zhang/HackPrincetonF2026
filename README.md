@@ -208,7 +208,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 | `C` | next camera (laptop ↔ external webcam); on the title screen use Settings instead |
 | `F` | toggle mirroring |
 | `G` | **demo run**: seeded RNG, slightly slower monsters, and an opening that sets up a multi-hit |
-| `T` | template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
+| `T` | Input lab only: template recorder on/off (`1`–`6` pick the symbol, `E` exports `templates.json`) |
 | Hold thumbs up | Classic with spells enabled / Duel: begin casting, then complete the spell sequence |
 | `N` | mute everything (sound effects and music); press again to bring both back |
 | `Esc` | back one screen |
@@ -217,7 +217,7 @@ The two browsers talk directly to each other (WebRTC) and find each other throug
 
 The recognizer ships with synthetic templates for every symbol in both directions, so it works out of the box. Real strokes from real hands make it better:
 
-1. Press `M` for hand mode, then `T` to start recording.
+1. Open the Input lab at `/dev/pinch`, allow camera access, then press `T` to start recording. Template recording shortcuts are available only in the input lab.
 2. Press `1`–`6` to choose a symbol (dash, pillar, vee, peak, ring, bolt), then draw it 5+ times, in both directions. Strokes are saved to `localStorage` immediately and used right away.
 3. Get 2–3 other people to add a few each.
 4. Press `E` to download `templates.json`, replace `src/input/templates.json` with it, and commit.
@@ -294,3 +294,6 @@ src/
 - **The default cursor follows the thumb tip.** Choose knuckle, index tip, thumb tip, or midpoint in the input lab. Hand loss retains a 300 ms stroke grace, but immediately releases menu presses; missing camera updates also cancel menu holds after 200 ms. Unbuffered strokes trim three points at each end when sufficiently long; buffering uses the inferred boundaries.
 - **Symbols a monster currently needs are matched first, with a lower bar** (score ≥ 0.55 and within 0.08 of the best match overall, against 0.76 otherwise). A slanted line counts as a dash or pillar when only one of the two is needed.
 - **The recognizer is \$1 without rotation invariance.** It searches only ±25° of rotation, so `|` ≠ `—` and `V` ≠ `Λ`. Circles have templates at 8 start angles × 2 directions. Zigzag accepts 3- and 4-segment zigzags (M, W, N-like) in both directions.
+# Developer controls
+
+Open the game with `?dev=1` to play without a camera. During a round, click or press Space to cast the nearest live monster's front card (including normal matching multi-hits). Press T to toggle between 1x and 5x game speed (movement, spawning, timers, and tween animations); the DEV banner shows the current speed. Speed resets on leaving the round. Press 1 or 2 to cast the corresponding equipped spell directly; enable Spells in Classic setup first. Spell shortcuts bypass gesture entry but retain mana costs and target checks. Controls are disabled while paused, outside active play, or typing in an input. A yellow DEV banner identifies this mode. Remove the URL parameter to restore gesture play.

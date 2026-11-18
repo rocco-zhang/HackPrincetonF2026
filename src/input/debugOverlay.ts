@@ -110,7 +110,7 @@ export function initDebugOverlay(getGame: () => Phaser.Game | null) {
         : "last: -",
       `stroke: ${state.lastStroke?.length ?? 0} captured points after trimming (minimum ${experiment.minStrokePointsEnabled?INPUT.minStrokePoints:2}); length minimum ${experiment.minStrokeLengthEnabled?`${INPUT.minStrokeLength}px`:"OFF"}; thumbnail: ${r?.resampled.length ?? 0} resampled points`,
       `templates: ${SYMBOLS.filter((n) => n !== "hline" && n !== "vline").map((n) => `${n} ${recognizer?.count(n) ?? 0}`).join("  ")}  (lines: angle rule)`,
-      `keys: D debug · T record · K calibrate · C camera · F mirror · G demo`,
+      `keys: D debug · K calibrate · C camera · F mirror · G demo`,
     ];
     ctx.font = "12px ui-monospace, Menlo, monospace";
     const tw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;

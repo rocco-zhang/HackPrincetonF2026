@@ -14,6 +14,75 @@ import { Arena } from "../src/game/scenes/Arena";
 import { INCANTATION } from "../src/game/spellCasting";
 import { spellRecipes } from "../src/game/spellCasting";
 import { state } from "../src/state";
+import { devControlsEnabled } from "../src/game/devControls";
+
+describe("developer controls", () => {
+  function setup() {
+    const arena = new Arena();
+    arena["devMode"] = true;
+    arena["phase"] = "play";
+    Object.assign(arena, { player: { x: 640, y: 360 }, casting: { cast: vi.fn() } });
+    const monster = (front: string, distance: number, dying = false) => ({ front, active: true, dying, distanceTo: () => distance });
+    Object.assign(arena, { monsters: [monster("hline", 200), monster("v", 20, true), monster("circle", 60)] });
+    return arena;
+  }
+
+  it("requires explicit URL opt-in", () => {
+    expect(devControlsEnabled("?dev=1")).toBe(true);
+    expect(devControlsEnabled("?dev=0")).toBe(false);
+    expect(devControlsEnabled("?mouse")).toBe(false);
+  });
+  it("casts the nearest live front through the normal multi-hit path", () => {
+    const arena = setup();
+    arena["devCastNearest"]();
+    expect(arena["casting"].cast).toHaveBeenCalledWith("circle");
+  });
+  it.each(["paused", "banner", "over", "disabled"])("blocks developer attacks when %s", condition => {
+    const arena = setup();
+    if (condition === "paused") arena["paused"] = true;
+    else if (condition === "disabled") arena["devMode"] = false;
+    else arena["phase"] = condition as "banner" | "over";
+    arena["devCastNearest"]();
+    expect(arena["casting"].cast).not.toHaveBeenCalled();
+  });
+  it("routes spell slots through normal spell validation and ignores repeats", () => {
+    const arena = setup();
+    const cast = vi.spyOn(arena as never as { castSpell: (id: string) => boolean }, "castSpell").mockReturnValue(false);
+    const event = { key: "2", code: "Digit2", preventDefault: vi.fn() } as unknown as KeyboardEvent;
+    arena["onDevKey"](event);
+    expect(cast).toHaveBeenCalledWith("water");
+    arena["onDevKey"]({ ...event, repeat: true });
+    expect(cast).toHaveBeenCalledTimes(1);
+  });
+  it("toggles 5x timers and animations during wave banners and preserves spell slowdown", () => {
+    const arena = setup();
+    arena["phase"] = "banner";
+    Object.assign(arena, { time: { timeScale: 1 }, tweens: { timeScale: 1 } });
+    const event = { code: "KeyT", key: "t", preventDefault: vi.fn() } as unknown as KeyboardEvent;
+    arena["onDevKey"](event);
+    expect(arena["devSpeed"]).toBe(5);
+    expect(arena.time.timeScale).toBe(5);
+    expect(arena.tweens.timeScale).toBe(5);
+    arena["setSpellTime"](true);
+    expect(arena.time.timeScale).toBe(5 * INCANTATION.timeScale);
+    arena["setSpellTime"](false);
+    expect(arena.time.timeScale).toBe(5);
+    arena["onDevKey"](event);
+    expect(arena["devSpeed"]).toBe(1);
+    expect(arena.time.timeScale).toBe(1);
+  });
+  it("does not toggle speed when paused, disabled, or a key repeats", () => {
+    const arena = setup();
+    const event = { code: "KeyT", key: "t", preventDefault: vi.fn() } as unknown as KeyboardEvent;
+    arena["paused"] = true;
+    arena["onDevKey"](event);
+    arena["paused"] = false;
+    arena["onDevKey"]({ ...event, repeat: true });
+    arena["devMode"] = false;
+    arena["onDevKey"](event);
+    expect(arena["devSpeed"]).toBe(1);
+  });
+});
 
 afterEach(() => {
   state.spellCastingActive = false;

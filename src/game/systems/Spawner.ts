@@ -1,4 +1,5 @@
-import { ARENA, DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
+import { DIFFICULTY, GAME, waveSpec, type Difficulty } from "../../config";
+import { makeSpawnAnglePicker } from "./spawnGeometry";
 import type { AslLetter } from "../../asl/hand";
 import { isMath, mathAnswer, SYMBOLS, aslName, type CastName } from "../../input/events";
 
@@ -21,17 +22,7 @@ export function aslPool(wave: number): CastName[] {
   return ASL_WAVES.slice(0, Math.max(1, wave)).flat().map(aslName);
 }
 
-/** Point just outside the arena along a ray from the center. */
-export function edgePoint(angle: number, margin = 50) {
-  const cx = ARENA.width / 2;
-  const cy = ARENA.height / 2;
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  const tx = Math.abs(dx) > 1e-6 ? (cx + margin) / Math.abs(dx) : Infinity;
-  const ty = Math.abs(dy) > 1e-6 ? (cy + margin) / Math.abs(dy) : Infinity;
-  const t = Math.min(tx, ty);
-  return { x: cx + dx * t, y: cy + dy * t };
-}
+export { edgePoint } from "./spawnGeometry";
 
 export type SpawnOrder = { angle: number; symbols: CastName[]; labels?: string[]; speed: number; palette: number; boss?: boolean };
 
@@ -42,6 +33,7 @@ export type CardSource = {
 };
 
 export class Spawner {
+  private pickAngle = makeSpawnAnglePicker();
   wave = 0;
   /** How far into the current subject's own lessons this wave is (same as the wave with one subject). */
   level = 0;
@@ -115,7 +107,7 @@ export class Spawner {
       symbols.push(s);
     }
     return {
-      angle: this.rand() * Math.PI * 2,
+      angle: this.pickAngle(this.rand),
       symbols,
       speed: this.spec.speed * this.speedScale * (0.9 + this.rand() * 0.2),
       palette: Math.floor(this.rand() * 3),
@@ -135,7 +127,7 @@ export class Spawner {
       labels.push(card.label);
     }
     return {
-      angle: this.rand() * Math.PI * 2,
+      angle: this.pickAngle(this.rand),
       symbols,
       labels,
       speed: this.spec.speed * this.speedScale * (0.9 + this.rand() * 0.2),

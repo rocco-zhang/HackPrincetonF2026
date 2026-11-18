@@ -186,9 +186,10 @@ export class Player extends Phaser.GameObjects.Container {
     });
   }
 
-  castPulse(color: number) {
-    const ring = this.scene.add.circle(this.x, this.y, 40).setStrokeStyle(5, color, 1).setDepth(401);
-    this.scene.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 380, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
+  castPulse(color: number, hits = 1) {
+    const tier = Math.max(0, Math.min(5, hits) - 1);
+    const ring = this.scene.add.circle(this.x, this.y, 40 + tier * 6).setStrokeStyle(5 + tier * 2, color, 1).setDepth(401);
+    this.scene.tweens.add({ targets: ring, scale: 2.4 + tier * 0.3, alpha: 0, duration: 380 + tier * 40, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
     this.scene.tweens.add({ targets: this.core, scaleX: 1.12, scaleY: 1.12, duration: 90, yoyo: true });
   }
 

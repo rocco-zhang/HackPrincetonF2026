@@ -4,9 +4,11 @@ import { bestKey, cleanSubjects, subjectsLabel, type Subject } from "../subjects
 import { ACCENT_CSS, FONT, INK_CSS, MUTED_CSS, ORANGE_CSS, TITLE_FONT } from "../palette";
 import { sfx } from "../sfx";
 import { HoldToStart } from "../systems/HoldToStart";
+import { Menu } from "../systems/Menu";
 
 export class GameOver extends Phaser.Scene {
   private hold!: HoldToStart;
+  private menu!: Menu;
 
   constructor() {
     super("GameOver");
@@ -15,6 +17,11 @@ export class GameOver extends Phaser.Scene {
   create(data: { score: number; wave: number; demo?: boolean; subjects?: Subject[]; difficulty?: Difficulty; versus?: { won: boolean; note?: string; theirScore: number } }) {
     const W = ARENA.width, H = ARENA.height;
     this.add.image(W / 2, H / 2, "floor");
+    this.hold = undefined!;
+    this.menu = new Menu(this);
+    const exit = () => this.scene.start(data.versus ? "Duel" : data.demo ? "Title" : "Classic");
+    const exitX = W / 2, exitY = 625, exitW = 220, exitH = 56;
+    this.menu.add({ x: exitX, y: exitY, w: exitW, h: exitH, label: "Exit", fontSize: 28, onClick: exit });
     // a best score per subject selection and difficulty
     const diff = data.difficulty ?? "medium";
     const subjects = cleanSubjects(data.subjects);
@@ -55,11 +62,11 @@ export class GameOver extends Phaser.Scene {
       .setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.55, duration: 800, yoyo: true, repeat: -1 });
     this.add.text(W / 2, H - 28, data.versus ? "Esc: back to Duel" : "Esc: change difficulty or subjects", { fontFamily: FONT, fontSize: "15px", color: MUTED_CSS }).setOrigin(0.5);
-    this.input.keyboard?.on("keydown-ESC", () => this.scene.start(data.versus ? "Duel" : data.demo ? "Title" : "Classic"));
+    this.input.keyboard?.on("keydown-ESC", exit);
 
     // short delay so a stroke that was in progress at game over doesn't restart instantly
     this.time.delayedCall(700, () => {
-      this.hold = new HoldToStart(this, 600, null, () => {
+      this.hold = new HoldToStart(this, 600, (x, y) => Math.abs(x - exitX) <= exitW / 2 + 6 && Math.abs(y - exitY) <= exitH / 2 + 6, () => {
         sfx.start();
         // versus: back to the Duel screen, where both players ready up for a rematch
         if (data.versus) this.scene.start("Duel");
@@ -69,6 +76,7 @@ export class GameOver extends Phaser.Scene {
   }
 
   update() {
+    this.menu?.update();
     this.hold?.update();
   }
 }

@@ -24,6 +24,8 @@ describe("arithmetic waves", () => {
     expect(mathQueue(1)).toBe(1);
     expect(mathQueue(6)).toBe(2);
     expect(mathQueue(8)).toBe(3);
+    expect(mathQueue(9)).toBe(4);
+    expect(mathQueue(100)).toBe(4);
   });
 
   it("asks questions whose written problem equals the answer", () => {

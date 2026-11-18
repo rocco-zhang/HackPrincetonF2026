@@ -2,6 +2,15 @@
 
 export const ARENA = { width: 1280, height: 720 } as const;
 
+export const SPAWN = {
+  margin: 50,
+  bottomWeight: 1.5, // bottom-half directions relative to mirrored top-half directions
+  hudTop: 90,
+  cardClearance: 100, // cards sit above the monster; wait until they clear the HUD
+  hudBottom: 36,
+  directionBins: 720,
+};
+
 export const INPUT = {
   // Optional world-space depth veto; user-editable pinch settings live in config/pinch.defaults.json.
   pinch3dMax: 0.5,
@@ -120,6 +129,6 @@ export function waveSpec(n: number, difficulty: Difficulty = "medium") {
     count: Math.max(3, Math.round((4 + 2 * n) * d.countMult)),
     speed: Math.min(d.maxSpeed, (GAME.baseSpeed + GAME.speedPerWave * (n - 1)) * d.speedMult),
     interval: Math.max(d.intervalFloor, (GAME.spawnIntervalStart - GAME.spawnIntervalPerWave * (n - 1)) * d.intervalMult),
-    maxQueue: q >= 5 ? 3 : q >= 3 ? 2 : 1,
+    maxQueue: q >= 7 ? 4 : q >= 5 ? 3 : q >= 3 ? 2 : 1,
   };
 }

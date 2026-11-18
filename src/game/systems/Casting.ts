@@ -152,7 +152,6 @@ export class Casting {
     }
     sfx.symbol(name);
     const { player } = this.host;
-    player.castPulse(color);
 
     const targets = this.host.monsters.filter(
       // Matching monsters can be hit immediately, including in the spawn margin.
@@ -164,6 +163,7 @@ export class Casting {
     }
     this.host.onCast(name, targets);
     const multi = targets.length;
+    player.castPulse(color, multi);
     // it hit something: the figure writes what was drawn in the air (nothing to write for a signed letter)
     const drawn = [...new Set([...this.finished, ...(trail && performance.now() - trail.at < 1000 ? [trail] : [])])];
     this.finished = [];

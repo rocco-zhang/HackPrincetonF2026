@@ -4,13 +4,30 @@ import { startCamera, video, listCameras, applyMirror } from "./camera";
 import { onInput, SYMBOLS, type Pt, type InputEvent } from "./events";
 import { cancelHandStroke, initHandTracker, pinchDiagnostics, observationListeners, inferenceMs, processObservation, setReplaying, replaying } from "./handTracker";
 import { calibrationRatio, calibratePinch, experiment, type Observation } from "./pinchExperiment";
-import { recognizer } from "./castPipeline";
+import { exportTemplates, localTemplateCount, recognizer } from "./castPipeline";
+import { typingInInput } from "../game/devControls";
 import { pinchDefaults } from "./pinchConfig";
 import { missingHandTail } from "./pinchReplay";
 import { measureLine, type LineMetrics } from "./recognizer";
 import "./pinchLab.css";
 
 export function initPinchLab() {
+  state.recorder.active = false;
+  window.addEventListener("keydown", (ev) => {
+    if (ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey || typingInInput()) return;
+    const key = ev.key.toLowerCase();
+    if (key === "t") {
+      ev.preventDefault();
+      state.recorder.active = !state.recorder.active;
+    } else if (state.recorder.active && /^[1-6]$/.test(key)) {
+      ev.preventDefault();
+      state.recorder.symbol = SYMBOLS[Number(key) - 1];
+    } else if (key === "e") {
+      ev.preventDefault();
+      exportTemplates();
+    }
+  });
+  window.addEventListener("pagehide", () => { state.recorder.active = false; });
   document.body.classList.add("pinch-lab");
   state.spellGesturesEnabled=true;
   state.spellCastingActive=false;
@@ -73,6 +90,9 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
       <button id="lab-clear">Clear results</button>
       <p id="lab-message" role="status">Starting camera automatically. Allow camera access when prompted.</p>
     </aside><main>
+      <h2>Shape template trainer</h2>
+      <p>T: start / stop recording · 1–6: choose shape · E: export templates.json. Records stroke coordinates, not video. Separate from landmark recording.</p>
+      <p id="lab-template-status" role="status">Template recording off</p>
       <h2>Camera &amp; drawing surface</h2>
       <canvas id="lab-camera-view" width="640" height="480" aria-label="Live camera with hand skeleton and drawing area"></canvas>
       <p id="lab-preview-status">Starting camera and hand tracking...</p>
@@ -299,7 +319,11 @@ Open: not sampled</pre><p id="lab-calibration-result" role="status">Using defaul
   el("cancel").onclick=()=>{stopReplay();message("Replay stopped. Live input resumed if camera is enabled.");};
   el("clear").onclick=reset;
   const line=(pts:Pt[],color:string)=>{if(!pts.length)return;ctx.strokeStyle=color;ctx.lineWidth=5;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();};
-  function draw(){const {engine:pinchEngine,hand}=pinchDiagnostics();requestAnimationFrame(draw);ctx.clearRect(0,0,1280,720);line(completed,"#a7b9b3");line(current,"#cf3976");
+  function draw(){
+    el("template-status").textContent = state.recorder.active
+      ? `Recording ${state.recorder.symbol} (${localTemplateCount(state.recorder.symbol)} local examples). T to stop; E to export.`
+      : "Template recording off. T to start; E to export.";
+const {engine:pinchEngine,hand}=pinchDiagnostics();requestAnimationFrame(draw);ctx.clearRect(0,0,1280,720);line(completed,"#a7b9b3");line(current,"#cf3976");
     el<HTMLAnchorElement>("game").href=`/?buffered=${experiment.buffered}&anchor=${experiment.anchor}&release=${experiment.releaseMs}&on=${experiment.on}&off=${experiment.off}&drawbox=wide&timing=${experiment.timing}&begin=${experiment.timing==="frames"?experiment.startFrames:experiment.startMs}&end=${experiment.timing==="frames"?experiment.endFrames:experiment.releaseMs}&calibrated=${experiment.calibrated}&speedAssist=${experiment.speedAssist}&speedRange=${experiment.speedAssistRange}&depthVeto=${experiment.depthVeto}&use3d=${experiment.use3d}&recognitionThreshold=${experiment.recognitionThreshold}&wantedRecognitionThreshold=${experiment.wantedRecognitionThreshold}&minStrokeLengthEnabled=${experiment.minStrokeLengthEnabled}&minStrokePointsEnabled=${experiment.minStrokePointsEnabled}&thumbUpThreshold=${experiment.thumbUpThreshold}&thumbUpHoldMs=${experiment.thumbUpHoldMs}&hysteresisGap=${experiment.hysteresisGap}&lineStraightness=${experiment.lineStraightness}&lineThinness=${experiment.lineThinness}&lineAngleTolerance=${experiment.lineAngleTolerance}&lineAngleToleranceWanted=${experiment.lineAngleToleranceWanted}`;
     if(cursor){ctx.fillStyle=state.inking?"#cf3976":"#257c81";ctx.beginPath();ctx.arc(cursor.x,cursor.y,9,0,Math.PI*2);ctx.fill();}
     const v=video(), liveVideo=state.cameraOn && v.readyState>=2 && !replaying;

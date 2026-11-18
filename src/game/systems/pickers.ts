@@ -1,5 +1,6 @@
 // The difficulty and subject pickers shared by the Classic and Duel setup screens.
 import Phaser from "phaser";
+import { devControlsEnabled } from "../devControls";
 import { DIFFICULTIES, DIFFICULTY, type Difficulty } from "../../config";
 import { pvp } from "../../net/pvp";
 import { saveDifficulty, saveLoadout, saveSubjects, state } from "../../state";
@@ -64,7 +65,7 @@ export function subjectChips(menu: Menu, cx: number, y: number, w: number, h: nu
 }
 
 /** ASL reads handshapes, so it can't be played with the mouse. */
-export const cameraNeeded = () => state.subjects.includes("asl") && state.mode !== "hand";
+export const cameraNeeded = () => !devControlsEnabled() && state.subjects.includes("asl") && state.mode !== "hand";
 
 /**
  * The spell deck: every spell as a card, two of them picked to bring into a round. Picking a

@@ -8,13 +8,20 @@ import type { Subject } from "./subjects";
 
 /** A boss comes with every wave that is a multiple of this. */
 export const BOSS_EVERY = 3;
-export const isBossWave = (wave: number) => wave > 0 && wave % BOSS_EVERY === 0;
+export const isBossWave = (wave: number) => wave > 0 && (wave > 25 || wave % BOSS_EVERY === 0);
 
 export const BOSS = {
   scale: 1.8,
-  speed: 0.42, // of an ordinary monster's speed that wave
+  maxCards: 10,
+  speedBoostPerWave: 0.08,
+  maxSpeedBoost: 2.5,
   scoreMult: 4,
 };
+
+/** Applied on top of the normal wave/subject speed and 1/sqrt(initial health). */
+export function bossSpeedBoost(wave: number) {
+  return Math.min(BOSS.maxSpeedBoost, 1 + Math.max(0, wave - BOSS_EVERY) * BOSS.speedBoostPerWave);
+}
 
 export type BossCards = { symbols: CastName[]; labels?: string[]; title: string };
 
@@ -75,7 +82,7 @@ export function bossCards(subject: Subject, level: number, rand: () => number): 
     return { symbols: problems.map((p) => p.name), labels: problems.map((p) => p.prompt), title: "Four problems in a row" };
   }
   if (subject === "shapes") {
-    const n = Math.min(8, 5 + Math.floor(level / 2));
+    const n = Math.min(BOSS.maxCards, 5 + Math.floor(level / 2));
     const symbols: CastName[] = [];
     while (symbols.length < n) {
       const s = pick(SYMBOLS, rand);

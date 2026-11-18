@@ -62,10 +62,10 @@ export class Fx {
     });
   }
 
-  banner(text: string, color = INK_CSS, sub?: string, hold = 900) {
+  banner(text: string, color = INK_CSS, sub?: string, hold = 900, size = 84) {
     const { width: W, height: H } = ARENA; // the game world, not the canvas (which has more pixels on Retina screens)
     const t = this.scene.add
-      .text(W / 2, H / 2 - 120, text, { fontFamily: TITLE_FONT, fontSize: "84px", color, stroke: "#f9f5ea", strokeThickness: 14 })
+      .text(W / 2, H / 2 - 120, text, { fontFamily: TITLE_FONT, fontSize: `${size}px`, color, stroke: "#f9f5ea", strokeThickness: 14 })
       .setOrigin(0.5)
       .setDepth(980)
       .setScale(0.4)

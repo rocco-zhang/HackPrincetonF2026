@@ -1,11 +1,12 @@
 import Phaser from "phaser";
 import { actions } from "./actions";
 import { ARENA } from "./config";
+import { devControlsEnabled } from "./game/devControls";
 import { renderDensity } from "./density";
 import { applyMirror, listCameras, nextCamera, startCamera } from "./input/camera";
-import { exportTemplates, initCastPipeline, toast } from "./input/castPipeline";
+import { initCastPipeline, toast } from "./input/castPipeline";
 import { initDebugOverlay } from "./input/debugOverlay";
-import { bus, emit, SYMBOLS } from "./input/events";
+import { bus, emit } from "./input/events";
 import { loadAslExamples } from "./asl/examples";
 import { aslClassifier, initHandTracker, startCalibration } from "./input/handTracker";
 import { initMouseAdapter } from "./input/mouseAdapter";
@@ -237,12 +238,12 @@ enableBtn.addEventListener("click", async () => {
 enableBtn.disabled = false;
 gateMsg.textContent = "";
 void fontsReady.then(startGame);
-if (!new URLSearchParams(location.search).has("mouse")) {
+if (!new URLSearchParams(location.search).has("mouse") && !devControlsEnabled()) {
   void initHandTracker().catch(err => console.warn("Hand tracking preload failed; will retry on enable", err));
 }
 
 // Testing without a camera: with ?mouse in the URL the mouse plays the whole game.
-if (new URLSearchParams(location.search).has("mouse")) {
+if (new URLSearchParams(location.search).has("mouse") || devControlsEnabled()) {
   state.mode = "mouse";
   void closeGate();
   // no button was clicked, so sound has to wait for the first click or key press
@@ -283,13 +284,6 @@ window.addEventListener("keydown", (ev) => {
   const k = ev.key.toLowerCase();
   if (k === "d") actions.toggleDebug();
   else if (k === "n") actions.toggleSound();
-  else if (k === "t") {
-    state.recorder.active = !state.recorder.active;
-    toast(state.recorder.active ? `Recording templates: draw "${state.recorder.symbol}" (1-6 to switch)` : "Template recording off");
-  } else if (state.recorder.active && /^[1-6]$/.test(k)) {
-    state.recorder.symbol = SYMBOLS[Number(k) - 1];
-    toast(`Recording "${state.recorder.symbol}"`);
-  } else if (state.recorder.active && k === "e") exportTemplates();
   else if (k === "f") actions.toggleMirror();
   else if (k === "c" && !game?.scene.isActive("Title")) void actions.nextCamera(); // on the title screen C opens Classic
   else if (k === "k") void actions.calibrate();
