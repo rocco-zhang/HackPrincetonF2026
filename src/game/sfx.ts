@@ -37,7 +37,7 @@ function applyAudio() {
   if (!music) return;
   music.volume = audio.musicVol * MUSIC_GAIN;
   music.playbackRate = musicRate;
-  const play = audio.musicOn && audio.musicVol > 0;
+  const play = !document.hidden && audio.musicOn && audio.musicVol > 0;
   if (play && music.paused) void music.play().catch(() => {}); // refused until the first click or key press
   else if (!play && !music.paused) music.pause();
 }
@@ -57,6 +57,8 @@ export function unlockAudio() {
     music = new Audio(MUSIC_URL);
     music.loop = true;
     music.preload = "auto";
+    // Pause in background tabs or with the screen locked; resume at the same position.
+    document.addEventListener("visibilitychange", applyAudio);
   }
   if (!ctx) {
     ctx = new AudioContext();
