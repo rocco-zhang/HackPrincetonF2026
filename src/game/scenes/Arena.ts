@@ -21,7 +21,7 @@ import { Menu } from "../systems/Menu";
 import { hintFor, langCast, langWaveBlurb, nextMarks, pickLang, scriptMarks, type Mark } from "../languages";
 import { cleanSubjects, isScript, SUBJECT_INFO, waveSubject, type Subject } from "../subjects";
 import { makeProblem, mathQueue, mathWaveBlurb } from "../math";
-import { BOSS, bossCards, bossSpeedBoost, isBossWave, type BossCards } from "../bosses";
+import { BOSS, bossCards, bossCount, bossSpeedBoost, isBossWave, type BossCards } from "../bosses";
 import { cleanLoadout, damageSpellTarget, spellMovementScale, wavePushDistance, MANA, SPELL_POWER, SPELLS, type Loadout, type SpellId } from "../spells";
 import { INCANTATION, SpellCasting, spellFailureCost, type SpellResult } from "../spellCasting";
 import { ASL_WAVES, aslPool, DEMO_SEED, edgePoint, Spawner, symbolPool, type SpawnOrder } from "../systems/Spawner";
@@ -63,6 +63,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   private shieldGfx: Phaser.GameObjects.Graphics | null = null;
   /** What this wave's boss will carry, on a boss wave. */
   private bossPlan: BossCards | null = null;
+  private bossesRemaining = 0;
   private languageStrokes: Pt[][] = [];
   private buffer = "";
   private answerHold = 0;
@@ -122,6 +123,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.mana = MANA.start;
     this.slowUntil = this.freezeUntil = this.shieldUntil = 0;
     this.bossPlan = null;
+    this.bossesRemaining = 0;
     this.versus = !!data?.pvp;
     this.demo = !!data?.demo && !this.versus;
     // the demo run is scripted for drawn shapes
@@ -313,7 +315,7 @@ export class Arena extends Phaser.Scene implements CastHost {
     if (!this.devMode || this.paused || this.phase === "over" || typingInInput() || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (ev.code === "KeyT") {
       ev.preventDefault();
-      this.devSpeed = this.devSpeed === 1 ? 5 : 1;
+      this.devSpeed = this.devSpeed === 1 ? 8 : 1;
       this.setSpellTime(!!this.incantation.active);
       this.updateDevBanner();
       return;
@@ -329,7 +331,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private updateDevBanner() {
-    this.devBanner?.setText(`DEV ${this.devSpeed}x · T: 1x / 5x · Click / Space: nearest card · 1 / 2: spells · Esc: pause`);
+    this.devBanner?.setText(`DEV ${this.devSpeed}x · T: 1x / 8x · Click / Space: nearest card · 1 / 2: spells · Esc: pause`);
   }
 
   private onPauseClick(x: number, y: number) {
@@ -427,7 +429,7 @@ export class Arena extends Phaser.Scene implements CastHost {
   }
 
   private gainMana(n: number) {
-    this.mana = Math.min(MANA.max, this.mana + n);
+    this.mana = Math.min(MANA.max, this.mana + n * (this.wave > 30 ? 0.5 : 1));
     this.hud.setMana(this.mana, MANA.max);
   }
 
@@ -499,15 +501,16 @@ export class Arena extends Phaser.Scene implements CastHost {
     this.hud.setWave(n);
     // every few waves a boss comes too; ASL words only use letters this difficulty has introduced
     const boss = isBossWave(n) && !this.demo;
+    this.bossesRemaining = boss ? bossCount(n) : 0;
     this.bossPlan = boss ? bossCards(this.subject, this.asl ? Spawner.poolWave(this.level, this.difficulty) : this.level, this.roll) : null;
-    this.fx.banner(boss ? `Wave ${n}: Boss!` : `Wave ${n}`, boss ? ACCENT_CSS : INK_CSS, this.bossPlan?.title ?? this.waveSubtitle(n), boss ? 1700 : 1200);
+    this.fx.banner(boss ? `Wave ${n}: ${this.bossesRemaining > 1 ? `${this.bossesRemaining} Bosses!` : "Boss!"}` : `Wave ${n}`, boss ? ACCENT_CSS : INK_CSS, this.bossPlan?.title ?? this.waveSubtitle(n), boss ? 1700 : 1200);
     sfx.wave();
     this.time.delayedCall(DIFFICULTY[this.difficulty].breather * 1000, () => {
       if (this.phase === "over" || this.wave !== n) return;
       if (this.demo && n === 1) this.scriptDemoOpening();
       this.phase = "play";
       state.spellGesturesEnabled=this.spells;
-      if (this.bossPlan) this.spawnBoss(this.bossPlan);
+      this.spawnNextBoss();
     });
   }
 
@@ -682,6 +685,19 @@ export class Arena extends Phaser.Scene implements CastHost {
     sfx.hurt();
   }
 
+  private spawnNextBoss() {
+    if (this.phase !== "play" || this.bossesRemaining <= 0) return;
+    const regularsCleared = this.spawner.done && !this.monsters.some(m => !m.boss && !m.dying);
+    if (!regularsCleared && this.monsters.some(m => m.boss)) return;
+    const count = regularsCleared ? this.bossesRemaining : 1;
+    for (let i = 0; i < count; i++) {
+      this.bossesRemaining--;
+      const cards = this.bossPlan ?? bossCards(this.subject, this.asl ? Spawner.poolWave(this.level, this.difficulty) : this.level, this.roll);
+      this.bossPlan = null;
+      this.spawnBoss(cards);
+    }
+  }
+
   update(_t: number, deltaMs: number) {
     this.pauseMenu?.update();
     if (this.paused) return;
@@ -721,7 +737,8 @@ export class Arena extends Phaser.Scene implements CastHost {
       if (this.hearts <= 0) return;
     }
 
-    if (this.phase === "play" && !this.incantation.active && this.spawner.done && this.monsters.length === 0) {
+    this.spawnNextBoss();
+    if (this.phase === "play" && !this.incantation.active && this.bossesRemaining === 0 && this.spawner.done && this.monsters.length === 0) {
       const bonus = Math.round(500 * this.wave * DIFFICULTY[this.difficulty].scoreMult);
       this.score += bonus;
       this.fx.floatText(px, py - 90, `wave clear +${bonus}`, ORANGE_CSS, 28);

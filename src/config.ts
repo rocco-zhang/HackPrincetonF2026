@@ -42,9 +42,7 @@ export const GAME = {
   monsterRadius: 30,
   contactDistance: 62,
   baseSpeed: 40,
-  speedPerWave: 6,
   spawnIntervalStart: 2.0,
-  spawnIntervalPerWave: 0.15,
   scorePerSymbol: 100,
   scorePerKill: 250,
   streakStep: 5, // casts per +0.5x streak multiplier
@@ -80,9 +78,9 @@ export const DIFFICULTY: Record<Difficulty, {
     blurb: "5 hearts · slower monsters · shorter symbol queues",
     hearts: 5,
     speedMult: 0.75,
-    maxSpeed: 70,
+    maxSpeed: 150,
     intervalMult: 1.35,
-    intervalFloor: 1.4,
+    intervalFloor: 0.35,
     countMult: 0.8,
     queueWaveShift: 2,
     poolWaveShift: 1,
@@ -95,9 +93,9 @@ export const DIFFICULTY: Record<Difficulty, {
     blurb: "3 hearts · the standard game",
     hearts: 3,
     speedMult: 1,
-    maxSpeed: 90,
+    maxSpeed: 195,
     intervalMult: 1,
-    intervalFloor: 0.9,
+    intervalFloor: 0.225,
     countMult: 1,
     queueWaveShift: 0,
     poolWaveShift: 0,
@@ -110,9 +108,9 @@ export const DIFFICULTY: Record<Difficulty, {
     blurb: "2 hearts · fast, crowded waves · long queues early",
     hearts: 2,
     speedMult: 1.3,
-    maxSpeed: 125,
+    maxSpeed: 225,
     intervalMult: 0.75,
-    intervalFloor: 0.6,
+    intervalFloor: 0.15,
     countMult: 1.3,
     queueWaveShift: -2,
     poolWaveShift: -1,
@@ -122,13 +120,31 @@ export const DIFFICULTY: Record<Difficulty, {
   },
 };
 
+/** Reach the previous limit at wave 20, then the new limit at wave 30. */
+export function waveRamp(wave: number, start: number, previous: number, limit: number, startWave = 1) {
+  if (wave <= 20) {
+    const progress = Math.max(0, (wave - startWave) / (20 - startWave));
+    return start + (previous - start) * progress;
+  }
+  if (wave >= 30) return limit;
+  return previous + (limit - previous) * ((wave - 20) / 10);
+}
+
 export function waveSpec(n: number, difficulty: Difficulty = "medium") {
   const d = DIFFICULTY[difficulty];
   const q = n - d.queueWaveShift; // the wave whose queue lengths this one uses
+  const interval = waveRamp(n, GAME.spawnIntervalStart * d.intervalMult, d.intervalFloor * 2, d.intervalFloor);
+  const firstCount = Math.max(3, Math.round(6 * d.countMult));
+  const previousCount = Math.round(44 * d.countMult);
+  // Keep the spawn window growing through wave 20, then steady as gaps shrink.
+  const spawnWindow = waveRamp(n,
+    (firstCount - 1) * GAME.spawnIntervalStart * d.intervalMult,
+    (previousCount - 1) * d.intervalFloor * 2,
+    (previousCount - 1) * d.intervalFloor * 2);
   return {
-    count: Math.max(3, Math.round((4 + 2 * n) * d.countMult)),
-    speed: Math.min(d.maxSpeed, (GAME.baseSpeed + GAME.speedPerWave * (n - 1)) * d.speedMult),
-    interval: Math.max(d.intervalFloor, (GAME.spawnIntervalStart - GAME.spawnIntervalPerWave * (n - 1)) * d.intervalMult),
+    count: 1 + Math.ceil(spawnWindow / interval - 1e-9),
+    speed: waveRamp(n, GAME.baseSpeed * d.speedMult, d.maxSpeed / 1.5, d.maxSpeed),
+    interval,
     maxQueue: q >= 7 ? 4 : q >= 5 ? 3 : q >= 3 ? 2 : 1,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { edgePoint, healthAdjustedSpeed, makeSpawnAnglePicker, spawnDirections } from "../src/game/systems/spawnGeometry";
 import { waveSpec } from "../src/config";
-import { bossSpeedBoost, isBossWave, bossCards } from "../src/game/bosses";
+import { bossSpeedBoost, isBossWave, bossCards, bossCount } from "../src/game/bosses";
 import { mulberry32 } from "../src/input/shapes";
 
 function edgeShares(size: { width: number; height: number }) {
@@ -45,12 +45,34 @@ describe("balanced spawning", () => {
     expect(waveSpec(7).maxQueue).toBe(4);
     expect(waveSpec(100).maxQueue).toBe(4);
   });
-  it("boosts boss speed separately, caps boss health at ten, and spawns every wave after 25", () => {
+  it("reaches previous limits at wave 20 and higher limits at wave 30", () => {
+    for (const [difficulty, speed, gap, count] of [["easy", 100, 0.7, 35], ["medium", 130, 0.45, 44], ["hard", 150, 0.3, 57]] as const) {
+      expect(waveSpec(19, difficulty).speed).toBeLessThan(speed);
+      expect(waveSpec(19, difficulty).interval).toBeGreaterThan(gap);
+      expect(waveSpec(20, difficulty).speed).toBeCloseTo(speed);
+      expect(waveSpec(20, difficulty).interval).toBeCloseTo(gap);
+      expect(waveSpec(20, difficulty).count).toBe(count);
+      expect(waveSpec(30, difficulty).speed).toBeCloseTo(speed * 1.5);
+      expect(waveSpec(30, difficulty).interval).toBeCloseTo(gap / 2);
+      expect(waveSpec(100, difficulty)).toEqual(waveSpec(30, difficulty));
+      const duration = (count - 1) * gap;
+      for (let wave = 21; wave <= 30; wave++) {
+        const spec = waveSpec(wave, difficulty);
+        const window = (spec.count - 1) * spec.interval;
+        expect(window).toBeGreaterThanOrEqual(duration - 1e-9);
+        expect(window).toBeLessThan(duration + spec.interval + 1e-9);
+      }
+    }
+    expect(waveSpec(30).count).toBe(87);
+  });
+  it("boosts boss speed separately, caps boss health at twelve, and increases boss frequency", () => {
     expect(bossSpeedBoost(3)).toBe(1);
-    expect(bossSpeedBoost(6)).toBeCloseTo(1.24);
-    expect(bossSpeedBoost(100)).toBe(2.5);
-    expect(bossCards("shapes", 100, mulberry32(5)).symbols).toHaveLength(10);
-    expect([24, 25, 26, 27, 28, 29].map(isBossWave)).toEqual([true, false, true, true, true, true]);
+    expect(bossSpeedBoost(20)).toBe(2.5);
+    expect(bossSpeedBoost(30)).toBe(3.75);
+    expect(bossSpeedBoost(100)).toBe(3.75);
+    expect(bossCards("shapes", 100, mulberry32(5)).symbols).toHaveLength(12);
+    expect([14, 15, 16, 17, 20, 21, 22].map(isBossWave)).toEqual([false, true, true, true, true, true, true]);
+    expect([0, 3, 14, 15, 16, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 32, 100].map(bossCount)).toEqual([0, 1, 0, 1, 1, 1, 2, 3, 3, 4, 4, 5, 6, 7, 7, 8, 8]);
   });
 });
 

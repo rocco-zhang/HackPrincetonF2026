@@ -1,6 +1,7 @@
 // Bosses: every few waves one big, slow monster arrives carrying a long row of cards.
 // For the language subjects and ASL the row is a real word.
 import type { AslLetter } from "../asl/hand";
+import { waveRamp } from "../config";
 import { aslName, SYMBOLS, type CastName } from "../input/events";
 import { langCast, taughtLabels, type Mark } from "./languages";
 import { makeProblem } from "./math";
@@ -8,19 +9,19 @@ import type { Subject } from "./subjects";
 
 /** A boss comes with every wave that is a multiple of this. */
 export const BOSS_EVERY = 3;
-export const isBossWave = (wave: number) => wave > 0 && (wave > 25 || wave % BOSS_EVERY === 0);
+export const bossCount = (wave: number) => wave > 20 ? Math.min(8, 2 + Math.floor((wave - 20) / 2)) : wave > 0 && (wave > 15 || wave % BOSS_EVERY === 0) ? 1 : 0;
+export const isBossWave = (wave: number) => bossCount(wave) > 0;
 
 export const BOSS = {
   scale: 1.8,
-  maxCards: 10,
-  speedBoostPerWave: 0.08,
-  maxSpeedBoost: 2.5,
+  maxCards: 12,
+  maxSpeedBoost: 3.75,
   scoreMult: 4,
 };
 
 /** Applied on top of the normal wave/subject speed and 1/sqrt(initial health). */
 export function bossSpeedBoost(wave: number) {
-  return Math.min(BOSS.maxSpeedBoost, 1 + Math.max(0, wave - BOSS_EVERY) * BOSS.speedBoostPerWave);
+  return waveRamp(wave, 1, 2.5, BOSS.maxSpeedBoost, BOSS_EVERY);
 }
 
 export type BossCards = { symbols: CastName[]; labels?: string[]; title: string };

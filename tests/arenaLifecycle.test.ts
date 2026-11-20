@@ -12,9 +12,65 @@ import type { StrokeName } from "../src/input/events";
 beforeAll(() => initCastPipeline());
 import { Arena } from "../src/game/scenes/Arena";
 import { INCANTATION } from "../src/game/spellCasting";
+import { MANA } from "../src/game/spells";
 import { spellRecipes } from "../src/game/spellCasting";
 import { state } from "../src/state";
 import { devControlsEnabled } from "../src/game/devControls";
+
+describe("sequential bosses", () => {
+  it("waits for the current boss to leave before spawning the next", () => {
+    const arena = new Arena();
+    arena["phase"] = "play";
+    arena["bossesRemaining"] = 2;
+    arena["bossPlan"] = { symbols: ["v"], title: "First boss" };
+    arena["subject"] = "shapes";
+    arena["level"] = 21;
+    arena["roll"] = mulberry32(5);
+    const monsters: { boss: boolean }[] = [];
+    Object.assign(arena, { monsters, spawner: { done: false } });
+    const spawn = vi.spyOn(arena as never as { spawnBoss: (cards: unknown) => void }, "spawnBoss")
+      .mockImplementation(() => { monsters.push({ boss: true }); });
+    arena["spawnNextBoss"]();
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(arena["bossesRemaining"]).toBe(1);
+    arena["spawnNextBoss"]();
+    expect(spawn).toHaveBeenCalledTimes(1);
+    monsters.length = 0;
+    arena["spawnNextBoss"]();
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(arena["bossesRemaining"]).toBe(0);
+    monsters.length = 0;
+    arena["spawnNextBoss"]();
+    expect(spawn).toHaveBeenCalledTimes(2);
+  });
+  it("spawns all pending bosses once the regular spawns are exhausted and cleared", () => {
+    const arena = new Arena();
+    const monsters = [{ boss: true, dying: false }, { boss: false, dying: false }];
+    Object.assign(arena, { phase: "play", bossesRemaining: 3, monsters,
+      spawner: { done: false }, subject: "shapes", level: 30, roll: mulberry32(5) });
+    const spawn = vi.spyOn(arena as never as { spawnBoss: (cards: unknown) => void }, "spawnBoss").mockImplementation(() => {});
+    arena["spawnNextBoss"]();
+    expect(spawn).not.toHaveBeenCalled();
+    Object.assign(arena, { spawner: { done: true } });
+    arena["spawnNextBoss"]();
+    expect(spawn).not.toHaveBeenCalled();
+    monsters.pop();
+    arena["spawnNextBoss"]();
+    expect(spawn).toHaveBeenCalledTimes(3);
+    expect(arena["bossesRemaining"]).toBe(0);
+  });
+  it("halves mana rewards only after wave 30 and still caps mana", () => {
+    const arena = new Arena();
+    Object.assign(arena, { wave: 30, mana: 0, hud: { setMana: vi.fn() } });
+    arena["gainMana"](10);
+    expect(arena["mana"]).toBe(10);
+    Object.assign(arena, { wave: 31 });
+    arena["gainMana"](10);
+    expect(arena["mana"]).toBe(15);
+    arena["gainMana"](10000);
+    expect(arena["mana"]).toBe(MANA.max);
+  });
+});
 
 describe("developer controls", () => {
   function setup() {
@@ -54,19 +110,19 @@ describe("developer controls", () => {
     arena["onDevKey"]({ ...event, repeat: true });
     expect(cast).toHaveBeenCalledTimes(1);
   });
-  it("toggles 5x timers and animations during wave banners and preserves spell slowdown", () => {
+  it("toggles 8x timers and animations during wave banners and preserves spell slowdown", () => {
     const arena = setup();
     arena["phase"] = "banner";
     Object.assign(arena, { time: { timeScale: 1 }, tweens: { timeScale: 1 } });
     const event = { code: "KeyT", key: "t", preventDefault: vi.fn() } as unknown as KeyboardEvent;
     arena["onDevKey"](event);
-    expect(arena["devSpeed"]).toBe(5);
-    expect(arena.time.timeScale).toBe(5);
-    expect(arena.tweens.timeScale).toBe(5);
+    expect(arena["devSpeed"]).toBe(8);
+    expect(arena.time.timeScale).toBe(8);
+    expect(arena.tweens.timeScale).toBe(8);
     arena["setSpellTime"](true);
-    expect(arena.time.timeScale).toBe(5 * INCANTATION.timeScale);
+    expect(arena.time.timeScale).toBe(8 * INCANTATION.timeScale);
     arena["setSpellTime"](false);
-    expect(arena.time.timeScale).toBe(5);
+    expect(arena.time.timeScale).toBe(8);
     arena["onDevKey"](event);
     expect(arena["devSpeed"]).toBe(1);
     expect(arena.time.timeScale).toBe(1);

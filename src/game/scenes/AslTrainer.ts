@@ -3,6 +3,7 @@ import { ARENA } from "../../config";
 import { aslExampleCount, clearAllAslExamples, lastSave, setAslExamples } from "../../asl/examples";
 import { ASL, ASL_CLASSES, type AslClass } from "../../asl/hand";
 import { state } from "../../state";
+import { Menu } from "../systems/Menu";
 import { ACCENT, ACCENT_CSS, FONT, HIGHLIGHTER, INK, INK_CSS, MUTED_CSS, TITLE_FONT } from "../palette";
 
 const COLS = 5;
@@ -17,6 +18,7 @@ const EVERY_NTH_FRAME = 3; // 30 examples over ~3 s, so small movements of the h
  * so they are still there after a restart.
  */
 export class AslTrainer extends Phaser.Scene {
+  private menu!: Menu;
   private sel = 0;
   private phase: "idle" | "ready" | "capture" = "idle";
   private phaseStart = 0;
@@ -46,6 +48,9 @@ export class AslTrainer extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => (state.aslTraining = false));
 
     this.add.image(W / 2, H / 2, "floor");
+    this.menu = new Menu(this);
+    const exit = () => this.scene.start("Panel", { kind: "settings" });
+    this.menu.add({ x: 100, y: 62, w: 140, h: 54, label: "Exit", fontSize: 24, onClick: exit });
     this.gfx = this.add.graphics();
     this.add.text(W / 2, 62, "Teach it your own hand", { fontFamily: TITLE_FONT, fontSize: "58px", color: INK_CSS }).setOrigin(0.5).setPadding(12);
     this.add
@@ -93,7 +98,7 @@ export class AslTrainer extends Phaser.Scene {
       if (ev.shiftKey) void clearAllAslExamples().then(() => (this.note = "Forgot all your examples. Every letter uses the built-in model again."));
       else void setAslExamples(this.cls, []).then(() => (this.note = `Forgot your ${this.label}. It uses the built-in model again.`));
     });
-    kb.on("keydown-ESC", () => this.scene.start("Panel", { kind: "settings" }));
+    kb.on("keydown-ESC", exit);
   }
 
   private get cls(): AslClass {
@@ -132,6 +137,7 @@ export class AslTrainer extends Phaser.Scene {
   }
 
   update() {
+    this.menu.update();
     const now = performance.now();
     const g = this.gfx;
     g.clear();
